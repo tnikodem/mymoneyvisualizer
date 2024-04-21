@@ -1,0 +1,34 @@
+.DS_Store
+.env
+*.pyc
+*.pyo
+*.log
+tmp/
+env/
+env*
+venv/
+venv*
+dist/
+build/
+*.egg
+*.egg-info/
+_mailinglist
+.tox/
+.cache/
+.pytest_cache/
+.idea/
+docs/_build/
+
+.vscode/
+
+# Coverage reports
+coverage/
+.coverage
+.coverage.*
+*,cover
+
+test_input.csv
+
+# config files
+config/
+mmv_backup*
