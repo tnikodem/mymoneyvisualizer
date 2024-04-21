@@ -24,8 +24,8 @@ jobs:
       uses: actions/setup-python@v3
       with:
         python-version: ${{ matrix.python-version }}
-    - name: Install libgl1
-      run: sudo apt-get install -y libgl1-mesa-glx      
+    - name: Install libegl1
+      run: sudo apt-get install -y libegl1
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
