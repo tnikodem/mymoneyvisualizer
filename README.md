@@ -7,11 +7,6 @@ Where did all my money go? Simple tool (100% offline) for visualizing your incom
 Installation
 ------------
 
-Checkout code:
- 
-    $ git clone git@gitlab.com:tnikodem/mymoneyvisualizer.git mymoneyvisualizer
-    $ cd mymoneyvisualizer
-    
 (Optional) Create and activate virtual environment:
 
     $ virtualenv -p python3 venv
