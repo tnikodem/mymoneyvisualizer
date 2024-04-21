@@ -34,5 +34,4 @@ jobs:
         
     - name: Test with pytest
       run: |
-        pytest 
-  # --exitfirst --cov=mymoneyvisualizer --cov-report term --cov-report html:coverage tests/
+        pytest --exitfirst --cov=mymoneyvisualizer --cov-report term --cov-report html:coverage tests/
