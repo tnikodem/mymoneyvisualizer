@@ -42,3 +42,6 @@ class Naming:
     is_saved = "is_saved"
 
     category = "category"
+    basic = "basic"
+    optional = "optional"
+    income = "income"

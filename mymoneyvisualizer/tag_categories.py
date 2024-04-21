@@ -20,10 +20,11 @@ class TagCategories(OrderedDataContainer):
         logger.debug("started taggers")
 
     def add(self, name, category):
-        new_tag_category = TagCategory(parent=self, name=name, category=category)
+        new_tag_category = TagCategory(
+            parent=self, name=name, category=category)
         logger.debug("added new tag catgegory: "+str(name))
         return super().add(name=name, obj=new_tag_category)
-    
+
     @staticmethod
     def match_orders(old_sorted_tag_names, new_sorted_tag_names):
         new_order = []
@@ -46,19 +47,14 @@ class TagCategories(OrderedDataContainer):
                 i_new += 1
         return new_order
 
-    
     def update_category_and_sort(self, new_sorted_tags):
-        print(new_sorted_tags)
         new_sorted_tag_names = []
         for category, tag_names in new_sorted_tags.items():
             new_sorted_tag_names += tag_names
             for name in tag_names:
                 tag_cat = self.get_by_name(name)
-                print(tag_cat)                
                 if tag_cat.category != category:
                     tag_cat.category = category
-                    print("###")
-                    
 
         old_sorted_tag_names = []
         for tag_cat in self:
@@ -75,7 +71,6 @@ class TagCategories(OrderedDataContainer):
         self.data_objects = new_data_objects
 
         self.save()
-
 
 
 class TagCategory:

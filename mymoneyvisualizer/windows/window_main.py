@@ -26,7 +26,6 @@ class WindowMain(QMainWindow):
         self.title = 'My Money Visualiser'
         self.left = 500
         self.top = 500
-        
         self.width = 320
         self.height = 200
         self.setWindowTitle(self.title)
@@ -44,10 +43,10 @@ class WindowMain(QMainWindow):
         self.graph_button.resize(250, 32)
         self.graph_button.move(40, 100)
 
-
         # # TODO optimize window imports. Which window must be initialised here, which can also in subwindows?
         # # Make sure you still have the overview which window is connected to which
-        self.addtrans_window = WindowAddTransaction(parent=self, config=self.config)
+        self.addtrans_window = WindowAddTransaction(
+            parent=self, config=self.config)
         self.tagger_window = WindowTagger(parent=self, config=self.config)
         self.importdata_window = WindowImportData(parent=self, config=self.config,
                                                   tagger_window=self.tagger_window)
@@ -65,7 +64,6 @@ class WindowMain(QMainWindow):
                                                      tagger_window=self.tagger_window)
         self.summary_window = WindowSummary(parent=self, config=self.config,
                                             detail_month_window=self.detail_month_window)
-        
         self.graph_window = WindowGraph(parent=self, config=self.config)
 
         # #actions
@@ -74,6 +72,6 @@ class WindowMain(QMainWindow):
         self.graph_button.clicked.connect(self.graph_window.show)
 
         logger.debug("starting main window finished")
-        #self.show()
+        self.show()
 
-        self.graph_window.show()
+        # self.graph_window.show()
