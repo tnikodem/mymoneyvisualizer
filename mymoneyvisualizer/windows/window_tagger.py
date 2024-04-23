@@ -5,6 +5,7 @@ from PyQt6.QtWidgets import QWidget, QMainWindow, QVBoxLayout, QLineEdit, QLabel
 from PyQt6.QtWidgets import QPushButton
 from PyQt6.QtWidgets import QTableWidget, QTableWidgetItem
 from PyQt6.QtWidgets import QAbstractItemView
+from PyQt6.QtWidgets import QHBoxLayout, QVBoxLayout
 from PyQt6.QtCore import Qt
 
 from mymoneyvisualizer.naming import Naming as nn
@@ -16,16 +17,18 @@ class MyTableWidgetMultiAccount(QWidget):
     def __init__(self, parent, main):
         super(QWidget, self).__init__(parent)
         self.main = main
-        self.columns = [nn.account, nn.date, nn.recipient, nn.description, nn.value, nn.tag]
+        self.columns = [nn.account, nn.date, nn.recipient,
+                        nn.description, nn.value, nn.tag]
         self.table_widget = QTableWidget()
-        self.table_widget.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.table_widget.setEditTriggers(
+            QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table_widget.setColumnCount(len(self.columns))
         self.table_widget.setHorizontalHeaderLabels(self.columns)
         self.table_widget.verticalHeader().setVisible(False)
         self.table_widget.setColumnWidth(0, 100)
         self.table_widget.setColumnWidth(1, 80)
-        self.table_widget.setColumnWidth(2, 180)
-        self.table_widget.setColumnWidth(3, 516)
+        self.table_widget.setColumnWidth(2, 480)
+        self.table_widget.setColumnWidth(3, 550)
         self.table_widget.setColumnWidth(4, 80)
         self.table_widget.setColumnWidth(5, 150)
         self.table_widget.verticalHeader().setDefaultSectionSize(60)
@@ -33,6 +36,14 @@ class MyTableWidgetMultiAccount(QWidget):
         self.layout = QVBoxLayout(self)
         self.layout.addWidget(self.table_widget)
         self.setLayout(self.layout)
+
+        self.main.resize_callbacks += [self.resize_window]
+
+    def resize_window(self, width):
+        additional_width = max(width - 1500, -200)
+        additional_width = int(additional_width/2)
+        self.table_widget.setColumnWidth(3, 480+additional_width)
+        self.table_widget.setColumnWidth(2, 550+additional_width)
 
     def update_table(self):
         df = self.main.get_filtered_df()
@@ -56,58 +67,60 @@ class MyTaggerWidget(QWidget):
         super(QWidget, self).__init__(parent)
         self.main = main
 
+        self.layout = QVBoxLayout(self)
+
+        layout_control_buttons = QHBoxLayout()
+
+        # Control buttons
         self.button_ok = QPushButton('OK', self)
-        self.button_ok.resize(250, 32)
-        self.button_ok.move(40, 0)
-        self.button_ok.clicked.connect(self.save)
-
-        self.button_update = QPushButton('Update', self)
-        self.button_update.resize(250, 32)
-        self.button_update.move(300, 0)
-        self.button_update.clicked.connect(self.update_widget)
-
+        self.button_ok.setFixedWidth(150)
+        layout_control_buttons.addWidget(self.button_ok)
         self.button_cancel = QPushButton('Cancel', self)
-        self.button_cancel.resize(250, 32)
-        self.button_cancel.move(560, 0)
+        self.button_cancel.setFixedWidth(150)
+        layout_control_buttons.addWidget(self.button_cancel)
+        layout_control_buttons.addStretch()
+        self.layout.addLayout(layout_control_buttons)
+
+        # Actions
+        self.button_ok.clicked.connect(self.save)
         self.button_cancel.clicked.connect(self.parent().close)
 
+        # Tagger definition
+        layout_tagger_definition = QHBoxLayout()
         # Create textbox "name"
-        self.name_label = QLabel(self)
-        self.name_label.setText('Name:')
-        self.name_label.move(20, 50)
+        self.name_label = QLabel("Name:", self)
+        layout_tagger_definition.addWidget(self.name_label)
         self.name_textbox = QLineEdit(self)
-        self.name_textbox.move(150, 50)
-        self.name_textbox.resize(200, 40)
-        # self.name_textbox.setReadOnly(True)
-
+        self.name_textbox.setFixedWidth(200)
+        layout_tagger_definition.addWidget(self.name_textbox)
         # Create textbox "regex recipient"
-        self.rec_regex_label = QLabel(self)
-        self.rec_regex_label.setText('Recipient Regex:')
-        self.rec_regex_label.move(20, 120)
-        self.rec_regex_textbox = QLineEdit(self)
-        self.rec_regex_textbox.move(150, 120)
-        self.rec_regex_textbox.resize(200, 40)
-
+        self.recipient_regex_label = QLabel("Recipient Regex:", self)
+        layout_tagger_definition.addWidget(self.recipient_regex_label)
+        self.recipient_regex_textbox = QLineEdit(self)
+        self.recipient_regex_textbox.setMinimumWidth(200)
+        layout_tagger_definition.addWidget(self.recipient_regex_textbox)
         # Create textbox "regex description"
-        self.des_regex_label = QLabel(self)
-        self.des_regex_label.setText('Description Regex:')
-        self.des_regex_label.move(600, 120)
-        self.des_regex_textbox = QLineEdit(self)
-        self.des_regex_textbox.move(750, 120)
-        self.des_regex_textbox.resize(200, 40)
+        self.description_regex_label = QLabel("Description Regex:", self)
+        layout_tagger_definition.addWidget(self.description_regex_label)
+        self.description_regex_textbox = QLineEdit(self)
+        self.description_regex_textbox.setMinimumWidth(200)
+        layout_tagger_definition.addWidget(self.description_regex_textbox)
+        # layout_tagger_definition.addStretch()
+        self.layout.addLayout(layout_tagger_definition)
 
-        # Create textbox "tag"
-        self.tag_label = QLabel(self)
-        self.tag_label.setText('Tag:')
-        self.tag_label.move(20, 200)
+        # Tag
+        layout_tag_definition = QHBoxLayout()
+        layout_tag_definition.addWidget(QLabel("Tag:    ", self))
         self.tag_textbox = QLineEdit(self)
-        self.tag_textbox.move(150, 200)
-        self.tag_textbox.resize(200, 40)
+        self.tag_textbox.setMaximumWidth(200)
+        layout_tag_definition.addWidget(self.tag_textbox)
+        layout_tag_definition.addStretch()
+        self.layout.addLayout(layout_tag_definition)
 
         # Create Table
-        self.table = MyTableWidgetMultiAccount(self, main=self.main)
-        self.table.resize(1200, 800)
-        self.table.move(0, 250)
+        self.multi_account_table = MyTableWidgetMultiAccount(
+            self, main=self.main)
+        self.layout.addWidget(self.multi_account_table)
 
     def open(self):
         logger.debug("open")
@@ -138,28 +151,47 @@ class MyTaggerWidget(QWidget):
         self.main.save_tagger()
 
 
-class WindowTagger(QMainWindow):
+class MyMainWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.resize_callbacks = []
+
+    def resizeEvent(self, event):
+        width = self.size().width()
+        for f in self.resize_callbacks:
+            f(width=width)
+        QMainWindow.resizeEvent(self, event)
+
+
+class WindowTagger(MyMainWindow):
     def __init__(self, parent, config):
-        super(WindowTagger, self).__init__(parent)
+        super().__init__()
+        # super(WindowTagger, self).__init__(parent)
         self.config = config
+        self.tagger = None
+
         self.left = 100
         self.top = 100
         self.width = 1500
-        self.height = 900
+        self.height = 400
         self.setGeometry(self.left, self.top, self.width, self.height)
 
+        layout = QVBoxLayout()
         self.tagger_widget = MyTaggerWidget(parent=self, main=self)
-        self.tagger_widget.resize(1400, 800)
-        self.tagger_widget.move(0, 30)
+        layout.addWidget(self.tagger_widget)
 
-        # properties
-        self.tagger = None
+        # Window
+        widget = QWidget()
+        widget.setLayout(layout)
+        self.setCentralWidget(widget)
 
     def open_or_create_tagger(self, tagger_name="", description="", recipient="", tag="", overwrite=False):
-        logger.debug(f"open or create {tagger_name}, {description}, {recipient}, {tag}, overwrite {overwrite}")
+        logger.debug(f"open or create {tagger_name}, {description}, {
+                     recipient}, {tag}, overwrite {overwrite}")
         if overwrite and self.tagger is not None:
             if self.tagger.name != tagger_name:
-                self.tagger.name = self.config.taggers.get_free_name(tagger_name)
+                self.tagger.name = self.config.taggers.get_free_name(
+                    tagger_name)
             self.tagger.regex_recipient = recipient
             self.tagger.regex_description = description
             self.tagger.tag = tag
