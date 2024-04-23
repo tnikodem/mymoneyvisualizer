@@ -27,11 +27,12 @@ class MyTableWidgetMultiAccount(QWidget):
         self.table_widget.verticalHeader().setVisible(False)
         self.table_widget.setColumnWidth(0, 100)
         self.table_widget.setColumnWidth(1, 80)
-        self.table_widget.setColumnWidth(2, 480)
-        self.table_widget.setColumnWidth(3, 550)
+        self.table_widget.setColumnWidth(2, 280)
+        self.table_widget.setColumnWidth(3, 735)
         self.table_widget.setColumnWidth(4, 80)
         self.table_widget.setColumnWidth(5, 150)
         self.table_widget.verticalHeader().setDefaultSectionSize(60)
+        self.table_widget.horizontalHeader().setStretchLastSection(True)
 
         self.layout = QVBoxLayout(self)
         self.layout.addWidget(self.table_widget)
@@ -42,8 +43,8 @@ class MyTableWidgetMultiAccount(QWidget):
     def resize_window(self, width):
         additional_width = max(width - 1500, -200)
         additional_width = int(additional_width/2)
-        self.table_widget.setColumnWidth(3, 480+additional_width)
-        self.table_widget.setColumnWidth(2, 550+additional_width)
+        self.table_widget.setColumnWidth(2, 280+additional_width)
+        self.table_widget.setColumnWidth(3, 735+additional_width)
 
     def update_table(self):
         df = self.main.get_filtered_df()
@@ -125,8 +126,9 @@ class MyTaggerWidget(QWidget):
     def open(self):
         logger.debug("open")
         self.name_textbox.setText(self.main.tagger.name)
-        self.rec_regex_textbox.setText(self.main.tagger.regex_recipient)
-        self.des_regex_textbox.setText(self.main.tagger.regex_description)
+        self.recipient_regex_textbox.setText(self.main.tagger.regex_recipient)
+        self.description_regex_textbox.setText(
+            self.main.tagger.regex_description)
         # TODO every time create a new autocompleter??!! make autocompleter nicer
         unique_tags = self.main.config.taggers.get_unique_tags()
         logger.debug(f"unique tags: {unique_tags}")
@@ -136,12 +138,12 @@ class MyTaggerWidget(QWidget):
         tag_completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
         self.tag_textbox.setCompleter(tag_completer)
 
-        self.table.update_table()
+        self.multi_account_table.update_table()
 
     def update_widget(self):
         self.main.open_or_create_tagger(tagger_name=self.name_textbox.text(),
-                                        description=self.des_regex_textbox.text(),
-                                        recipient=self.rec_regex_textbox.text(),
+                                        description=self.description_regex_textbox.text(),
+                                        recipient=self.recipient_regex_textbox.text(),
                                         tag=self.tag_textbox.text(),
                                         overwrite=True)
 
@@ -173,7 +175,7 @@ class WindowTagger(MyMainWindow):
         self.left = 100
         self.top = 100
         self.width = 1500
-        self.height = 400
+        self.height = 800
         self.setGeometry(self.left, self.top, self.width, self.height)
 
         layout = QVBoxLayout()
