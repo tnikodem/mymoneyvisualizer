@@ -156,8 +156,8 @@ class Account(object):
             self.db_filepath = filepath
 
         self.df.to_csv(self.db_filepath, index=False)
-        logger.debug(f"saved {self.name} to {
-                     self.db_filepath}, in total entries: {len(self.df)}")
+        logger.debug(f"saved {self.name} to"
+                     f"{self.db_filepath}, in total entries: {len(self.df)}")
 
     def save(self, parent=None):
         self.save_db()

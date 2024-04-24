@@ -331,8 +331,8 @@ class Importer:
             min_date = df[nn.date].min()
             if self.import_since is None or self.import_since < min_date:
                 self.import_since = df[nn.date].min()
-                logger.debug(f"Based on data set import_since to {
-                             self.import_since}")
+                logger.debug("Based on data set import_since to "
+                             f"{self.import_since}")
             else:
                 df = df[df[nn.date] >= self.import_since]
 
