@@ -184,8 +184,8 @@ class SingleAccountWidget(QWidget):
     def click_delete_entry(self):
         rows = sorted(set(index.row()
                       for index in self.table.table_widget.selectedIndexes()))
-        logger.debug(f"delete {len(rows)} entries for account {
-                     self.tab_index}")
+        logger.debug(
+            f"delete {len(rows)} entries for account {self.tab_index}")
         dates = []
         recs = []
         dess = []
@@ -296,8 +296,8 @@ class WindowAccounts(QMainWindow):
         if len(df_del) < 1:
             return
         if not force:
-            msg = f"Delete {
-                date} - {recipient} - {description}? \nAffected entries: {len(df_del)}\n{df_del.head()}"
+            msg = f"Delete {date} - {recipient} - {description}? \n" \
+                f"Affected entries: {len(df_del)}\n{df_del.head()}"
             reply = QMessageBox.question(
                 self, 'Message', msg, QMessageBox.Yes, QMessageBox.No)
             if reply != QMessageBox.Yes:

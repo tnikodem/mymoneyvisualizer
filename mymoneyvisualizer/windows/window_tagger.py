@@ -260,8 +260,8 @@ class WindowTagger(MyMainWindow):
         self.setCentralWidget(widget)
 
     def open_or_create_tagger(self, tagger_name="", description="", recipient="", tag="", transaction_id=None, overwrite=False):
-        logger.debug(f"open or create {tagger_name}, {description}, {
-                     recipient}, {tag}, {transaction_id}, overwrite {overwrite}")
+        logger.debug(
+            f"open or create {tagger_name}, {description}, {recipient}, {tag}, {transaction_id}, overwrite {overwrite}")
         if overwrite and self.tagger is not None:
             if self.tagger.name != tagger_name:
                 self.tagger.name = self.config.taggers.get_free_name(
