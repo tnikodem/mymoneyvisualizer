@@ -46,8 +46,8 @@ def test_add_single_tagger(tmp_path, qtbot, config, window_main_account_full, te
     qt_df_taggerviewview = qt_table_to_dataframe(taggeroverview_table)
     assert len(qt_df_taggerviewview) == 1
     sum1 = float(qt_df_taggerviewview["sum"].sum())
-    sum2 = float(test_input_df.query(f"{nn.recipient} == 'rec b' and {
-                 nn.description} == 'des 7'")[nn.value].sum())
+    sum2 = float(test_input_df.query(
+        f"{nn.recipient} == 'rec b' and {nn.description} == 'des 7'")[nn.value].sum())
     assert abs(sum1 - sum2) < 0.0001
     assert counter.counter == 1
 
