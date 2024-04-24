@@ -156,8 +156,8 @@ class Account(object):
             self.db_filepath = filepath
 
         self.df.to_csv(self.db_filepath, index=False)
-        logger.debug(f"saved {self.name} to"
-                     f"{self.db_filepath}, in total entries: {len(self.df)}")
+        logger.debug(
+            f"saved {self.name} to {self.db_filepath}, in total entries: {len(self.df)}")
 
     def save(self, parent=None):
         self.save_db()
@@ -166,8 +166,8 @@ class Account(object):
             if self.name not in self.parent:
                 self.parent.add(**self.to_dict())
             else:
-                logger.warning(f"account with {
-                               self.name} already added, skipping....")
+                logger.warning(
+                    "account with {self.name} already added, skipping....")
 
         if self.parent is not None:
             self.parent.save()
@@ -184,8 +184,8 @@ class Account(object):
             self.df = df
         self.df = self.df.sort_values(
             [nn.date], ascending=False).reset_index(drop=True)
-        logger.info(f"account {self.name} updated with {
-                    len(self.df)} new entries")
+        logger.info(
+            f"account {self.name} updated with {len(self.df)} new entries")
         self.save()
 
     def delete(self):
@@ -242,8 +242,6 @@ class Account(object):
         mask |= self.df[nn.description] != description
         self.df = self.df[mask]
         self.df = self.df.reset_index(drop=True)
-        logger.info(f"deleted {n_entries_before -
-                    len(self.df)} entries in {self.name}")
         self.save()
 
     def add_entry(self, date, recipient, description, value):
