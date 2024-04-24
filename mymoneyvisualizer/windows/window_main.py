@@ -73,5 +73,3 @@ class WindowMain(QMainWindow):
 
         logger.debug("starting main window finished")
         self.show()
-
-        # self.graph_window.show()

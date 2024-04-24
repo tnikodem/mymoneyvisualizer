@@ -47,7 +47,7 @@ def test_importers_determine_config(test_input_latin1):
     assert nn.skiprows in config
     assert imp.config[nn.skiprows] == config[nn.skiprows]
     assert set(imp.available_columns) == {nn.date + " fää", nn.recipient + " föö", nn.description + " foo",
-                                          nn.value + " foo", nn.tag, nn.tagger_name}
+                                          nn.value + " foo", nn.tag, nn.tagger_name, nn.transaction_id}
 
 
 def test_importers_load_latin1(test_input_df, test_input_latin1):
@@ -120,5 +120,3 @@ def test_importers_get_working(tmp_path, test_config, test_input_df, test_input_
     assert imp4.config[nn.encoding] == config[nn.encoding]
     assert imp4.config[nn.seperator] == config[nn.seperator]
     assert imp4.config[nn.skiprows] == config[nn.skiprows]
-
-

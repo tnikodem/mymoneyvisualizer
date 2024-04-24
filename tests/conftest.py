@@ -2,6 +2,7 @@ import pytest
 
 import datetime
 import pandas as pd
+import uuid
 
 from mymoneyvisualizer.naming import Naming as Nn
 
@@ -41,6 +42,7 @@ def test_input_df():
         Nn.tag: [""]*len(dates),
         Nn.tagger_name: [""]*len(dates)
     })
+    df[Nn.transaction_id] = df.apply(lambda x: str(uuid.uuid4()), axis=1)
     return df
 
 
@@ -65,7 +67,7 @@ def test_input_latin1(tmp_path, test_input_df):
         Nn.date: config[Nn.col_date],
         Nn.recipient: config[Nn.col_recipient],
         Nn.description: config[Nn.col_description],
-        Nn.value: config[Nn.col_value],})
+        Nn.value: config[Nn.col_value], })
 
     with open(filepath, mode='w', encoding=config[Nn.encoding]) as f:
         for i in range(config[Nn.skiprows]):

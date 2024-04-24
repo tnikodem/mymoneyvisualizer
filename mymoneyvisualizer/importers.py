@@ -3,6 +3,7 @@
 import logging
 import numpy as np
 import pandas as pd
+import uuid
 
 from mymoneyvisualizer.utils.datacontainer import OrderedDataContainer
 from mymoneyvisualizer.naming import Naming as nn
@@ -253,7 +254,8 @@ class Importer:
         self.config[nn.seperator] = config[nn.seperator]
 
         if nn.skiprows not in config:
-            config = self.determine_n_header_lines(config=config, filepath=filepath)
+            config = self.determine_n_header_lines(
+                config=config, filepath=filepath)
         self.config[nn.skiprows] = config[nn.skiprows]
 
         if nn.decimal not in config:
@@ -262,12 +264,14 @@ class Importer:
         self.config[nn.thousands] = config[nn.thousands]
 
         logger.debug(f"config determined: {config}")
-        self.available_columns = self.determine_available_columns(config=self.config, filepath=filepath)
+        self.available_columns = self.determine_available_columns(
+            config=self.config, filepath=filepath)
         logger.debug(f"available columns determined: {self.available_columns}")
 
     def load_df(self, filepath, account=None):
         logger.info("loading "+str(filepath))
-        self.available_columns = self.determine_available_columns(config=self.config, filepath=filepath)
+        self.available_columns = self.determine_available_columns(
+            config=self.config, filepath=filepath)
 
         # adjust config for read_csv method from pandas
         # if not parsing dates at the very first step bad things may happen?!
@@ -291,7 +295,8 @@ class Importer:
                     date_config["dayfirst"] = load_config["dayfirst"]
                 if "yearfirst" in load_config.keys():
                     date_config["yearfirst"] = load_config["yearfirst"]
-                df_load[self.col_date] = pd.to_datetime(df_load[self.col_date], **date_config)
+                df_load[self.col_date] = pd.to_datetime(
+                    df_load[self.col_date], **date_config)
         except ValueError as e:
             logger.error(f"Error in pd.read_csv(): {e}")
         if df_load is None:
@@ -301,35 +306,33 @@ class Importer:
         # postprocessing
         df_dict = {}
         if self.col_date in df_load.columns:
-
             df_dict[nn.date] = df_load[self.col_date]
-
         if self.col_recipient in df_load.columns:
             df_dict[nn.recipient] = df_load[self.col_recipient].fillna("")
-
         if self.col_description in df_load.columns:
             df_dict[nn.description] = df_load[self.col_description].fillna("")
-
         if self.col_value in df_load.columns:
             try:
                 df_dict[nn.value] = df_load[self.col_value].astype(float)
             except Exception as e:
                 logger.error(e)
                 df_dict[nn.value] = [np.nan] * len(df_load)
-                
+
         df = pd.DataFrame(df_dict)
         df[nn.tag] = ""
         df[nn.tagger_name] = ""
+        df[nn.transaction_id] = df.apply(lambda x: str(uuid.uuid4()), axis=1)
 
         if len(df) < 1:
             logger.debug("after postprocessing df empty")
             return df
-        
+
         if nn.date in df and isinstance(df[nn.date].values[0], np.datetime64):
             min_date = df[nn.date].min()
             if self.import_since is None or self.import_since < min_date:
                 self.import_since = df[nn.date].min()
-                logger.debug(f"Based on data set import_since to {self.import_since}")
+                logger.debug(f"Based on data set import_since to {
+                             self.import_since}")
             else:
                 df = df[df[nn.date] >= self.import_since]
 
@@ -342,19 +345,24 @@ class Importer:
         # if in insert multiple entries, add (1), (2), ... to description
         # first add (2), if there are really more than one, than replace (2) by (i)
         duplicate_columns = [nn.date, nn.recipient, nn.description]
-        df.loc[~df.index.isin(df.drop_duplicates().index), nn.description] += " (2)"
+        df.loc[~df.index.isin(df.drop_duplicates().index),
+               nn.description] += " (2)"
         i = 2
         while len(df.loc[~df.index.isin(df.drop_duplicates(subset=duplicate_columns).index), nn.description]) > 0:
             leni = len(str(i))
             i += 1
-            mask = ~df.index.isin(df.drop_duplicates(subset=duplicate_columns).index)
-            df.loc[mask, nn.description] = df.loc[mask, nn.description].str.slice(stop=-(3 + leni)) + f" ({i})"
+            mask = ~df.index.isin(df.drop_duplicates(
+                subset=duplicate_columns).index)
+            df.loc[mask, nn.description] = df.loc[mask,
+                                                  nn.description].str.slice(stop=-(3 + leni)) + f" ({i})"
 
         # drop entries which are already present in account
         if self.drop_duplicates and account is not None:
             logger.info("removing duplicates")
-            dfu = df.merge(account.df, on=duplicate_columns, how="left", indicator=True, suffixes=('', '_y'))
+            dfu = df.merge(account.df, on=duplicate_columns,
+                           how="left", indicator=True, suffixes=('', '_y'))
             dfu = dfu.query("_merge == 'left_only'").reset_index(drop=True)
-            df = dfu[[nn.date, nn.recipient, nn.description, nn.value]]
+            df = dfu[[nn.transaction_id, nn.date,
+                      nn.recipient, nn.description, nn.value]]
 
         return df

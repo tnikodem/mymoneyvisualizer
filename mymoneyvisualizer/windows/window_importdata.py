@@ -9,8 +9,7 @@ from PyQt6.QtWidgets import QPushButton
 from PyQt6.QtWidgets import QTableWidget, QTableWidgetItem
 from PyQt6.QtWidgets import QDateEdit
 from PyQt6.QtWidgets import QAbstractItemView
-
-from PyQt6.QtCore import Qt, QDate 
+from PyQt6.QtCore import Qt, QDate
 
 from mymoneyvisualizer.naming import Naming as Nn
 logger = logging.getLogger(__name__)
@@ -21,10 +20,12 @@ class MyTableWidget(QWidget):
         super(QWidget, self).__init__(parent)
         self.main = main
 
-        self.columns = [Nn.date, Nn.recipient, Nn.description, Nn.value, Nn.tag, Nn.tagger_name]
+        self.columns = [Nn.date, Nn.recipient,
+                        Nn.description, Nn.value, Nn.tag, Nn.tagger_name]
         self.table_widget = QTableWidget()
         self.table_widget.setSortingEnabled(True)
-        self.table_widget.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.table_widget.setEditTriggers(
+            QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table_widget.setColumnCount(len(self.columns))
         self.table_widget.setHorizontalHeaderLabels(self.columns)
         self.table_widget.setColumnWidth(0, 80)
@@ -38,16 +39,6 @@ class MyTableWidget(QWidget):
         self.layout = QVBoxLayout(self)
         self.layout.addWidget(self.table_widget)
         self.setLayout(self.layout)
-
-        # actions and callback
-        self.table_widget.doubleClicked.connect(self.open_or_create_new_tagger)
-
-    def open_or_create_new_tagger(self, item):
-        row = item.row()
-        rec = re.escape(self.table_widget.item(row, 1).text())
-        des = re.escape(self.table_widget.item(row, 2).text())
-        tagger_name = self.table_widget.item(row, 5).text()
-        self.main.open_tagger_window(tagger_name=tagger_name, recipient=rec, description=des)
 
     def update_table(self, df):
         if df is None or len(df) < 1:
@@ -242,7 +233,8 @@ class MyImportDataWidget(QWidget):
         self.checkbox_drop_duplicates.setChecked(importer.drop_duplicates)
 
         if importer.import_since is not None:
-            qt_date = QDate.fromString(importer.import_since.strftime("%d.%m.%Y"), 'dd.MM.yyyy')
+            qt_date = QDate.fromString(
+                importer.import_since.strftime("%d.%m.%Y"), 'dd.MM.yyyy')
             self.dateedit.setDate(qt_date)
 
 
@@ -276,9 +268,6 @@ class WindowImportData(QMainWindow):
         self.load_importer()
         self.show()
 
-    def open_tagger_window(self, tagger_name, recipient, description):
-        self.tagger_window.open_or_create_tagger(tagger_name=tagger_name, recipient=recipient, description=description)
-
     def save(self):
         if self.update_df is not None and len(self.update_df) > 0:
             self.close()
@@ -291,7 +280,8 @@ class WindowImportData(QMainWindow):
         if self.loading:
             return
         self.loading = True
-        self.importer = self.config.importers.get_working_importer(filepath=self.filepath, config=config)
+        self.importer = self.config.importers.get_working_importer(
+            filepath=self.filepath, config=config)
         account = self.config.accounts.get_by_name(self.account_name)
         self.update_df = self.importer.load_df(self.filepath, account)
         self.update_df = self.config.taggers.tag_df(self.update_df)

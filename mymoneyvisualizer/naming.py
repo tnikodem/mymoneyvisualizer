@@ -8,6 +8,7 @@ class Naming:
     recipient = "recipient"
     description = "description"
     value = "value"
+    transaction_id = "transaction_id"
 
     tagger_name = "tagger_name"
     regex_recipient = "regex_recipient"

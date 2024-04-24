@@ -4,6 +4,7 @@ import pathlib
 import logging
 import datetime
 import pandas as pd
+import uuid
 
 from mymoneyvisualizer.naming import Naming as nn
 from mymoneyvisualizer.utils.datacontainer import OrderedDataContainer
@@ -29,14 +30,16 @@ class Accounts(OrderedDataContainer):
             while name + str(i) in self:
                 i += 1
             name = name + str(i)
-            db_filepath = (self.config.dir_path + DEFAULT_DB_FILEPATH + name + ".csv").replace(" ", "_")
+            db_filepath = (self.config.dir_path +
+                           DEFAULT_DB_FILEPATH + name + ".csv").replace(" ", "_")
 
         if name in self:
             logger.warning(name + " already loaded, skipping....")
             return
 
         # create new account
-        new_acc = Account(parent=self, name=name, db_filepath=db_filepath, **kwargs)
+        new_acc = Account(parent=self, name=name,
+                          db_filepath=db_filepath, **kwargs)
         return super().add(name=name, obj=new_acc)
 
     def delete(self, name):
@@ -61,7 +64,8 @@ class Accounts(OrderedDataContainer):
             df_result = df_result.sort_values(nn.date)
             df_result = df_result.reset_index(drop=True)
         else:
-            columns = [nn.account, nn.date, nn.recipient, nn.description, nn.value, nn.tag, nn.tagger_name]
+            columns = [nn.account, nn.date, nn.recipient,
+                       nn.description, nn.value, nn.tag, nn.tagger_name]
             df_result = pd.DataFrame({f: [] for f in columns})
 
         logger.debug(f"result: {df_result.head()}")
@@ -104,10 +108,12 @@ class Account(object):
         self.parent = parent
         self.name = str(name)
         if db_filepath is None and self.parent is not None:
-            db_filepath = (self.parent.config.dir_path + DEFAULT_DB_FILEPATH + name + ".csv").replace(" ", "_")
+            db_filepath = (self.parent.config.dir_path +
+                           DEFAULT_DB_FILEPATH + name + ".csv").replace(" ", "_")
         self.db_filepath = db_filepath
         self.df = self.load()
-        logger.info("created account: " + self.name + " entries: " + str(len(self.df)))
+        logger.info("created account: " + self.name +
+                    " entries: " + str(len(self.df)))
 
     def __str__(self):
         return f"Account: {self.name}, DB: {self.db_filepath} ({len(self)})\n {self.df.head()}"
@@ -122,28 +128,36 @@ class Account(object):
         if self.db_filepath is not None and os.path.isfile(self.db_filepath):
             self.df = pd.read_csv(self.db_filepath)
             self.df[nn.date] = pd.to_datetime(self.df[nn.date])
-            self.df[nn.recipient] = self.df[nn.recipient].fillna("").astype(str)
-            self.df[nn.description] = self.df[nn.description].fillna("").astype(str)
+            self.df[nn.recipient] = self.df[nn.recipient].fillna(
+                "").astype(str)
+            self.df[nn.description] = self.df[nn.description].fillna(
+                "").astype(str)
             self.df[nn.tag] = self.df[nn.tag].fillna("").astype(str)
+            if nn.transaction_id not in self.df.columns:
+                self.df[nn.transaction_id] = self.df.apply(
+                    lambda x: str(uuid.uuid4()), axis=1)
         else:
-            self.df = pd.DataFrame({nn.date: [], nn.recipient: [], nn.description: [], nn.value: [], nn.tag: [],
+            self.df = pd.DataFrame({nn.transaction_id: [], nn.date: [], nn.recipient: [], nn.description: [], nn.value: [], nn.tag: [],
                                     nn.tagger_name: []})
         return self.df
 
     def save_db(self):
         # make sure folder exists
-        filepath = os.path.dirname(self.db_filepath) + "/" + self.name.replace(" ", "_") + ".csv"
+        filepath = os.path.dirname(self.db_filepath) + \
+            "/" + self.name.replace(" ", "_") + ".csv"
         dir_path = os.path.dirname(filepath)
         if not os.path.exists(dir_path):
             pathlib.Path(dir_path).mkdir(parents=True, exist_ok=True)
         # rename csv file according to account name
         if os.path.normpath(filepath) != os.path.normpath(self.db_filepath):
             if os.path.isfile(self.db_filepath):
-                os.rename(os.path.normpath(self.db_filepath), os.path.normpath(filepath))
+                os.rename(os.path.normpath(self.db_filepath),
+                          os.path.normpath(filepath))
             self.db_filepath = filepath
 
         self.df.to_csv(self.db_filepath, index=False)
-        logger.debug(f"saved {self.name} to {self.db_filepath}, in total entries: {len(self.df)}")
+        logger.debug(f"saved {self.name} to {
+                     self.db_filepath}, in total entries: {len(self.df)}")
 
     def save(self, parent=None):
         self.save_db()
@@ -152,7 +166,8 @@ class Account(object):
             if self.name not in self.parent:
                 self.parent.add(**self.to_dict())
             else:
-                logger.warning(f"account with {self.name} already added, skipping....")
+                logger.warning(f"account with {
+                               self.name} already added, skipping....")
 
         if self.parent is not None:
             self.parent.save()
@@ -167,8 +182,10 @@ class Account(object):
             self.df = pd.concat([self.df, df], sort=False)
         else:
             self.df = df
-        self.df = self.df.sort_values([nn.date], ascending=False).reset_index(drop=True)
-        logger.info(f"account {self.name} updated with {len(self.df)} new entries")
+        self.df = self.df.sort_values(
+            [nn.date], ascending=False).reset_index(drop=True)
+        logger.info(f"account {self.name} updated with {
+                    len(self.df)} new entries")
         self.save()
 
     def delete(self):
@@ -184,7 +201,10 @@ class Account(object):
         df = self.df.copy()
         df = tagger.tag_df(df)  # TODO need to tag again?! tagger_collision
         logger.debug(f"df tagged: \n {df.head()}")
-        return df.loc[df[nn.tagger_name] == tagger.name]
+        mask = df[nn.tagger_name] == tagger.name
+        if tagger.transaction_id is not None:
+            mask |= df[nn.transaction_id] == tagger.transaction_id
+        return df.loc[mask]
 
     def get_saldo(self):
         return self.df[nn.value].sum()
@@ -195,6 +215,7 @@ class Account(object):
         if abs(saldo - self.get_saldo()) < 0.1:
             return
         df_saldocor = pd.DataFrame({
+            nn.transaction_id: [str(uuid.uuid4())],
             nn.date: [datetime.datetime(1970, 1, 1)],
             nn.recipient: [""],
             nn.description: ["saldo correction"],
@@ -206,7 +227,8 @@ class Account(object):
             self.df = pd.concat([self.df, df_saldocor], sort=False)
         else:
             self.df = df_saldocor
-        self.df = self.df.sort_values([nn.date], ascending=False).reset_index(drop=True)
+        self.df = self.df.sort_values(
+            [nn.date], ascending=False).reset_index(drop=True)
         logger.info("corrected saldo")
 
     def get_entries(self, date, recipient, description):
@@ -220,17 +242,19 @@ class Account(object):
         mask |= self.df[nn.description] != description
         self.df = self.df[mask]
         self.df = self.df.reset_index(drop=True)
-        logger.info(f"deleted {n_entries_before - len(self.df)} entries in {self.name}")
+        logger.info(f"deleted {n_entries_before -
+                    len(self.df)} entries in {self.name}")
         self.save()
 
     def add_entry(self, date, recipient, description, value):
         newdf = pd.DataFrame({
+            nn.transaction_id: [str(uuid.uuid4())],
             nn.date: [date],
             nn.description: [str(description)],
             nn.recipient: [str(recipient)],
             nn.value: [value],
             nn.tag: [""],
-            nn.tagger_name: [""]            
+            nn.tagger_name: [""]
         })
         self.update(newdf)
 

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import logging
 
+import pandas as pd
 from mymoneyvisualizer.naming import Naming as nn
 from mymoneyvisualizer.utils.datacontainer import OrderedDataContainer
 
@@ -29,7 +30,8 @@ class Taggers(OrderedDataContainer):
         logger.debug("tagging df")
         if df is None or len(df) < 1:
             return df
-        df.loc[:, nn.tag] = " "  # FIXME an empty string is converted to NaT??!!
+        # FIXME an empty string is converted to NaT??!!
+        df.loc[:, nn.tag] = " "
         df.loc[:, nn.tagger_name] = ""
         for tagger in self.get():
             df = tagger.tag_df(df)
@@ -53,24 +55,26 @@ class Taggers(OrderedDataContainer):
             i += 1
         return f"{name}_{i}"
 
-    def get_or_create(self, name, regex_recipient, regex_description, tag):
+    def get_or_create(self, name, regex_recipient, regex_description, tag, transaction_id):
         logger.debug("get or create name: " + str(name))
         if name == "":
             name = self.get_free_name()
         tagger = self.get_by_name(name=name)
         if tagger is None:
             tagger = Tagger(parent=None, name=name, regex_recipient=regex_recipient, regex_description=regex_description,
-                            tag=tag)
+                            tag=tag, transaction_id=transaction_id)
+        tagger.transaction_id = transaction_id
         return tagger
 
 
 class Tagger:
-    def __init__(self, parent, name, regex_recipient, regex_description, tag):
+    def __init__(self, parent, name, regex_recipient, regex_description, tag, transaction_id=None):
         self.parent = parent
         self.name = name
         self.regex_recipient = regex_recipient
         self.regex_description = regex_description
         self.tag = tag
+        self.transaction_id = transaction_id
         logger.debug("created tagger: "+str(self))
 
     def __str__(self):
@@ -94,35 +98,35 @@ class Tagger:
         if self.parent is not None:
             self.parent.save()
 
-    def tag_df(self, df):
-        mask1 = None
-        mask2 = None
-
+    def mask_recipient(self, df):
+        mask = pd.Series(True, index=df.index)
         if self.regex_recipient != "":
             try:
-                mask1 = df[nn.recipient].str.contains(pat=self.regex_recipient, na=False, regex=True)
+                mask = df[nn.recipient].str.contains(
+                    pat=self.regex_recipient, na=False, regex=True)
             except Exception as e:
                 logger.error(f"could not handle: {self.regex_recipient}")
                 logger.error(e)
+                mask = None
+        return mask
 
+    def mask_description(self, df):
+        mask = pd.Series(True, index=df.index)
         if self.regex_description != "":
             try:
-                mask2 = df[nn.description].str.contains(pat=self.regex_description, na=False, regex=True)
+                mask = df[nn.description].str.contains(
+                    pat=self.regex_description, na=False, regex=True)
             except Exception as e:
                 logger.error(f"could not handle: {self.regex_description}")
                 logger.error(e)
+                mask = None
+        return mask
 
-        if mask1 is None and mask2 is None:
-            df.loc[:, nn.tag] = self.tag
-            df.loc[:, nn.tagger_name] = self.name
+    def tag_df(self, df):
+        mask = self.mask_recipient(df)
+        mask &= self.mask_description(df)
+        if mask is None:
             return df
-        
-        if mask1 is None:
-            mask = mask2
-        elif mask2 is None:
-            mask = mask1
-        else:
-            mask = mask1 & mask2
 
         df.loc[mask, nn.tag] = self.tag
         df.loc[mask, nn.tagger_name] = self.name

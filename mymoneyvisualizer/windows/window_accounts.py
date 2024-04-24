@@ -20,25 +20,27 @@ class MyTableWidget(QWidget):
     def __init__(self, parent, main):
         super(QWidget, self).__init__(parent)
         self.main = main
-
-
-        self.columns = [nn.date, nn.recipient, nn.description, nn.value, nn.tag, nn.tagger_name]
-
+        self.columns = [nn.transaction_id, nn.tagger_name,
+                        nn.date, nn.recipient,
+                        nn.description, nn.value, nn.tag]
         self.table_widget = QTableWidget()
         self.table_widget.setColumnCount(len(self.columns))
         self.table_widget.setHorizontalHeaderLabels(self.columns)
-        self.table_widget.setColumnWidth(0, 80)
-        self.table_widget.setColumnWidth(1, 300)
-        self.table_widget.setColumnWidth(2, 600)
-        self.table_widget.setColumnWidth(3, 150)
-        self.table_widget.setColumnWidth(4, 130)
-        self.table_widget.setColumnWidth(5, 0)
+        self.table_widget.setColumnHidden(0, True)
+        self.table_widget.setColumnHidden(1, True)
+        self.table_widget.setColumnWidth(2, 80)
+        self.table_widget.setColumnWidth(3, 300)
+        self.table_widget.setColumnWidth(4, 600)
+        self.table_widget.setColumnWidth(5, 150)
+        self.table_widget.setColumnWidth(6, 130)
+
         self.table_widget.verticalHeader().setDefaultSectionSize(60)
         self.table_widget.verticalHeader().setVisible(False)
 
         # FIXME not working correctly??! update after sorting is enabled
         # self.table_widget.setSortingEnabled(True)
-        self.table_widget.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.table_widget.setEditTriggers(
+            QAbstractItemView.EditTrigger.NoEditTriggers)
 
         self.layout = QVBoxLayout(self)
         self.layout.addWidget(self.table_widget)
@@ -64,14 +66,29 @@ class MyTableWidget(QWidget):
                 else:
                     item = QTableWidgetItem(str(row[col]))
                 self.table_widget.setItem(i, j, item)
+
         self.table_widget.setSortingEnabled(True)
+
+    def get_columns(self):
+        columns = dict()
+        for i in range(self.table_widget.horizontalHeader().count()):
+            columns[self.table_widget.horizontalHeaderItem(i).text()] = i
+        return columns
 
     def open_or_create_new_tagger(self, item):
         row = item.row()
-        rec = re.escape(self.table_widget.item(row, 1).text()).replace(r"\ ", " ")
-        des = re.escape(self.table_widget.item(row, 2).text()).replace(r"\ ", " ")
-        tagger_name = self.table_widget.item(row, 5).text()
-        self.main.open_tagger_window(tagger_name=tagger_name, recipient=rec, description=des)
+
+        columns = self.get_columns()
+        recipient = self.table_widget.item(row, columns[nn.recipient]).text()
+        description = self.table_widget.item(
+            row, columns[nn.description]).text()
+        tagger_name = self.table_widget.item(
+            row, columns[nn.tagger_name]).text()
+        transaction_id = self.table_widget.item(
+            row, columns[nn.transaction_id]).text()
+
+        self.main.open_tagger_window(
+            tagger_name=tagger_name, recipient=recipient, description=description, transaction_id=transaction_id)
 
 
 class SingleAccountWidget(QWidget):
@@ -165,8 +182,10 @@ class SingleAccountWidget(QWidget):
         self.main.open_add_entry_window(account_index=self.tab_index)
 
     def click_delete_entry(self):
-        rows = sorted(set(index.row() for index in self.table.table_widget.selectedIndexes()))
-        logger.debug(f"delete {len(rows)} entries for account {self.tab_index}")
+        rows = sorted(set(index.row()
+                      for index in self.table.table_widget.selectedIndexes()))
+        logger.debug(f"delete {len(rows)} entries for account {
+                     self.tab_index}")
         dates = []
         recs = []
         dess = []
@@ -176,7 +195,8 @@ class SingleAccountWidget(QWidget):
             dess += [self.table.table_widget.item(row, 2).text()]
         for date, rec, des in zip(dates, recs, dess):
             # value = self.table.table_widget.item(row, 3).text()
-            self.main.delete_entry(account_index=self.tab_index, date=date, recipient=rec, description=des)
+            self.main.delete_entry(
+                account_index=self.tab_index, date=date, recipient=rec, description=des)
 
 
 class AccountsWidget(QWidget):
@@ -256,9 +276,11 @@ class WindowAccounts(QMainWindow):
         new_account = self.config.accounts.add()
         self.tab_widget.add_tab(new_account)
 
-    def open_tagger_window(self, tagger_name, recipient, description):
-        self.tagger_window.open_or_create_tagger(tagger_name=tagger_name, recipient=recipient,
-                                                 description=description)
+    def open_tagger_window(self, tagger_name, recipient, description, transaction_id):
+        recipient_regex = re.escape(recipient).replace(r"\ ", " ")
+        description_regex = re.escape(description).replace(r"\ ", " ")
+        self.tagger_window.open_or_create_tagger(tagger_name=tagger_name, recipient=recipient_regex,
+                                                 description=description_regex, transaction_id=transaction_id)
 
     def open_tagger_overview_window(self):
         self.tagger_overview_window.open()
@@ -269,15 +291,19 @@ class WindowAccounts(QMainWindow):
 
     def delete_entry(self, account_index, date, recipient, description, force=False):
         account = self.get_account(account_index=account_index)
-        df_del = account.get_entries(date=date, recipient=recipient, description=description)
+        df_del = account.get_entries(
+            date=date, recipient=recipient, description=description)
         if len(df_del) < 1:
             return
         if not force:
-            msg = f"Delete {date} - {recipient} - {description}? \nAffected entries: {len(df_del)}\n{df_del.head()}"
-            reply = QMessageBox.question(self, 'Message', msg, QMessageBox.Yes, QMessageBox.No)
+            msg = f"Delete {
+                date} - {recipient} - {description}? \nAffected entries: {len(df_del)}\n{df_del.head()}"
+            reply = QMessageBox.question(
+                self, 'Message', msg, QMessageBox.Yes, QMessageBox.No)
             if reply != QMessageBox.Yes:
                 return
-        account.delete_entries(date=date, recipient=recipient, description=description)
+        account.delete_entries(
+            date=date, recipient=recipient, description=description)
 
     @staticmethod
     def open_file_dialog(parent):
@@ -291,7 +317,8 @@ class WindowAccounts(QMainWindow):
         filepath = self.open_file_dialog(parent=self)
         if filepath is None or len(filepath) < 1:
             return
-        self.importdata_window.open_new_data(filepath=filepath, account_name=account_name)
+        self.importdata_window.open_new_data(
+            filepath=filepath, account_name=account_name)
 
     def set_tab_text(self, index, text):
         self.tab_widget.tabs.setTabText(index, text)
@@ -303,10 +330,12 @@ class WindowAccounts(QMainWindow):
     def get_account(self, account_index):
         return self.config.accounts.get_by_index(account_index)
 
-    def save_project(self, param=False, filepath=None):  # added param to be compatible to PyQt interface
+    # added param to be compatible to PyQt interface
+    def save_project(self, param=False, filepath=None):
         logger.debug("save project " + str(filepath))
         if filepath is None:
-            proposed_name = "mmv_backup_" + datetime.datetime.now().strftime("%Y_%m_%d__%H_%M_%S") + ".zip"
+            proposed_name = "mmv_backup_" + \
+                datetime.datetime.now().strftime("%Y_%m_%d__%H_%M_%S") + ".zip"
             options = QFileDialog.Option.DontUseNativeDialog
             filepath, _ = QFileDialog.getSaveFileName(self, "Save Project", proposed_name,
                                                       "Zip Files (*.zip)", options=options)
@@ -314,7 +343,8 @@ class WindowAccounts(QMainWindow):
             logger.debug("saving project as " + filepath)
             self.config.save(filepath=filepath)
 
-    def load_project(self, param=False, filepath=None):  # added param to be compatible to PyQt interface
+    # added param to be compatible to PyQt interface
+    def load_project(self, param=False, filepath=None):
         logger.debug("load project " + str(filepath))
         if filepath is None:
             options = QFileDialog.Option.DontUseNativeDialog
@@ -323,6 +353,3 @@ class WindowAccounts(QMainWindow):
         if filepath:
             logger.debug("saving project as " + filepath)
             self.config.load(filepath=filepath)
-
-
-
