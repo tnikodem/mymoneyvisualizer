@@ -5,6 +5,7 @@ import pandas as pd
 import uuid
 
 from mymoneyvisualizer.naming import Naming as Nn
+from mymoneyvisualizer.configuration import Configuration
 
 
 @pytest.fixture(scope="function")
@@ -121,3 +122,41 @@ class TestConfig:
 @pytest.fixture(scope="function")
 def test_config(tmp_path):
     return TestConfig(dir_path=str(tmp_path)+"/config")
+
+
+@pytest.fixture(scope="function")
+def config(tmp_path):
+    return Configuration(dir_path=str(tmp_path)+"/config")
+
+
+@pytest.fixture(scope="function")
+def config_full(config):
+    acc1 = config.accounts.add("acc1")
+    acc1.add_entry(date=datetime.datetime(2019, 1, 1),
+                   recipient="", description="tag1", value=30.1)
+    acc1.add_entry(date=datetime.datetime(2019, 1, 1),
+                   recipient="", description="tag2", value=20.1)
+    acc1.add_entry(date=datetime.datetime(2019, 1, 1),
+                   recipient="", description="tag3", value=10.1)
+
+    acc2 = config.accounts.add("acc2")
+    acc2.add_entry(date=datetime.datetime(2019, 1, 1),
+                   recipient="", description="tag1", value=300.1)
+    acc2.add_entry(date=datetime.datetime(2019, 1, 1),
+                   recipient="", description="tag2", value=200.1)
+    acc2.add_entry(date=datetime.datetime(2019, 1, 1),
+                   recipient="", description="tag2", value=200.1)
+    acc2.add_entry(date=datetime.datetime(2019, 1, 1),
+                   recipient="", description="tag3", value=100.1)
+    acc2.add_entry(date=datetime.datetime(2019, 1, 1),
+                   recipient="", description="tag3", value=100.1)
+    acc2.add_entry(date=datetime.datetime(2019, 1, 1),
+                   recipient="", description="tag3", value=100.1)
+
+    config.taggers.add(name="tagger1", regex_description="tag1", tag="tag1")
+    config.taggers.add(name="tagger2", regex_description="tag2", tag="tag2")
+    config.taggers.add(name="tagger3", regex_description="tag3", tag="tag3")
+
+    config.accounts.tag_dfs()
+
+    return config

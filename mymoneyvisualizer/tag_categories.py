@@ -14,9 +14,8 @@ CONTAINER_FILEPATH = "/tag_categories.yaml"
 
 
 class TagCategories(OrderedDataContainer):
-    def __init__(self, config):
-        self.config = config
-        super().__init__(container_filepath=self.config.dir_path+CONTAINER_FILEPATH)
+    def __init__(self, dir_path):
+        super().__init__(container_filepath=dir_path+CONTAINER_FILEPATH)
         logger.debug("started taggers")
 
     def add(self, name, category):

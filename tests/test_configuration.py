@@ -19,10 +19,12 @@ def test_config_create(tmp_path):
     # add entries to elements
     account = config.accounts.add("foo")
     account.update(pd.DataFrame({nn.date: [datetime.datetime(2019, 1, 1)],
-                          nn.recipient: ["bla"],
-                          nn.description: ["blub"],
-                          nn.value: [1337]
-                          }))
+                                 nn.recipient: ["bla"],
+                                 nn.description: ["blub"],
+                                 nn.value: [1337],
+                                 nn.tag: [" "],
+                                 nn.tagger_name: [" "]
+                                 }))
     config.taggers.add("bar")
     config.importers.add("blub")
 

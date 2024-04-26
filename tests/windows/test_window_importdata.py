@@ -109,7 +109,3 @@ def test_import_latin1(tmp_path, qtbot, config, window_main_account, test_input_
     assert abs(test_input_df[nn.value].sum() -
                account.df[nn.value].sum()) < 0.0001
     assert counter.counter == 1
-
-    # with qtbot.waitExposed(window_main, timeout=5000):
-    #     window_main.show()
-    # qtbot.stop()

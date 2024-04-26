@@ -30,14 +30,16 @@ class OrderedDataContainer:
         return self.__str__()
 
     def __iter__(self):
-        for f in self.data_objects:
-            yield self.data_objects[f]
+        for v in self.data_objects.values():
+            yield v
 
     def load(self):
-        logger.debug(f"loading {self.__class__} from {self.container_filepath}")
+        logger.debug(
+            f"loading {self.__class__} from {self.container_filepath}")
         data = None
         if os.path.isfile(self.container_filepath):
-            data = yaml.load(open(self.container_filepath).read(), Loader=SafeLoader)
+            data = yaml.load(
+                open(self.container_filepath).read(), Loader=SafeLoader)
         logger.debug("data loaded: " + str(data))
         if data is not None:
             self.data_objects.clear()
@@ -74,7 +76,7 @@ class OrderedDataContainer:
             name = f"{name}_{i}"
             obj.name = name
         self.data_objects[name] = obj
-        #self.run_update_callbacks()  FIXME why do not run callbacks on add??!!
+        # Data container must be always saved seperately.No update callback after adding one element!
         return obj
 
     def delete(self, name):
@@ -98,10 +100,12 @@ class OrderedDataContainer:
 
     def add_update_callback(self, func):
         self.update_callbacks += [func]
-        logger.debug(f"add callback {func.__module__} .{func.__name__} to {self.__class__}")
+        logger.debug(
+            f"add callback {func.__module__} .{func.__name__} to {self.__class__}")
 
     def run_update_callbacks(self):
         logger.debug(f"running callbacks for {self.__class__}")
         for func in self.update_callbacks:
-            logger.debug("run callback " + str(func.__module__) + "." + str(func.__name__))
+            logger.debug("run callback " + str(func.__module__) +
+                         "." + str(func.__name__))
             func()

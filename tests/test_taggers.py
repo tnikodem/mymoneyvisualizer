@@ -13,10 +13,11 @@ from mymoneyvisualizer.taggers import Taggers
 def test_taggers_create(tmp_path, test_config):
     config_filepath = test_config.dir_path + "/taggers.yaml"
 
-    taggers = Taggers(config=test_config)
+    taggers = Taggers(dir_path=test_config.dir_path)
 
     for i in range(50):
-        taggers.add(name=str(i), regex_recipient="", regex_description=str(i), tag=str(i))
+        taggers.add(name=str(i), regex_recipient="",
+                    regex_description=str(i), tag=str(i))
     assert len(taggers) == 50
 
     taggers.save()
@@ -30,7 +31,7 @@ def test_taggers_create(tmp_path, test_config):
     taggers.get_by_name("41").save()
     assert os.path.isfile(config_filepath)
 
-    #rename tagger
+    # rename tagger
     t41 = taggers.get_by_name("41")
     t41.name = "1337"
     t41.save()
@@ -38,14 +39,15 @@ def test_taggers_create(tmp_path, test_config):
 
 
 def test_taggers_tag_df(tmp_path, test_config):
-    taggers = Taggers(config=test_config)
+    taggers = Taggers(dir_path=test_config.dir_path)
     for i in range(50):
-        taggers.add(name=str(i), regex_recipient="", regex_description=str(i), tag=str(i))
+        taggers.add(name=str(i), regex_recipient="",
+                    regex_description=str(i), tag=str(i))
 
     dates = []
     recipients = []
     descriptions = []
-    values= []
+    values = []
     for i in range(100):
         dates += [datetime.date(2018, 11, 24)]
         recipients += [""]
@@ -58,6 +60,8 @@ def test_taggers_tag_df(tmp_path, test_config):
         Nn.description: descriptions,
         Nn.value: values,
     })
+    test_df[Nn.tag] = " "
+    test_df[Nn.tagger_name] = " "
 
     test_df = taggers.tag_df(test_df)
 

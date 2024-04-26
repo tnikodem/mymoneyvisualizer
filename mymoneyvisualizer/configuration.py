@@ -15,14 +15,12 @@ logger = logging.getLogger(__name__)
 class Configuration:
     def __init__(self, dir_path):
         self.dir_path = dir_path
-        # self.accounts = None
-        # self.taggers = None
-        # self.importers = None
 
-        self.importers = Importers(config=self)
-        self.taggers = Taggers(config=self)
-        self.accounts = Accounts(config=self)
-        self.tag_categories = TagCategories(config=self)
+        self.importers = Importers(dir_path=dir_path)
+        self.taggers = Taggers(dir_path=dir_path)
+        self.tag_categories = TagCategories(dir_path=dir_path)
+
+        self.accounts = Accounts(dir_path=dir_path, taggers=self.taggers)
 
         # add action and callbacks
         self.accounts.tag_dfs()
@@ -41,15 +39,20 @@ class Configuration:
         """
         with zipfile.ZipFile(filepath, 'w', zipfile.ZIP_DEFLATED) as zipf:
             self.importers.save()
-            self.save_file_by_name(zipf=zipf, filepath=self.importers.container_filepath)
+            self.save_file_by_name(
+                zipf=zipf, filepath=self.importers.container_filepath)
             self.taggers.save()
-            self.save_file_by_name(zipf=zipf, filepath=self.taggers.container_filepath)
+            self.save_file_by_name(
+                zipf=zipf, filepath=self.taggers.container_filepath)
             self.tag_categories.save()
-            self.save_file_by_name(zipf=zipf, filepath=self.tag_categories.container_filepath)
+            self.save_file_by_name(
+                zipf=zipf, filepath=self.tag_categories.container_filepath)
             for acc in self.accounts.get():
                 acc.save()
-                self.save_file_by_name(zipf=zipf, filepath=acc.db_filepath, folder="accounts/")
-            self.save_file_by_name(zipf=zipf, filepath=self.accounts.container_filepath)
+                self.save_file_by_name(
+                    zipf=zipf, filepath=acc.db_filepath, folder="accounts/")
+            self.save_file_by_name(
+                zipf=zipf, filepath=self.accounts.container_filepath)
 
     def _load_accounts(self, myzip):
         for name in myzip.namelist():
@@ -67,7 +70,7 @@ class Configuration:
         for name in myzip.namelist():
             if "tag_categories.yaml" in name:
                 myzip.extract(name, self.dir_path)
-            self.tag_categories.load()        
+            self.tag_categories.load()
 
     def _load_importers(self, myzip):
         for name in myzip.namelist():

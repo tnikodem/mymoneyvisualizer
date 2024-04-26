@@ -9,7 +9,7 @@ from mymoneyvisualizer.importers import Importers, Importer
 def test_importers_create(tmp_path, test_config):
     config_filepath = test_config.dir_path + "/importers.yaml"
 
-    imps = Importers(config=test_config)
+    imps = Importers(dir_path=test_config.dir_path)
 
     imp_names = []
     for i in range(5):
@@ -72,7 +72,7 @@ def test_importers_get_working(tmp_path, test_config, test_input_df, test_input_
     filepath, config = test_input_latin1
     filepath2, config2 = test_input_utf8
 
-    imps = Importers(config=test_config)
+    imps = Importers(dir_path=test_config.dir_path)
 
     # no importer yet, determine right enconding, tc..
     imp = imps.get_working_importer(filepath=filepath)

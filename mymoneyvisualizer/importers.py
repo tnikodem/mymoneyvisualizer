@@ -16,9 +16,8 @@ CONTAINER_FILEPATH = "/importers.yaml"
 # TODO put last used importer to the top
 
 class Importers(OrderedDataContainer):
-    def __init__(self, config):
-        self.config = config
-        super().__init__(container_filepath=self.config.dir_path+CONTAINER_FILEPATH)
+    def __init__(self, dir_path):
+        super().__init__(container_filepath=dir_path+CONTAINER_FILEPATH)
         logger.debug("started importers")
 
     def add(self, name=None, **kwargs):
@@ -300,7 +299,7 @@ class Importer:
         except ValueError as e:
             logger.error(f"Error in pd.read_csv(): {e}")
         if df_load is None:
-            return
+            return None
         logger.debug(f"loaded df: \n {df_load.head()}")
 
         # postprocessing
@@ -319,13 +318,13 @@ class Importer:
                 df_dict[nn.value] = [np.nan] * len(df_load)
 
         df = pd.DataFrame(df_dict)
-        df[nn.tag] = ""
-        df[nn.tagger_name] = ""
+        df[nn.tag] = " "
+        df[nn.tagger_name] = " "
         df[nn.transaction_id] = df.apply(lambda x: str(uuid.uuid4()), axis=1)
 
         if len(df) < 1:
             logger.debug("after postprocessing df empty")
-            return df
+            return None
 
         if nn.date in df and isinstance(df[nn.date].values[0], np.datetime64):
             min_date = df[nn.date].min()
@@ -363,6 +362,6 @@ class Importer:
                            how="left", indicator=True, suffixes=('', '_y'))
             dfu = dfu.query("_merge == 'left_only'").reset_index(drop=True)
             df = dfu[[nn.transaction_id, nn.date,
-                      nn.recipient, nn.description, nn.value]]
+                      nn.recipient, nn.description, nn.value, nn.tag, nn.tagger_name]]
 
         return df

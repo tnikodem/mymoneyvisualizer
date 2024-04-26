@@ -264,7 +264,7 @@ class WindowTagger(MyMainWindow):
             f"open or create {tagger_name}, {description}, {recipient}, {tag}, {transaction_id}, overwrite {overwrite}")
         if overwrite and self.tagger is not None:
             if self.tagger.name != tagger_name:
-                self.tagger.name = self.config.taggers.get_free_name(
+                self.tagger.name = self.config.taggers.get_free_tagger_name(
                     tagger_name)
             self.tagger.regex_recipient = recipient
             self.tagger.regex_description = description
@@ -300,7 +300,13 @@ class WindowTagger(MyMainWindow):
         self.filtered_df = df
 
     def save_tagger(self):
-        self.tagger.save(self.config.taggers)
+        if self.window_mode == WindowModes.one_time_tag:
+            self.config.taggers.save_one_time_tag(
+                tag=self.tagger.tag,
+                transaction_id=self.tagger.transaction_id,
+                accounts=self.config.accounts)
+        else:
+            self.tagger.save()
 
     def keyPressEvent(self, e):
         key = e.key()

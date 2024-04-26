@@ -48,7 +48,7 @@ def test_create_accounts(tmp_path, test_config):
     # config_filepath2 = str(tmp_path)+"/test_accounts2.yaml"
 
     # new accounts
-    accounts = Accounts(config=test_config)
+    accounts = Accounts(dir_path=test_config.dir_path, taggers=None)
     assert accounts is not None
     assert len(accounts) == 0
 
@@ -71,15 +71,17 @@ def test_create_accounts(tmp_path, test_config):
     os.remove(config_filepath)
     accounts.get_by_name(acc_names[1]).save()
     assert os.path.isfile(config_filepath)
-    assert os.path.isfile(default_db_filepath+acc_names[1].replace(" ", "_")+".csv")
+    assert os.path.isfile(default_db_filepath +
+                          acc_names[1].replace(" ", "_")+".csv")
 
     # delete account with csv
     accounts.delete(acc_names[1])
-    assert not os.path.isfile(default_db_filepath+acc_names[1].replace(" ", "_")+".csv")
+    assert not os.path.isfile(
+        default_db_filepath+acc_names[1].replace(" ", "_")+".csv")
     assert len(accounts) == 1
 
     # load accounts
-    accounts2 = Accounts(config=test_config)
+    accounts2 = Accounts(dir_path=test_config.dir_path, taggers=None)
     assert len(accounts) == len(accounts2)
 
     # manual add account
@@ -88,3 +90,20 @@ def test_create_accounts(tmp_path, test_config):
     account4.save(parent=accounts)
     assert len(accounts) == 2
     assert "test4" in accounts
+
+
+def test_one_time_tag(config_full):
+    # Check tag is set
+    transactions_ids = []
+    for i, account in enumerate(config_full.accounts):
+        transactions_ids += [account.df[Nn.transaction_id].values[i]]
+    for t_id in transactions_ids:
+        config_full.taggers.save_one_time_tag(
+            tag="test_tag", transaction_id=t_id, accounts=config_full.accounts)
+    for i, account in enumerate(config_full.accounts):
+        assert account.df[Nn.tag].values[i] == "test_tag"
+
+    # Check tag is not overwritten
+    config_full.accounts.tag_dfs()
+    for i, account in enumerate(config_full.accounts):
+        assert account.df[Nn.tag].values[i] == "test_tag"

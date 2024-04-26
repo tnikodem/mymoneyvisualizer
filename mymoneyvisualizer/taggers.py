@@ -10,17 +10,16 @@ logger = logging.getLogger(__name__)
 
 CONTAINER_FILEPATH = "/taggers.yaml"
 
-# TODO do we need a name for a tagger? tag is enough?!
+ONE_TIME_TAG_TAGGER_NAME = "one_time_tag"
 
 
 class Taggers(OrderedDataContainer):
-    def __init__(self, config):
-        self.config = config
-        super().__init__(container_filepath=self.config.dir_path+CONTAINER_FILEPATH)
+    def __init__(self, dir_path):
+        super().__init__(container_filepath=dir_path+CONTAINER_FILEPATH)
         logger.debug("started taggers")
 
     def add(self, name=None, regex_recipient="", regex_description="", tag="", **kwargs):
-        name = self.get_free_name(name)
+        name = self.get_free_tagger_name(name)
         new_tagger = Tagger(parent=self, name=name, regex_recipient=regex_recipient,
                             regex_description=regex_description, tag=tag)
         logger.debug("added new tagger "+str(name))
@@ -30,9 +29,11 @@ class Taggers(OrderedDataContainer):
         logger.debug("tagging df")
         if df is None or len(df) < 1:
             return df
+        mask = df[nn.tagger_name] != ONE_TIME_TAG_TAGGER_NAME
+        # There could be tags overwriting other tags. make sure that result is always the same by starting from a clean state
         # FIXME an empty string is converted to NaT??!!
-        df.loc[:, nn.tag] = " "
-        df.loc[:, nn.tagger_name] = ""
+        df.loc[mask, nn.tag] = " "
+        df.loc[mask, nn.tagger_name] = ""
         for tagger in self.get():
             df = tagger.tag_df(df)
         return df
@@ -45,10 +46,10 @@ class Taggers(OrderedDataContainer):
         logger.debug(f"get unique tags: {tags}")
         return tags
 
-    def get_free_name(self, name=None):
+    def get_free_tagger_name(self, name=None):
         if name is None:
             name = "new_tagger"
-        if name not in self:
+        if name not in self and name != ONE_TIME_TAG_TAGGER_NAME:
             return name
         i = 1
         while f"{name}_{i}" in self:
@@ -58,13 +59,19 @@ class Taggers(OrderedDataContainer):
     def get_or_create(self, name, regex_recipient, regex_description, tag, transaction_id):
         logger.debug("get or create name: " + str(name))
         if name == "":
-            name = self.get_free_name()
+            name = self.get_free_tagger_name()
         tagger = self.get_by_name(name=name)
         if tagger is None:
-            tagger = Tagger(parent=None, name=name, regex_recipient=regex_recipient, regex_description=regex_description,
+            tagger = Tagger(parent=self, name=name, regex_recipient=regex_recipient, regex_description=regex_description,
                             tag=tag, transaction_id=transaction_id)
         tagger.transaction_id = transaction_id
         return tagger
+
+    @staticmethod
+    def save_one_time_tag(tag, transaction_id, accounts):
+        for account in accounts:
+            account.tag_transaction_id(
+                transaction_id=transaction_id, tag=tag, tagger_name=ONE_TIME_TAG_TAGGER_NAME)
 
 
 class Tagger:
@@ -90,13 +97,11 @@ class Tagger:
                 nn.tag: self.tag,
                 }
 
-    def save(self, parent=None):
+    def save(self):
         logger.debug("saving tagger: "+str(self.name))
-        if self.parent is None and parent is not None:
-            self.parent = parent
+        if self.name not in self.parent:
             self.parent.add(**self.to_dict())
-        if self.parent is not None:
-            self.parent.save()
+        self.parent.save()
 
     def mask_recipient(self, df):
         mask = pd.Series(True, index=df.index)
@@ -125,6 +130,7 @@ class Tagger:
     def tag_df(self, df):
         mask = self.mask_recipient(df)
         mask &= self.mask_description(df)
+        mask &= df[nn.tagger_name] != ONE_TIME_TAG_TAGGER_NAME
         if mask is None:
             return df
 

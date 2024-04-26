@@ -3,6 +3,7 @@ import os
 import pathlib
 import logging
 import datetime
+import numpy as np
 import pandas as pd
 import uuid
 
@@ -16,10 +17,11 @@ DEFAULT_DB_FILEPATH = "/accounts/"
 
 
 class Accounts(OrderedDataContainer):
-    def __init__(self, config):
+    def __init__(self, dir_path, taggers):
         logger.debug("creating Accounts")
-        self.config = config
-        super().__init__(container_filepath=self.config.dir_path+CONTAINER_FILEPATH)
+        self.dir_path = dir_path
+        self.taggers = taggers
+        super().__init__(container_filepath=dir_path+CONTAINER_FILEPATH)
 
     def add(self, name=None, db_filepath=None, **kwargs):
         logger.debug("add account "+str(name)+" "+str(db_filepath))
@@ -30,7 +32,7 @@ class Accounts(OrderedDataContainer):
             while name + str(i) in self:
                 i += 1
             name = name + str(i)
-            db_filepath = (self.config.dir_path +
+            db_filepath = (self.dir_path +
                            DEFAULT_DB_FILEPATH + name + ".csv").replace(" ", "_")
 
         if name in self:
@@ -94,11 +96,11 @@ class Accounts(OrderedDataContainer):
 
     def tag_dfs(self):
         logger.debug("tagging dfs")
-        if self.config.taggers is None:
+        if self.taggers is None:
             logger.debug("taggers not set, skip tagging")
             return
-        for acc in self.get():
-            acc.tag_df(self.config.taggers)
+        for account in self:
+            account.tag_df(self.taggers)
         logger.debug("dfs tagged")
         self.run_update_callbacks()
 
@@ -108,7 +110,7 @@ class Account(object):
         self.parent = parent
         self.name = str(name)
         if db_filepath is None and self.parent is not None:
-            db_filepath = (self.parent.config.dir_path +
+            db_filepath = (self.parent.dir_path +
                            DEFAULT_DB_FILEPATH + name + ".csv").replace(" ", "_")
         self.db_filepath = db_filepath
         self.df = self.load()
@@ -258,3 +260,10 @@ class Account(object):
 
     def get_unique(self, column):
         return self.df[column].unique()
+
+    def tag_transaction_id(self, transaction_id, tag, tagger_name):
+        mask = self.df[nn.transaction_id] == transaction_id
+        if np.any(mask):
+            self.df.loc[mask, nn.tag] = tag
+            self.df.loc[mask, nn.tagger_name] = tagger_name
+            self.save()

@@ -134,7 +134,3 @@ def test_sort_overview(tmp_path, qtbot, config_full):
     tagger1.save()
     qt_df_taggeroverview = qt_table_to_dataframe(tagger_overview_window.table)
     assert "tag1_new" in qt_df_taggeroverview[nn.tag].values
-
-    # window_main.show()
-    # qtbot.wait_for_window_shown(window_main)
-    # qtbot.stopForInteraction()
