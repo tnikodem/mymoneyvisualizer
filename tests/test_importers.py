@@ -51,24 +51,27 @@ def test_importers_determine_config(test_input_latin1):
 
 
 def test_importers_load_latin1(test_input_df, test_input_latin1):
+    compare_df = test_input_df.query(f"abs({nn.value}) > 0")
     filepath, config = test_input_latin1
     imp = Importer(parent=None, **config)
     df = imp.load_df(filepath=filepath)
-    assert set(test_input_df.columns) == set(df.columns)
-    assert len(test_input_df) == len(df)
-    assert test_input_df[nn.value].sum() == df[nn.value].sum()
+    assert set(compare_df.columns) == set(df.columns)
+    assert len(compare_df) == len(df)
+    assert compare_df[nn.value].sum() == df[nn.value].sum()
 
 
 def test_importers_load_utf8(test_input_df, test_input_utf8):
+    compare_df = test_input_df.query(f"abs({nn.value}) > 0")
     filepath, config = test_input_utf8
     imp = Importer(parent=None, **config)
     df = imp.load_df(filepath=filepath)
-    assert set(test_input_df.columns) == set(df.columns)
-    assert len(test_input_df) == len(df)
-    assert test_input_df[nn.value].sum() == df[nn.value].sum()
+    assert set(compare_df.columns) == set(df.columns)
+    assert len(compare_df) == len(df)
+    assert compare_df[nn.value].sum() == df[nn.value].sum()
 
 
 def test_importers_get_working(tmp_path, test_config, test_input_df, test_input_latin1, test_input_utf8):
+    compare_df = test_input_df.query(f"abs({nn.value}) > 0")
     filepath, config = test_input_latin1
     filepath2, config2 = test_input_utf8
 
@@ -89,9 +92,9 @@ def test_importers_get_working(tmp_path, test_config, test_input_df, test_input_
     imp.col_value = config[nn.col_value]
 
     df = imp.load_df(filepath=filepath)
-    assert set(test_input_df.columns) == set(df.columns)
-    assert len(test_input_df) == len(df)
-    assert test_input_df[nn.value].sum() == df[nn.value].sum()
+    assert set(compare_df.columns) == set(df.columns)
+    assert len(compare_df) == len(df)
+    assert compare_df[nn.value].sum() == df[nn.value].sum()
 
     # save importer and get it back
     imp.name = "test1"
@@ -99,9 +102,9 @@ def test_importers_get_working(tmp_path, test_config, test_input_df, test_input_
     assert len(imps) == 1
     imp2 = imps.get_working_importer(filepath=filepath)
     df = imp2.load_df(filepath=filepath)
-    assert set(test_input_df.columns) == set(df.columns)
-    assert len(test_input_df) == len(df)
-    assert test_input_df[nn.value].sum() == df[nn.value].sum()
+    assert set(compare_df.columns) == set(df.columns)
+    assert len(compare_df) == len(df)
+    assert compare_df[nn.value].sum() == df[nn.value].sum()
     assert imp2.name == "test1"
 
     # make sure it is not saved two times

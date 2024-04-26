@@ -29,15 +29,16 @@ def test_import_utf8(tmp_path, qtbot, config, window_main_account, test_input_ut
     qtbot.mouseClick(
         window_main.importdata_window.import_data_widget.import_button, Qt.MouseButton.LeftButton)
 
-    assert len(account) == 40
+    assert len(account) == 36
     assert window_main.accounts_window.tab_widget.tab_widgets[0].table.table_widget.rowCount(
-    ) == 40
+    ) == 36
     assert abs(test_input_df[nn.value].sum() -
                account.df[nn.value].sum()) < 0.0001
     assert counter.counter == 1
 
 
 def test_import_since(tmp_path, qtbot, config, window_main_account, test_input_utf8, test_input_df):
+    compare_df = test_input_df.query(f"abs({nn.value}) > 0")
     window_main, account = window_main_account
     filepath, _ = test_input_utf8
     counter = CallbackCounter()
@@ -65,9 +66,9 @@ def test_import_since(tmp_path, qtbot, config, window_main_account, test_input_u
     qtbot.mouseClick(
         window_main.importdata_window.import_data_widget.import_button, Qt.MouseButton.LeftButton)
 
-    assert len(account) == 30
+    assert len(account) == 27
     assert window_main.accounts_window.tab_widget.tab_widgets[0].table.table_widget.rowCount(
-    ) == 30
+    ) == 27
     assert abs(test_input_df.query(
         f"{nn.date} > '2018-08-18'")[nn.value].sum() - account.df[nn.value].sum()) < 0.0001
     assert counter.counter == 1
@@ -103,9 +104,9 @@ def test_import_latin1(tmp_path, qtbot, config, window_main_account, test_input_
     qtbot.mouseClick(
         window_main.importdata_window.import_data_widget.import_button, Qt.MouseButton.LeftButton)
 
-    assert len(account) == 40
+    assert len(account) == 36
     assert window_main.accounts_window.tab_widget.tab_widgets[0].table.table_widget.rowCount(
-    ) == 40
+    ) == 36
     assert abs(test_input_df[nn.value].sum() -
                account.df[nn.value].sum()) < 0.0001
     assert counter.counter == 1
