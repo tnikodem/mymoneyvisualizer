@@ -12,7 +12,7 @@ from PyQt6.QtWidgets import QApplication
 
 
 from mymoneyvisualizer.naming import Naming as nn
-
+from mymoneyvisualizer.configuration import Configuration
 from mymoneyvisualizer.windows.window_main import WindowMain
 
 
@@ -77,6 +77,11 @@ def window_main_two_accounts_tagged(tmp_path, qtbot, config):
     qtbot.add_widget(window_main)
 
     return window_main
+
+
+@pytest.fixture(scope="function")
+def config(tmp_path):
+    return Configuration(dir_path=str(tmp_path)+"/config")
 
 
 @pytest.fixture(scope="function")

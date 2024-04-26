@@ -5,7 +5,6 @@ import pandas as pd
 import uuid
 
 from mymoneyvisualizer.naming import Naming as Nn
-from mymoneyvisualizer.configuration import Configuration
 
 
 @pytest.fixture(scope="function")
@@ -122,8 +121,3 @@ class TestConfig:
 @pytest.fixture(scope="function")
 def test_config(tmp_path):
     return TestConfig(dir_path=str(tmp_path)+"/config")
-
-
-@pytest.fixture(scope="function")
-def config(tmp_path):
-    return Configuration(dir_path=str(tmp_path)+"/config")
