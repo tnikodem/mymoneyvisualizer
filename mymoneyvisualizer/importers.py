@@ -326,7 +326,7 @@ class Importer:
             logger.debug("after postprocessing df empty")
             return None
 
-        if nn.date in df and isinstance(df[nn.date].values[0], np.datetime64):
+        if nn.date in df.columns and isinstance(df[nn.date].values[0], np.datetime64):
             min_date = df[nn.date].min()
             if self.import_since is None or self.import_since < min_date:
                 self.import_since = df[nn.date].min()
@@ -334,6 +334,9 @@ class Importer:
                              f"{self.import_since}")
             else:
                 df = df[df[nn.date] >= self.import_since]
+
+        if nn.value in df.columns:
+            df = df.query(f"abs({nn.value} > 0)")
 
         for col in [nn.date, nn.recipient, nn.description, nn.value]:
             if col not in df:

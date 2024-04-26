@@ -218,7 +218,7 @@ class MyTaggerWidget(QWidget):
 
     def save(self):
         self.reload_widget()
-        self.parent().close()
+        self.main.close()
         self.main.save_tagger()
 
 
