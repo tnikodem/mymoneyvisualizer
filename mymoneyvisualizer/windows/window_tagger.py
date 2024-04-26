@@ -290,10 +290,10 @@ class WindowTagger(MyMainWindow):
                     df.loc[~mask]
                 ])
 
-            self.mask_recipient_matches = self.tagger.mask_recipient(
-                df=df.loc[:0]).values[0]
-            self.mask_description_matches = self.tagger.mask_description(
-                df=df.loc[:0]).values[0]
+            self.mask_recipient_matches = self.tagger.recipient_matches(
+                test_string=df[nn.recipient].values[0])
+            self.mask_description_matches = self.tagger.recipient_matches(
+                test_string=df[nn.description].values[0])
         else:
             self.mask_recipient_matches = None
             self.mask_description_matches = None

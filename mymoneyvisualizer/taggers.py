@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import logging
 
+import re
 import pandas as pd
 from mymoneyvisualizer.naming import Naming as nn
 from mymoneyvisualizer.utils.datacontainer import OrderedDataContainer
@@ -102,6 +103,28 @@ class Tagger:
         if self.name not in self.parent:
             self.parent.add(**self.to_dict())
         self.parent.save()
+
+    def recipient_matches(self, test_string):
+        if self.regex_recipient == "":
+            return True
+        try:
+            pattern = re.compile(self.regex_recipient)
+            return bool(re.match(pattern, test_string))
+        except Exception as e:
+            logger.error(f"could not handle: {self.regex_recipient}")
+            logger.error(e)
+            return False
+
+    def description_matches(self, test_string):
+        if self.regex_description == "":
+            return True
+        try:
+            pattern = re.compile(self.regex_description)
+            return bool(re.match(pattern, test_string))
+        except Exception as e:
+            logger.error(f"could not handle: {self.regex_description}")
+            logger.error(e)
+            return False
 
     def mask_recipient(self, df):
         mask = pd.Series(True, index=df.index)
