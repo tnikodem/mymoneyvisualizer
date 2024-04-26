@@ -63,8 +63,8 @@ def test_create_account(tmp_path, qtbot, config):
     ) == 1
 
 
-def test_money_transfer(tmp_path, qtbot, window_main_two_accounts_full_tagged):
-    window_main = window_main_two_accounts_full_tagged
+def test_money_transfer(tmp_path, qtbot, window_main_two_accounts_tagged):
+    window_main = window_main_two_accounts_tagged
     table_credit = window_main.accounts_window.tab_widget.tab_widgets[0].table
     table_cash = window_main.accounts_window.tab_widget.tab_widgets[1].table
 
