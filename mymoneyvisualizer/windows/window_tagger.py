@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import QPushButton
 from PyQt6.QtWidgets import QHBoxLayout, QVBoxLayout
 from PyQt6.QtCore import Qt
 
-from mymoneyvisualizer.constants import DEFAULT_BACKGROUND_COLOR, GREEN_BACKGROUND_COLOR, RED_BACKGROUND_COLOR
+from mymoneyvisualizer.constants import DEFAULT_BACKGROUND_COLOR, GREEN_BACKGROUND_COLOR, RED_BACKGROUND_COLOR, GREY_BACKGROUND_COLOR
 
 from mymoneyvisualizer.naming import Naming as nn
 from mymoneyvisualizer.windows.widgets.multi_account_table import MultiAccountTable, ResizeMainWindow
@@ -47,16 +47,19 @@ class TaggerDefinition(QWidget):
         self.layout_tagger_definition.addWidget(self.description_regex_textbox)
         self.setLayout(self.layout_tagger_definition)
 
+        # Add actions
+        self.recipient_regex_textbox.textChanged.connect(self.main.update)
+        self.description_regex_textbox.textChanged.connect(self.main.update)
+
 
 class MyTaggerWidget(QWidget):
     def __init__(self, parent, main):
         super(QWidget, self).__init__(parent)
         self.main = main
         self.mode = WindowModes.tagger
+
         self.layout = QVBoxLayout(self)
-
         layout_control_buttons = QHBoxLayout()
-
         # Control buttons
         self.button_ok = QPushButton('OK', self)
         self.button_ok.setFixedWidth(150)
@@ -83,13 +86,14 @@ class MyTaggerWidget(QWidget):
 
         # Create Table
         self.multi_account_table = MultiAccountTable(
-            self, main=self.main, color_first_row=True)
+            self, main=self.main, get_first_row_color=self.get_first_row_color)
         self.layout.addWidget(self.multi_account_table)
 
         # Actions
         self.button_ok.clicked.connect(self.save)
         self.button_cancel.clicked.connect(self.parent().close)
         self.button_onetimetag.clicked.connect(self.toggle_one_time_tag)
+        self.tag_textbox.textChanged.connect(self.main.update)
 
     def toggle_one_time_tag(self):
         if self.main.window_mode == WindowModes.tagger:
@@ -102,10 +106,27 @@ class MyTaggerWidget(QWidget):
             self.main.window_mode = WindowModes.tagger
         self.reload_widget()
 
-    def update(self):
-        logger.debug("update")
-        self.main.get_filtered_df()
+    def get_first_row_color(self):
+        if self.main.mask_recipient_matches is None or self.main.mask_description_matches is None:
+            first_row_color = GREY_BACKGROUND_COLOR
+        elif self.main.mask_recipient_matches and self.main.mask_description_matches:
+            first_row_color = GREEN_BACKGROUND_COLOR
+        else:
+            first_row_color = RED_BACKGROUND_COLOR
+        return first_row_color
 
+    def set_tagger_text(self, tagger):
+        if self.tagger_definition_widget.name_textbox.text() != tagger.name:
+            self.tagger_definition_widget.name_textbox.setText(tagger.name)
+        if self.tagger_definition_widget.recipient_regex_textbox.text() != tagger.regex_recipient:
+            self.tagger_definition_widget.recipient_regex_textbox.setText(
+                tagger.regex_recipient)
+        if self.tagger_definition_widget.description_regex_textbox.text() != tagger.regex_description:
+            self.tagger_definition_widget.description_regex_textbox.setText(
+                tagger.regex_description)
+
+    def update(self):
+        # Get and set color of elements
         if self.main.mask_recipient_matches is None:
             recipient_color = DEFAULT_BACKGROUND_COLOR
         elif self.main.mask_recipient_matches:
@@ -120,15 +141,8 @@ class MyTaggerWidget(QWidget):
         else:
             description_color = RED_BACKGROUND_COLOR
 
-        # Update text elements
-        self.tagger_definition_widget.name_textbox.setText(
-            self.main.tagger.name)
-        self.tagger_definition_widget.recipient_regex_textbox.setText(
-            self.main.tagger.regex_recipient)
         self.tagger_definition_widget.recipient_regex_textbox.setStyleSheet(
             f"QLineEdit {{ background : rgb{recipient_color};}}")
-        self.tagger_definition_widget.description_regex_textbox.setText(
-            self.main.tagger.regex_description)
         self.tagger_definition_widget.description_regex_textbox.setStyleSheet(
             f"QLineEdit {{ background : rgb{description_color};}}")
 
@@ -142,6 +156,7 @@ class MyTaggerWidget(QWidget):
         tag_completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
         self.tag_textbox.setCompleter(tag_completer)
 
+        # Update table
         self.multi_account_table.update_table()
 
     def reload_widget(self):
@@ -167,6 +182,7 @@ class WindowTagger(ResizeMainWindow):
         self.multi_account_df = None
         self.mask_recipient_matches = None
         self.mask_description_matches = None
+        self.updateing = False
 
         self.left = 100
         self.top = 100
@@ -184,6 +200,7 @@ class WindowTagger(ResizeMainWindow):
         self.setCentralWidget(widget)
 
     def open_or_create_tagger(self, tagger_name="", description="", recipient="", tag="", transaction_id=None, overwrite=False):
+        self.updateing = True
         logger.debug(
             f"open or create {tagger_name}, {description}, {recipient}, {tag}, {transaction_id}, overwrite {overwrite}")
         if overwrite and self.tagger is not None:
@@ -199,12 +216,20 @@ class WindowTagger(ResizeMainWindow):
                                                             regex_recipient=recipient, tag=tag, transaction_id=transaction_id)
 
         self.setWindowTitle(self.tagger.name)
+        self.get_multi_account_df()
+        self.tagger_widget.set_tagger_text(tagger=self.tagger)
         self.tagger_widget.update()
         self.show()
+        self.updateing = False
 
-    # TODO rename to "get_tagger_df"
-    def get_filtered_df(self):
-        df = self.config.accounts.get_filtered_df(self.tagger)
+    def update(self):
+        if self.updateing:
+            return
+        self.tagger_widget.reload_widget()
+        self.updateing = False
+
+    def get_multi_account_df(self):
+        df = self.config.accounts.get_tagger_df(self.tagger)
         if self.tagger.transaction_id is not None:
             mask = df[nn.transaction_id] == self.tagger.transaction_id
             if self.window_mode == WindowModes.one_time_tag:
@@ -217,7 +242,7 @@ class WindowTagger(ResizeMainWindow):
 
             self.mask_recipient_matches = self.tagger.recipient_matches(
                 test_string=df[nn.recipient].values[0])
-            self.mask_description_matches = self.tagger.recipient_matches(
+            self.mask_description_matches = self.tagger.description_matches(
                 test_string=df[nn.description].values[0])
         else:
             self.mask_recipient_matches = None
@@ -232,10 +257,3 @@ class WindowTagger(ResizeMainWindow):
                 accounts=self.config.accounts)
         else:
             self.tagger.save()
-
-    def keyPressEvent(self, e):
-        key = e.key()
-        if key == Qt.Key.Key_Escape:
-            self.close()
-        elif key == Qt.Key.Key_Enter or key == Qt.Key.Key_Return:
-            self.tagger_widget.reload_widget()

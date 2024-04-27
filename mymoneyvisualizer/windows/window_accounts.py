@@ -56,7 +56,7 @@ class MyTableWidget(QWidget):
         # FIXME in PyQt need to disable sorting while udpating ?!
         self.table_widget.setSortingEnabled(False)
         self.table_widget.setRowCount(len(df))
-        for i, row in df.iterrows():
+        for i, row in df.reset_index(drop=True).iterrows():
             for j, col in enumerate(self.columns):
                 if isinstance(row[col], (int, float)):
                     item = QTableWidgetItem()

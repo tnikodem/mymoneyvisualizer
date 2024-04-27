@@ -25,7 +25,7 @@ class DetailMonthWidget(QWidget):
 
     def update(self):
         logger.debug("update")
-        self.main.get_filtered_df()
+        self.main.get_multi_account_df()
         self.multi_account_table.update_table()
 
 
@@ -54,7 +54,7 @@ class WindowDetailMonth(ResizeMainWindow):
         widget.setLayout(layout)
         self.setCentralWidget(widget)
 
-    def get_filtered_df(self):
+    def get_multi_account_df(self):
         logger.debug("requesting filtered df")
         if self.tag is None or self.month is None:
             return None

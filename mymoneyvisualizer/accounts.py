@@ -71,13 +71,13 @@ class Accounts(OrderedDataContainer):
         return None
 
     # TODO rename to get_tagger_df
-    def get_filtered_df(self, tagger):
+    def get_tagger_df(self, tagger):
         logger.debug("get filtered df for "+tagger.name)
 
         dfs = []
         for account in self.get():
             logger.debug(f"filtering account {account.name}")
-            tmpdf = account.get_filtered_df(tagger)
+            tmpdf = account.get_tagger_df(tagger)
             tmpdf[nn.account] = account.name
             dfs += [tmpdf]
 
@@ -219,7 +219,7 @@ class Account(object):
         self.df = taggers.tag_df(self.df)
         return self.df
 
-    def get_filtered_df(self, tagger):
+    def get_tagger_df(self, tagger):
         df = self.df.copy()
         df = tagger.tag_df(df)  # TODO need to tag again?! tagger_collision
         logger.debug(f"df tagged: \n {df.head()}")
