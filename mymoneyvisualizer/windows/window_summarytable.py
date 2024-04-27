@@ -31,7 +31,8 @@ class MyTableWidget(QWidget):
         self.table_widget = QTableWidget()
         self.table_widget.verticalHeader().setVisible(False)
         self.table_widget.setSortingEnabled(True)
-        self.table_widget.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.table_widget.setEditTriggers(
+            QAbstractItemView.EditTrigger.NoEditTriggers)
 
         # always exactly 12 month (tag, months ... , total, mthly average)
         self.table_widget.setColumnCount(15)
@@ -74,7 +75,8 @@ class MyTableWidget(QWidget):
             for j, col in enumerate(df.columns):
                 if isinstance(row[col], (int, float)):
                     item = QTableWidgetItem()
-                    item.setData(Qt.ItemDataRole.EditRole, float(round(row[col], 0)))
+                    item.setData(Qt.ItemDataRole.EditRole,
+                                 float(round(row[col], 0)))
                 else:
                     item = QTableWidgetItem(str(row[col]))
                 if col == "total" or col == "monthly average" or i == len(df) - 1:
@@ -149,9 +151,9 @@ class SummaryWidget(QWidget):
         self.table.move(40, 80)
 
 
-class WindowSummary(QMainWindow):
+class WindowSummaryTable(QMainWindow):
     def __init__(self, parent, config, detail_month_window):
-        super(WindowSummary, self).__init__(parent)
+        super(WindowSummaryTable, self).__init__(parent)
         self.config = config
         self.detail_month_window = detail_month_window
 
@@ -166,7 +168,6 @@ class WindowSummary(QMainWindow):
         self.date_from, self.date_upto = None, None
         self.set_current_date_window()
         self.excluded_tags = set()
-
         self.update_callbacks = []
 
         self.summary_widget = SummaryWidget(parent=self, main=self)
@@ -186,20 +187,26 @@ class WindowSummary(QMainWindow):
 
     def set_current_date_window(self):
         now = datetime.datetime.now()
-        date_upto = datetime.datetime(now.year, now.month, 1) + datetime.timedelta(days=32)  # mth at most 31 days
+        date_upto = datetime.datetime(
+            # mth at most 31 days
+            now.year, now.month, 1) + datetime.timedelta(days=32)
         self.date_upto = datetime.datetime(date_upto.year, date_upto.month, 1)
-        self.date_from = datetime.datetime(date_upto.year - 1, date_upto.month, 1)
+        self.date_from = datetime.datetime(
+            date_upto.year - 1, date_upto.month, 1)
 
     def month_before(self):
         date_upto = self.date_upto - datetime.timedelta(days=2)
         self.date_upto = datetime.datetime(date_upto.year, date_upto.month, 1)
-        self.date_from = datetime.datetime(date_upto.year - 1, date_upto.month, 1)
+        self.date_from = datetime.datetime(
+            date_upto.year - 1, date_upto.month, 1)
         self.run_update_callbacks()
 
     def month_after(self):
-        date_upto = self.date_upto + datetime.timedelta(days=32)  # month at most 31 days
+        date_upto = self.date_upto + \
+            datetime.timedelta(days=32)  # month at most 31 days
         self.date_upto = datetime.datetime(date_upto.year, date_upto.month, 1)
-        self.date_from = datetime.datetime(date_upto.year - 1, date_upto.month, 1)
+        self.date_from = datetime.datetime(
+            date_upto.year - 1, date_upto.month, 1)
         self.run_update_callbacks()
 
     def open_detailmonth(self, month, tag):
@@ -214,13 +221,15 @@ class WindowSummary(QMainWindow):
 
     # TODO unittest method
     def summary_df(self):
-        logger.debug(f"request summary df from {self.date_from} upto {self.date_upto}")
+        logger.debug(f"request summary df from {
+                     self.date_from} upto {self.date_upto}")
         dfs = []
         account_names = []
         for acc in self.config.accounts.get():
             account_names += [acc.name]
             df = acc.df
-            df = df[(df[nn.date] >= self.date_from) & (df[nn.date] < self.date_upto)]
+            df = df[(df[nn.date] >= self.date_from) &
+                    (df[nn.date] < self.date_upto)]
             if len(df) < 1:
                 continue
             dfs += [df]
@@ -245,8 +254,10 @@ class WindowSummary(QMainWindow):
         df[nn.tag] = df[nn.tag].apply(self.get_base_tag)
 
         # calculate pivot table
-        dfg = df.groupby([nn.tag, pd.Grouper(freq="1ME", key=nn.date)]).agg({nn.value: "sum"}).reset_index()
-        dfp = dfg.pivot(index=nn.tag, columns=nn.date, values=["value"]).fillna(0)
+        dfg = df.groupby([nn.tag, pd.Grouper(freq="1ME", key=nn.date)]).agg(
+            {nn.value: "sum"}).reset_index()
+        dfp = dfg.pivot(index=nn.tag, columns=nn.date,
+                        values=["value"]).fillna(0)
         dfp = dfp[dfp.index != "temp_tag_43643564356345"]
         dfp.columns = [t.strftime('%Y-%m') for a, t in dfp.columns]
         ncol = len(dfp.columns)

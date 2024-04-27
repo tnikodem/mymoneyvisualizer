@@ -1,6 +1,7 @@
-# -*- coding: utf-8 -*-
-import logging
 import os
+import logging
+import yaml
+from yaml.loader import SafeLoader
 import zipfile
 
 from mymoneyvisualizer.taggers import Taggers
@@ -11,20 +12,37 @@ from mymoneyvisualizer.tag_categories import TagCategories
 
 logger = logging.getLogger(__name__)
 
+CONTAINER_FILEPATH = "/configuration.yaml"
+
 
 class Configuration:
     def __init__(self, dir_path):
         self.dir_path = dir_path
+        self.settings = dict()
 
+        self.load_settings()
         self.importers = Importers(dir_path=dir_path)
         self.taggers = Taggers(dir_path=dir_path)
         self.tag_categories = TagCategories(dir_path=dir_path)
-
         self.accounts = Accounts(dir_path=dir_path, taggers=self.taggers)
 
         # add action and callbacks
         self.accounts.tag_dfs()
         self.taggers.add_update_callback(self.accounts.tag_dfs)
+
+    def save_settings(self):
+        settings_filepath = self.dir_path+CONTAINER_FILEPATH
+        with open(settings_filepath, 'w') as outfile:
+            yaml.dump(self.settings, outfile, default_flow_style=False)
+
+    def load_settings(self):
+        settings_filepath = self.dir_path+CONTAINER_FILEPATH
+        if os.path.isfile(settings_filepath):
+            self.settings = yaml.load(
+                open(settings_filepath).read(), Loader=SafeLoader)
+
+
+# TODO refactor store and rading zip to "backup" or similar
 
     @staticmethod
     def save_file_by_name(zipf, filepath, folder=""):

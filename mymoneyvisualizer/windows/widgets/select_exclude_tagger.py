@@ -21,13 +21,11 @@ from PyQt6.QtWidgets import QLabel, QListWidget, QAbstractItemView
 from PyQt6.QtCore import Qt
 
 
-#from mymoneyvisualizer.windows.pyqtgraph_extensions.LegendItem import LegendItem
 from mymoneyvisualizer.naming import Naming as nn
 
 pg.setConfigOptions(antialias=True)
 
 logger = logging.getLogger(__name__)
-
 
 
 class ExcludeTaggerSelectComboBox(QWidget):
@@ -60,10 +58,15 @@ class ExcludeTaggerSelectComboBox(QWidget):
         self.updateing = True
         unique_tags = self.main.config.taggers.get_unique_tags()
         self.multi_select.clear()
+
+        excluded_tags = []
+        if nn.exclude_tags in self.main.config.settings:
+            excluded_tags = self.main.config.settings[nn.exclude_tags]
+
         selected_indexes = []
         for i, tag in enumerate(unique_tags):
             self.multi_select.addItem(tag, tag)
-            if tag in self.main.excluded_tags:
+            if tag in excluded_tags:
                 selected_indexes += [i]
         if len(selected_indexes) > 0:
             self.multi_select.setCurrentIndexes(selected_indexes)

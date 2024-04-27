@@ -40,14 +40,13 @@ class SummaryGraphWidget(QWidget):
         self.layout.addLayout(vlayout, 100)
 
 
-class WindowGraph(QMainWindow):
+class WindowSummaryGraph(QMainWindow):
     def __init__(self, parent, config):
-        super(WindowGraph, self).__init__(parent)
+        super(WindowSummaryGraph, self).__init__(parent)
         self.config = config
         self.update_callbacks = []
         self.updateing = True
 
-        self.excluded_tags = set()
         self.df_summary = None
         self.df_summary_income = None
         self.budgets = {nn.basic: 0.5,
@@ -107,7 +106,8 @@ class WindowGraph(QMainWindow):
         self.updateing = False
 
     def set_excluded_tags(self, tags):
-        self.excluded_tags = set(tags)
+        self.config.settings[nn.exclude_tags] = list(tags)
+        self.config.save_settings()
         self.run_update_callbacks()
 
     def update_category_and_sort(self, new_sorted_tags):
@@ -134,8 +134,10 @@ class WindowGraph(QMainWindow):
             return
         df = pd.concat(dfs, sort=False)
         df = df.loc[~(df[nn.tag].isin(account_names)), :]
-        if len(self.excluded_tags) > 0:
-            df = df.loc[~(df[nn.tag].isin(self.excluded_tags)), :]
+
+        if nn.exclude_tags in self.config.settings and len(self.config.settings[nn.exclude_tags]) > 0:
+            df = df.loc[~(df[nn.tag].isin(
+                set(self.config.settings[nn.exclude_tags]))), :]
 
         if len(df) < 1:
             return

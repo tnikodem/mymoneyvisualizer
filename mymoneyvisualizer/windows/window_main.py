@@ -9,9 +9,9 @@ from mymoneyvisualizer.windows.window_tagger import WindowTagger
 from mymoneyvisualizer.windows.window_taggeroverview import WindowTaggerOverview
 from mymoneyvisualizer.windows.window_accounts import WindowAccounts
 from mymoneyvisualizer.windows.window_detailmonth import WindowDetailMonth
-from mymoneyvisualizer.windows.window_summary import WindowSummary
+from mymoneyvisualizer.windows.window_summarytable import WindowSummaryTable
+from mymoneyvisualizer.windows.window_summarygraph import WindowSummaryGraph
 from mymoneyvisualizer.windows.window_importdata import WindowImportData
-from mymoneyvisualizer.windows.window_graph import WindowGraph
 
 logger = logging.getLogger(__name__)
 
@@ -62,9 +62,9 @@ class WindowMain(QMainWindow):
                                               )
         self.detail_month_window = WindowDetailMonth(
             parent=self, config=self.config)
-        self.summary_window = WindowSummary(parent=self, config=self.config,
-                                            detail_month_window=self.detail_month_window)
-        self.graph_window = WindowGraph(parent=self, config=self.config)
+        self.summary_window = WindowSummaryTable(parent=self, config=self.config,
+                                                 detail_month_window=self.detail_month_window)
+        self.graph_window = WindowSummaryGraph(parent=self, config=self.config)
 
         # #actions
         self.accounts_button.clicked.connect(self.accounts_window.show)

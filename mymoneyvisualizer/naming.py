@@ -46,3 +46,5 @@ class Naming:
     basic = "basic"
     optional = "optional"
     income = "income"
+
+    exclude_tags = "exclude_tags"
