@@ -8,6 +8,8 @@ from PyQt6.QtWidgets import QPushButton
 from PyQt6.QtWidgets import QHBoxLayout, QVBoxLayout
 from PyQt6.QtCore import Qt
 
+from mymoneyvisualizer.constants import DEFAULT_BACKGROUND_COLOR, GREEN_BACKGROUND_COLOR, RED_BACKGROUND_COLOR
+
 from mymoneyvisualizer.naming import Naming as nn
 from mymoneyvisualizer.windows.widgets.multi_account_table import MultiAccountTable, ResizeMainWindow
 

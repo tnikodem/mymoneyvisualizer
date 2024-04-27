@@ -1,25 +1,18 @@
 # -*- coding: utf-8 -*-
 import logging
-from enum import Enum
-import pandas as pd
 import datetime
 
-from PyQt6.QtWidgets import QWidget, QMainWindow, QVBoxLayout, QLineEdit, QLabel, QCompleter
-from PyQt6.QtWidgets import QPushButton
+from PyQt6.QtWidgets import QWidget, QMainWindow, QVBoxLayout
 from PyQt6.QtWidgets import QTableWidget, QTableWidgetItem
 from PyQt6.QtWidgets import QAbstractItemView
-from PyQt6.QtWidgets import QHBoxLayout, QVBoxLayout
+from PyQt6.QtWidgets import QVBoxLayout
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 
+from mymoneyvisualizer.constants import GREY_BACKGROUND_COLOR
 from mymoneyvisualizer.naming import Naming as nn
 
 logger = logging.getLogger(__name__)
-
-GREY_BACKGROUND_COLOR = (123, 123, 123)
-DEFAULT_BACKGROUND_COLOR = (255, 255, 255)
-GREEN_BACKGROUND_COLOR = (203, 255, 179)
-RED_BACKGROUND_COLOR = (255, 122, 111)
 
 
 TABLE_COLUMNS = [nn.transaction_id, nn.tagger_name,
