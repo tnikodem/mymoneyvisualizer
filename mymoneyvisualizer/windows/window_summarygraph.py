@@ -7,7 +7,7 @@ import pandas as pd
 
 from PyQt6.QtWidgets import QMainWindow, QPushButton
 from PyQt6.QtWidgets import QWidget, QMainWindow, QVBoxLayout, QHBoxLayout
-from PyQt6.QtWidgets import QMainWindow, QWidget
+from PyQt6.QtWidgets import QMainWindow, QWidget, QLabel, QComboBox
 
 from mymoneyvisualizer.naming import Naming as nn
 from mymoneyvisualizer.windows.widgets.select_exclude_tagger import ExcludeTaggerSelectComboBox
@@ -40,6 +40,35 @@ class SummaryGraphWidget(QWidget):
         self.layout.addLayout(vlayout, 100)
 
 
+class AggregationSelect(QWidget):
+    def __init__(self, parent, main):
+        super(AggregationSelect, self).__init__(parent)
+        self.main = main
+        self.layout = QHBoxLayout(self)
+        self.layout.addWidget(QLabel("Aggregate months"))
+
+        self.combobox = QComboBox()
+        self.combobox.addItem('1')
+        self.combobox.addItem('2')
+        self.combobox.addItem('3')
+        self.combobox.addItem('6')
+        self.combobox.addItem('12')
+        self.layout.addWidget(self.combobox)
+
+        self.update_combobox()
+
+        # add action
+        self.combobox.currentTextChanged.connect(
+            self.main.update_plot_aggregation_month)
+
+    def update_combobox(self):
+        current_text = "3"
+        if nn.plot_aggregation_month in self.main.config.settings:
+            current_text = str(
+                self.main.config.settings[nn.plot_aggregation_month])
+        self.combobox.setCurrentText(current_text)
+
+
 class WindowSummaryGraph(QMainWindow):
     def __init__(self, parent, config):
         super(WindowSummaryGraph, self).__init__(parent)
@@ -49,6 +78,7 @@ class WindowSummaryGraph(QMainWindow):
 
         self.df_summary = None
         self.df_summary_income = None
+        # TODO move into config settings
         self.budgets = {nn.basic: 0.5,
                         nn.optional: 0.3
                         }
@@ -69,10 +99,10 @@ class WindowSummaryGraph(QMainWindow):
 
         # Navigation Bar
         hlayout = QHBoxLayout()
-        self.button = QPushButton('Start', self)
-        self.button.setFixedHeight(30)
-        self.button.setFixedWidth(130)
-        hlayout.addWidget(self.button)
+        # TODO figure out how to correctly implement multiselect
+        # hlayout.addStretch(2)
+        self.aggregation_select = AggregationSelect(parent=self, main=self)
+        hlayout.addWidget(self.aggregation_select)
         self.multi_select = ExcludeTaggerSelectComboBox(self, main=self)
         hlayout.addWidget(self.multi_select)
         layout.addLayout(hlayout)
@@ -88,13 +118,6 @@ class WindowSummaryGraph(QMainWindow):
 
         self.run_update_callbacks()
 
-    @staticmethod
-    def get_base_tag(tag):
-        tag = str(tag)
-        tags = tag.split(".")
-        tag_out = tags[0]
-        return tag_out
-
     def add_update_callback(self, func):
         self.update_callbacks += [func]
 
@@ -104,6 +127,11 @@ class WindowSummaryGraph(QMainWindow):
         for func in self.update_callbacks:
             func()
         self.updateing = False
+
+    def update_plot_aggregation_month(self, value):
+        self.config.settings[nn.plot_aggregation_month] = int(value)
+        self.config.save_settings()
+        self.run_update_callbacks()
 
     def set_excluded_tags(self, tags):
         self.config.settings[nn.exclude_tags] = list(tags)
@@ -142,7 +170,8 @@ class WindowSummaryGraph(QMainWindow):
         if len(df) < 1:
             return
 
-        df[nn.tag] = df[nn.tag].apply(self.get_base_tag)
+        # TODO change to "base tag"
+        df[nn.tag] = df[nn.tag].str.split(".").str[0]
         df = df[[nn.date, nn.value, nn.tag]]
 
         # Fill holes
@@ -154,15 +183,17 @@ class WindowSummaryGraph(QMainWindow):
                                     })
         df = pd.concat([df, temp_values], sort=False)
 
-        # create
-        dfg = df.groupby([nn.tag, pd.Grouper(freq="3ME", key=nn.date)]).agg(
+        # Pivot Table
+        aggregate_months = self.config.settings.get(
+            nn.plot_aggregation_month, 3)
+        dfg = df.groupby([nn.tag, pd.Grouper(freq=f"{aggregate_months}ME", key=nn.date)]).agg(
             {nn.value: "sum"}).reset_index()
         dfp = dfg.pivot(index=nn.date, columns=nn.tag,
                         values=["value"]).fillna(0.)
         dfp.columns = dfp.columns.get_level_values(1)
 
-        # assume first and last row are not complete
-        dfp = dfp[1:-1]
+        # assume first row is not complete
+        dfp = dfp[1:]
 
         # Add missing in tag categories
         for col in dfp.columns:
@@ -171,7 +202,7 @@ class WindowSummaryGraph(QMainWindow):
 
         self.df_summary = dfp
 
-        # TODO calc from category, make baseline 0 if no income is selected
+        # get income series
         self.df_summary_income = np.zeros(len(dfp))
         for tag_cat in self.config.tag_categories.get():
             if tag_cat.category != nn.income:

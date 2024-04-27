@@ -35,11 +35,11 @@ class WindowMain(QMainWindow):
         self.accounts_button.resize(250, 32)
         self.accounts_button.move(40, 0)
 
-        self.summary_button = QPushButton('Summary', self)
+        self.summary_button = QPushButton('Summary Table', self)
         self.summary_button.resize(250, 32)
         self.summary_button.move(40, 50)
 
-        self.graph_button = QPushButton('Graph', self)
+        self.graph_button = QPushButton('Summary Graph', self)
         self.graph_button.resize(250, 32)
         self.graph_button.move(40, 100)
 

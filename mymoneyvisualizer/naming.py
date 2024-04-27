@@ -47,4 +47,6 @@ class Naming:
     optional = "optional"
     income = "income"
 
+    # settings
     exclude_tags = "exclude_tags"
+    plot_aggregation_month = "plot_aggregation_month"
