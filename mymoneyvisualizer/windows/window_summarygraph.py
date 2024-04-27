@@ -5,12 +5,13 @@ import logging
 import numpy as np
 import pandas as pd
 
-from PyQt6.QtWidgets import QMainWindow, QPushButton
 from PyQt6.QtWidgets import QWidget, QMainWindow, QVBoxLayout, QHBoxLayout
 from PyQt6.QtWidgets import QMainWindow, QWidget, QLabel, QComboBox
 
 from mymoneyvisualizer.naming import Naming as nn
-from mymoneyvisualizer.windows.widgets.select_exclude_tagger import ExcludeTaggerSelectComboBox
+from mymoneyvisualizer.windows.widgets.select_exclude_tags import SelectExcludeTags
+from mymoneyvisualizer.windows.widgets.select_average_tags import SelectAverageTags
+
 from mymoneyvisualizer.windows.widgets.assign_tag_category import AssignTagCategoryWidget
 from mymoneyvisualizer.windows.widgets.sumamry_plot import SummaryPlotWidget
 
@@ -45,7 +46,9 @@ class AggregationSelect(QWidget):
         super(AggregationSelect, self).__init__(parent)
         self.main = main
         self.layout = QHBoxLayout(self)
-        self.layout.addWidget(QLabel("Aggregate months"))
+        self.label = QLabel("Aggregate months")
+        self.label.setFixedWidth(100)
+        self.layout.addWidget(self.label)
 
         self.combobox = QComboBox()
         self.combobox.addItem('1')
@@ -53,6 +56,7 @@ class AggregationSelect(QWidget):
         self.combobox.addItem('3')
         self.combobox.addItem('6')
         self.combobox.addItem('12')
+        self.combobox.setFixedWidth(40)
         self.layout.addWidget(self.combobox)
 
         self.update_combobox()
@@ -103,8 +107,12 @@ class WindowSummaryGraph(QMainWindow):
         # hlayout.addStretch(2)
         self.aggregation_select = AggregationSelect(parent=self, main=self)
         hlayout.addWidget(self.aggregation_select)
-        self.multi_select = ExcludeTaggerSelectComboBox(self, main=self)
-        hlayout.addWidget(self.multi_select)
+
+        self.select_average_tags = SelectAverageTags(self, main=self)
+        hlayout.addWidget(self.select_average_tags)
+
+        self.multi_select_excluded_tags = SelectExcludeTags(self, main=self)
+        hlayout.addWidget(self.multi_select_excluded_tags)
         layout.addLayout(hlayout)
 
         # graph
@@ -130,6 +138,11 @@ class WindowSummaryGraph(QMainWindow):
 
     def update_plot_aggregation_month(self, value):
         self.config.settings[nn.plot_aggregation_month] = int(value)
+        self.config.save_settings()
+        self.run_update_callbacks()
+
+    def set_average_tags(self, tags):
+        self.config.settings[nn.average_tags] = list(tags)
         self.config.save_settings()
         self.run_update_callbacks()
 
@@ -191,6 +204,23 @@ class WindowSummaryGraph(QMainWindow):
         dfp = dfg.pivot(index=nn.date, columns=nn.tag,
                         values=["value"]).fillna(0.)
         dfp.columns = dfp.columns.get_level_values(1)
+
+        # Average columns
+        if nn.average_tags in self.config.settings:
+            index = (dfp.index.astype(np.int64)*1e-12).astype(int)
+            for tag in self.config.settings[nn.average_tags]:
+                # assume first and last entry are not complete
+                center_index = index[1:-1]
+                center_series = dfp[tag][1:-1]
+                coef = np.polyfit(x=center_index, y=center_series, deg=1)
+                poly1d_fn = np.poly1d(coef)
+                values = index.map(poly1d_fn)
+                mean_rel_diff = np.mean(np.abs((dfp[tag] - values) / values))
+                if mean_rel_diff > 1:
+                    coef = np.polyfit(x=center_index, y=center_series, deg=0)
+                    poly0d_fn = np.poly1d(coef)
+                    values = index.map(poly0d_fn)
+                dfp[tag] = values
 
         # assume first row is not complete
         dfp = dfp[1:]

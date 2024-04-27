@@ -49,4 +49,5 @@ class Naming:
 
     # settings
     exclude_tags = "exclude_tags"
+    average_tags = "average_tags"
     plot_aggregation_month = "plot_aggregation_month"

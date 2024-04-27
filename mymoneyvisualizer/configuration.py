@@ -32,6 +32,9 @@ class Configuration:
 
     def save_settings(self):
         settings_filepath = self.dir_path+CONTAINER_FILEPATH
+        if not os.path.exists(self.dir_path):
+            os.mkdir(self.dir_path)
+
         with open(settings_filepath, 'w') as outfile:
             yaml.dump(self.settings, outfile, default_flow_style=False)
 

@@ -148,7 +148,7 @@ class MyTaggerWidget(QWidget):
 
         # Update tag completer
         # TODO every time create a new autocompleter??!! update compelte text of autocompleter instead if possible?!
-        unique_tags = self.main.config.taggers.get_unique_tags()
+        unique_tags = self.main.config.accounts.get_unique_tags()
         logger.debug(f"unique tags: {unique_tags}")
         tag_completer = QCompleter(unique_tags)
         self.tag_textbox.setText(self.main.tagger.tag)

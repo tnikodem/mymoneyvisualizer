@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import logging
-
+import warnings
 import numpy as np
 import pandas as pd
 
@@ -169,5 +169,6 @@ class SummaryPlotWidget(QWidget):
         for stack_data in stacked_data_series:
             max_y = max(max_y, max(stack_data["dataseries"]))
 
-        self.plot_graph.setXRange(ds_dates[0], ds_dates[-1], padding=0)
         self.plot_graph.setYRange(0, max_y*1.2, padding=0)
+        with warnings.catch_warnings(action="ignore"):
+            self.plot_graph.setXRange(ds_dates[0], ds_dates[-1], padding=0)

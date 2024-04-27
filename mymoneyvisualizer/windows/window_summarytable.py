@@ -13,10 +13,9 @@ from PyQt6.QtWidgets import QLabel
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 
-from pyqt6_multiselect_combobox import MultiSelectComboBox
-
-
 from mymoneyvisualizer.naming import Naming as nn
+from mymoneyvisualizer.windows.widgets.select_exclude_tags import SelectExcludeTags
+
 
 logger = logging.getLogger(__name__)
 
@@ -84,46 +83,6 @@ class MyTableWidget(QWidget):
                 self.table_widget.setItem(i, j, item)
 
 
-class ExcludeTaggerSelectComboBox(QWidget):
-    def __init__(self, parent, main):
-        super(QWidget, self).__init__(parent)
-        self.main = main
-
-        self.updateing = True
-
-        self.label = QLabel("Exclude:", self)
-        self.multi_select = MultiSelectComboBox(self)
-
-        self.layout = QHBoxLayout(self)
-        self.layout.addWidget(self.label)
-        self.layout.addWidget(self.multi_select)
-        self.setLayout(self.layout)
-
-        # add actions
-        self.main.config.taggers.add_update_callback(self.update_tag_list)
-        # FIXME only gets triggered if there are visible changes! Functionality missing currently in widget!
-        self.multi_select.currentTextChanged.connect(self.update_excluded_tags)
-
-        self.update_tag_list()
-
-    def update_excluded_tags(self, a):
-        if not self.updateing:
-            self.main.set_excluded_tags(self.multi_select.currentData())
-
-    def update_tag_list(self):
-        self.updateing = True
-        unique_tags = self.main.config.taggers.get_unique_tags()
-        self.multi_select.clear()
-        selected_indexes = []
-        for i, tag in enumerate(unique_tags):
-            self.multi_select.addItem(tag, tag)
-            if tag in self.main.excluded_tags:
-                selected_indexes += [i]
-        if len(selected_indexes) > 0:
-            self.multi_select.setCurrentIndexes(selected_indexes)
-        self.updateing = False
-
-
 class SummaryWidget(QWidget):
     def __init__(self, parent, main):
         super(QWidget, self).__init__(parent)
@@ -142,7 +101,7 @@ class SummaryWidget(QWidget):
         self.button_after.move(340, 0)
         self.button_after.clicked.connect(self.main.month_after)
 
-        self.multi_select = ExcludeTaggerSelectComboBox(self, main)
+        self.multi_select = SelectExcludeTags(self, main)
         self.multi_select.resize(300, 44)
         self.multi_select.move(600, 0)
 

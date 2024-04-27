@@ -39,14 +39,6 @@ class Taggers(OrderedDataContainer):
             df = tagger.tag_df(df)
         return df
 
-    def get_unique_tags(self):
-        tag_set = set()
-        for f in self.get():
-            tag_set.add(f.tag)
-        tags = sorted(list(tag_set))
-        logger.debug(f"get unique tags: {tags}")
-        return tags
-
     def get_free_tagger_name(self, name=None):
         if name is None:
             name = "new_tagger"

@@ -52,6 +52,19 @@ class Accounts(OrderedDataContainer):
             super().delete(name)
             logger.debug("deleted "+str(name))
 
+    def get_unique_tags(self):
+        tag_set = set()
+        for account in self.values():
+            tag_set.update(account.df[nn.tag].unique())
+        tags = sorted(list(tag_set))
+        return tags
+
+    def get_unique_base_tags(self):
+        tags = self.get_unique_tags()
+        base_tags = [t.split(".")[0] for t in tags]
+        base_tags = sorted(list(set(base_tags)))
+        return base_tags
+
     def get_base_tag_df(self, base_tag):
         dfs = []
         for account in self.values():
