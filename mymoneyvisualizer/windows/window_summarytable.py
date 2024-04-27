@@ -180,8 +180,8 @@ class WindowSummaryTable(QMainWindow):
 
     # TODO unittest method
     def summary_df(self):
-        logger.debug(f"request summary df from {
-                     self.date_from} upto {self.date_upto}")
+        logger.debug(
+            f"request summary df from {self.date_from} upto {self.date_upto}")
         dfs = []
         account_names = []
         for acc in self.config.accounts.get():
