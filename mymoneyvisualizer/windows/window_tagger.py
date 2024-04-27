@@ -3,22 +3,15 @@ import logging
 from enum import Enum
 import pandas as pd
 
-from PyQt6.QtWidgets import QWidget, QMainWindow, QVBoxLayout, QLineEdit, QLabel, QCompleter
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLineEdit, QLabel, QCompleter
 from PyQt6.QtWidgets import QPushButton
-from PyQt6.QtWidgets import QTableWidget, QTableWidgetItem
-from PyQt6.QtWidgets import QAbstractItemView
 from PyQt6.QtWidgets import QHBoxLayout, QVBoxLayout
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QColor
 
 from mymoneyvisualizer.naming import Naming as nn
+from mymoneyvisualizer.windows.widgets.multi_account_table import MultiAccountTable, ResizeMainWindow
 
 logger = logging.getLogger(__name__)
-
-
-DEFAULT_BACKGROUND_COLOR = (255, 255, 255)
-GREEN_BACKGROUND_COLOR = (203, 255, 179)
-RED_BACKGROUND_COLOR = (255, 122, 111)
 
 
 class WindowModes(Enum):
@@ -51,65 +44,6 @@ class TaggerDefinition(QWidget):
         self.description_regex_textbox.setMinimumWidth(200)
         self.layout_tagger_definition.addWidget(self.description_regex_textbox)
         self.setLayout(self.layout_tagger_definition)
-
-
-class MyTableWidgetMultiAccount(QWidget):
-    # TODO refactor and combine with account Tablewidget?!
-    def __init__(self, parent, main):
-        super(QWidget, self).__init__(parent)
-        self.main = main
-        self.columns = [nn.transaction_id, nn.account, nn.date, nn.recipient,
-                        nn.description, nn.value, nn.tag]
-        self.table_widget = QTableWidget()
-        self.table_widget.setEditTriggers(
-            QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.table_widget.setColumnCount(len(self.columns))
-        self.table_widget.setHorizontalHeaderLabels(self.columns)
-        self.table_widget.verticalHeader().setVisible(False)
-        self.table_widget.setColumnHidden(0, True)
-        self.table_widget.setColumnWidth(1, 100)
-        self.table_widget.setColumnWidth(2, 80)
-        self.table_widget.setColumnWidth(3, 280)
-        self.table_widget.setColumnWidth(4, 735)
-        self.table_widget.setColumnWidth(5, 80)
-        self.table_widget.setColumnWidth(6, 150)
-        self.table_widget.verticalHeader().setDefaultSectionSize(60)
-        self.table_widget.horizontalHeader().setStretchLastSection(True)
-        self.layout = QVBoxLayout(self)
-        self.layout.addWidget(self.table_widget)
-        self.setLayout(self.layout)
-        self.main.resize_callbacks += [self.resize_window]
-
-    def resize_window(self, width):
-        additional_width = max(width - 1500, -200)
-        additional_width = int(additional_width/2)
-        self.table_widget.setColumnWidth(3, 280+additional_width)
-        self.table_widget.setColumnWidth(4, 735+additional_width)
-
-    def update_table(self):
-        if self.main.mask_recipient_matches is None or self.main.mask_description_matches is None:
-            first_row_color = QColor(*DEFAULT_BACKGROUND_COLOR)
-        elif self.main.mask_recipient_matches and self.main.mask_description_matches:
-            first_row_color = QColor(*GREEN_BACKGROUND_COLOR)
-        else:
-            first_row_color = QColor(*RED_BACKGROUND_COLOR)
-
-        df = self.main.filtered_df
-        self.table_widget.setRowCount(len(df))
-        for i, row in df.iterrows():
-            for j, col in enumerate(self.columns):
-                if col not in row:
-                    item = QTableWidgetItem("")
-                elif isinstance(row[col], (int, float)):
-                    item = QTableWidgetItem()
-                    item.setData(Qt.ItemDataRole.EditRole, row[col])
-                else:
-                    item = QTableWidgetItem(str(row[col]))
-                if i == 0:
-                    item.setBackground(first_row_color)
-                self.table_widget.setItem(i, j, item)
-
-        logger.debug(f"table updated \n {df.head()}")
 
 
 class MyTaggerWidget(QWidget):
@@ -146,8 +80,8 @@ class MyTaggerWidget(QWidget):
         self.layout.addWidget(self.tagger_definition_widget)
 
         # Create Table
-        self.multi_account_table = MyTableWidgetMultiAccount(
-            self, main=self.main)
+        self.multi_account_table = MultiAccountTable(
+            self, main=self.main, color_first_row=True)
         self.layout.addWidget(self.multi_account_table)
 
         # Actions
@@ -222,25 +156,13 @@ class MyTaggerWidget(QWidget):
         self.main.save_tagger()
 
 
-class MyMainWindow(QMainWindow):
-    def __init__(self):
-        super().__init__()
-        self.resize_callbacks = []
-
-    def resizeEvent(self, event):
-        width = self.size().width()
-        for f in self.resize_callbacks:
-            f(width=width)
-        QMainWindow.resizeEvent(self, event)
-
-
-class WindowTagger(MyMainWindow):
+class WindowTagger(ResizeMainWindow):
     def __init__(self, parent, config):
         super().__init__()
         self.config = config
         self.window_mode = WindowModes.tagger
         self.tagger = None
-        self.filtered_df = None
+        self.multi_account_df = None
         self.mask_recipient_matches = None
         self.mask_description_matches = None
 
@@ -278,6 +200,7 @@ class WindowTagger(MyMainWindow):
         self.tagger_widget.update()
         self.show()
 
+    # TODO rename to "get_tagger_df"
     def get_filtered_df(self):
         df = self.config.accounts.get_filtered_df(self.tagger)
         if self.tagger.transaction_id is not None:
@@ -297,7 +220,7 @@ class WindowTagger(MyMainWindow):
         else:
             self.mask_recipient_matches = None
             self.mask_description_matches = None
-        self.filtered_df = df
+        self.multi_account_df = df
 
     def save_tagger(self):
         if self.window_mode == WindowModes.one_time_tag:

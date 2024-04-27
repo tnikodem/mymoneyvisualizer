@@ -29,7 +29,34 @@ class OrderedDataContainer:
     def __repr__(self):
         return self.__str__()
 
+    # TODO refactor to standard
     def __iter__(self):
+        for v in self.data_objects.values():
+            yield v
+
+    def get(self):
+        for f in self.data_objects.keys():
+            yield self.data_objects[f]
+
+    def get_by_index(self, index):
+        if index <= len(self):
+            for i, data in enumerate(self.get()):
+                if i == index:
+                    return data
+
+    def get_by_name(self, name):
+        if name in self.data_objects:
+            return self.data_objects[name]
+
+    def items(self):
+        for i in self.data_objects.items():
+            yield i
+
+    def keys(self):
+        for k in self.data_objects.keys():
+            yield k
+
+    def values(self):
         for v in self.data_objects.values():
             yield v
 
@@ -83,20 +110,6 @@ class OrderedDataContainer:
         if name in self.data_objects:
             self.data_objects.pop(name)
         self.save()
-
-    def get(self):
-        for f in self.data_objects.keys():
-            yield self.data_objects[f]
-
-    def get_by_index(self, index):
-        if index <= len(self):
-            for i, data in enumerate(self.get()):
-                if i == index:
-                    return data
-
-    def get_by_name(self, name):
-        if name in self.data_objects:
-            return self.data_objects[name]
 
     def add_update_callback(self, func):
         self.update_callbacks += [func]

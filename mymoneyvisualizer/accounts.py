@@ -3,6 +3,7 @@ import os
 import pathlib
 import logging
 import datetime
+import warnings
 import numpy as np
 import pandas as pd
 import uuid
@@ -51,6 +52,25 @@ class Accounts(OrderedDataContainer):
             super().delete(name)
             logger.debug("deleted "+str(name))
 
+    def get_base_tag_df(self, base_tag):
+        dfs = []
+        for account in self.values():
+            if base_tag != "":
+                mask = account.df[nn.tag].str.split(".").str[0] == base_tag
+                dftmp = account.df[mask]
+            else:
+                dftmp = account.df
+            if len(dftmp) < 1:
+                continue
+
+            with warnings.catch_warnings(action="ignore"):
+                dftmp.loc[:, nn.account] = account.name
+            dfs += [dftmp]
+        if len(dfs) > 0:
+            return pd.concat(dfs, sort=False)
+        return None
+
+    # TODO rename to get_tagger_df
     def get_filtered_df(self, tagger):
         logger.debug("get filtered df for "+tagger.name)
 

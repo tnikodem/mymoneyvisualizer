@@ -48,7 +48,7 @@ def test_overview(tmp_path, qtbot, config, window_main_account_full, test_input_
     assert abs(qt_df_summary["total"].astype(
         float).sum() - test_input_df[nn.value].sum()*2) < 1.
 
-    # move 2 month fprward
+    # move 2 month forward
     qtbot.mouseClick(
         window_main.summary_window.summary_widget.button_after, Qt.MouseButton.LeftButton)
     qtbot.mouseClick(

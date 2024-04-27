@@ -60,8 +60,8 @@ class WindowMain(QMainWindow):
                                               addtrans_window=self.addtrans_window,
                                               importdata_window=self.importdata_window,
                                               )
-        self.detail_month_window = WindowDetailMonth(parent=self, config=self.config,
-                                                     tagger_window=self.tagger_window)
+        self.detail_month_window = WindowDetailMonth(
+            parent=self, config=self.config)
         self.summary_window = WindowSummary(parent=self, config=self.config,
                                             detail_month_window=self.detail_month_window)
         self.graph_window = WindowGraph(parent=self, config=self.config)

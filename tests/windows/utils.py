@@ -12,8 +12,12 @@ class CallbackCounter:
 
 
 def qt_table_to_dataframe(table):
+    columns = []
+    for i in range(table.table_widget.horizontalHeader().count()):
+        columns += [table.table_widget.horizontalHeaderItem(i).text()]
+
     dict_df = {}
-    for i, col in enumerate(table.columns):
+    for i, col in enumerate(columns):
         data = []
         for j in range(table.table_widget.rowCount()):
             data += [table.table_widget.item(j, i).text()]

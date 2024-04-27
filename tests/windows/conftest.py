@@ -17,8 +17,7 @@ from mymoneyvisualizer.windows.window_main import WindowMain
 
 
 # run pytests in an environment without display (e.g. ci runner)
-# if not "DISPLAY" in os.environ and not "-s" in sys.argv:
-if not "DISPLAY" in os.environ:
+if not "DISPLAY" in os.environ and not "-s" in sys.argv:
     app = QApplication(sys.argv+['-platform', 'minimal'])
 
 
