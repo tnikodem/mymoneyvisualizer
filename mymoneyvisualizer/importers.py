@@ -276,7 +276,7 @@ class Importer:
         # if not parsing dates at the very first step bad things may happen?!
         load_config = self.config.copy()
         if self.col_date != '' and self.col_date in self.available_columns:
-            load_config["parse_dates"] = [self.col_date]
+            load_config["dtype"] = {self.col_date: str}
         # read csv crash with certain >thousands< values
         if nn.thousands in load_config:
             if load_config[nn.thousands] in ["", load_config[nn.seperator], load_config[nn.decimal]]:
@@ -336,7 +336,8 @@ class Importer:
                 df = df[df[nn.date] >= self.import_since]
 
         if nn.value in df.columns:
-            df = df.query(f"abs({nn.value} > 0)")
+            # TODO check why bug was not covered in unit tests!!
+            df = df.query(f"abs({nn.value}) > 0")
 
         for col in [nn.date, nn.recipient, nn.description, nn.value]:
             if col not in df:
