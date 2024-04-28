@@ -2,6 +2,7 @@
 
 import logging
 
+import datetime
 import numpy as np
 import pandas as pd
 
@@ -87,6 +88,8 @@ class WindowSummaryGraph(QMainWindow):
                         nn.optional: 0.3
                         }
 
+        self.statistics_numbers = {}
+
         super().__init__()
         logger.debug("starting main window")
 
@@ -156,7 +159,7 @@ class WindowSummaryGraph(QMainWindow):
             new_sorted_tags=new_sorted_tags)
         self.run_update_callbacks()
 
-    def update_budget(self, category, budget):
+    def update_budget_factor(self, category, budget):
         self.budgets[category] = budget
         self.run_update_callbacks()
 
@@ -183,7 +186,7 @@ class WindowSummaryGraph(QMainWindow):
         if len(df) < 1:
             return
 
-        # TODO change to "base tag"
+        # TODO change "tag" to "base tag", as this is what it really is here..
         df[nn.tag] = df[nn.tag].str.split(".").str[0]
         df = df[[nn.date, nn.value, nn.tag]]
 
@@ -240,3 +243,47 @@ class WindowSummaryGraph(QMainWindow):
             if tag_cat.name not in dfp.columns:
                 continue
             self.df_summary_income += dfp[tag_cat.name]
+
+        # calculate budget numbers
+        # for the moment calculate budget for last year, make it later choosable
+        budget_year = df[nn.date].max().year
+        budget_dates = pd.date_range(datetime.date(budget_year-1, 12, 31),
+                                     datetime.date(budget_year, 12, 31),
+                                     freq=f"{aggregate_months}ME")
+        budget_dates = budget_dates[1:]
+
+        if len(budget_dates) < 1:
+            return
+
+        # calculated expected income in last year
+        index = (dfp.index.astype(np.int64)*1e-12).astype(int)
+        center_index = index[1:-1]
+        center_series = self.df_summary_income[1:-1]
+        deg = 1
+        if len(center_series) < 1:
+            return
+        elif len(center_series) < 2:
+            deg = 0
+        coef = np.polyfit(x=center_index, y=center_series, deg=deg)
+        poly1d_fn = np.poly1d(coef)
+        budget_index = (budget_dates.astype(np.int64)*1e-12).astype(int)
+        expected_income = budget_index.map(poly1d_fn)
+        expected_income = np.sum(expected_income)
+        self.statistics_numbers = dict(
+            budget_year=budget_year,
+            expected_income=expected_income,
+            last_date=df[nn.date].max(),
+            consumed_budget=dict()
+        )
+
+        exclude_tags = set()
+        if nn.exclude_tags in self.config.settings and len(self.config.settings[nn.exclude_tags]) > 0:
+            exclude_tags = set(self.config.settings[nn.exclude_tags])
+
+        df_budget_year = df.query(f"{nn.date} > {budget_year}")
+        for tag_cat in self.config.tag_categories.values():
+            if tag_cat.name in exclude_tags:
+                continue
+
+            self.statistics_numbers["consumed_budget"][tag_cat.name] = df_budget_year.query(
+                f"{nn.tag} == '{tag_cat.name}'")[nn.value].sum()
