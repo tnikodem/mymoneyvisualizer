@@ -72,6 +72,4 @@ class WindowMain(QMainWindow):
         self.graph_button.clicked.connect(self.graph_window.show)
 
         logger.debug("starting main window finished")
-        # self.show()
-
-        self.graph_window.show()
+        self.show()
