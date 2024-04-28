@@ -28,7 +28,7 @@ setup(
         'numpy==1.26.*',
         'pandas==2.2.*',
         'pyyaml==6.0.*',
-        'pyqt6==6.6.*',
+        'pyqt6>=6.6,<6.8',
         'PyQt6_Qt6==6.6.*',
         'pyqtgraph==0.13.*',
         'pyqt6-multiselect-combobox==1.1.*',
