@@ -64,12 +64,13 @@ class WindowMain(QMainWindow):
             parent=self, config=self.config)
         self.summary_window = WindowSummaryTable(parent=self, config=self.config,
                                                  detail_month_window=self.detail_month_window)
-        self.graph_window = WindowSummaryGraph(parent=self, config=self.config)
+        self.summarygraph_window = WindowSummaryGraph(
+            parent=self, config=self.config)
 
         # #actions
         self.accounts_button.clicked.connect(self.accounts_window.show)
         self.summary_button.clicked.connect(self.summary_window.show)
-        self.graph_button.clicked.connect(self.graph_window.show)
+        self.graph_button.clicked.connect(self.summarygraph_window.show)
 
         logger.debug("starting main window finished")
         self.show()

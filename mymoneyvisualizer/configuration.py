@@ -8,17 +8,26 @@ from mymoneyvisualizer.taggers import Taggers
 from mymoneyvisualizer.importers import Importers
 from mymoneyvisualizer.accounts import Accounts
 from mymoneyvisualizer.tag_categories import TagCategories
-
+from mymoneyvisualizer.constants import DEFAULT_SETTINGS
 
 logger = logging.getLogger(__name__)
 
 CONTAINER_FILEPATH = "/configuration.yaml"
 
 
+def overwrite_dict(old_dict, new_dict):
+    for key, value in new_dict.items():
+        if isinstance(value, dict):
+            value = overwrite_dict(old_dict=old_dict[key], new_dict=value)
+        old_dict[key] = value
+    return old_dict
+
+
 class Configuration:
     def __init__(self, dir_path):
         self.dir_path = dir_path
         self.settings = dict()
+        self.update_callbacks = list()
 
         self.load_settings()
         self.importers = Importers(dir_path=dir_path)
@@ -39,13 +48,22 @@ class Configuration:
             yaml.dump(self.settings, outfile, default_flow_style=False)
 
     def load_settings(self):
+        self.settings = DEFAULT_SETTINGS
+
         settings_filepath = self.dir_path+CONTAINER_FILEPATH
-        if os.path.isfile(settings_filepath):
-            self.settings = yaml.load(
-                open(settings_filepath).read(), Loader=SafeLoader)
+        if not os.path.isfile(settings_filepath):
+            return
+
+        loaded_settings = yaml.load(
+            open(settings_filepath).read(), Loader=SafeLoader)
+
+        self.settings = overwrite_dict(
+            old_dict=self.settings, new_dict=loaded_settings)
+
+        print(self.settings)
 
 
-# TODO refactor store and rading zip to "backup" or similar
+# TODO refactor store and reading zip to "backup" or similar
 
     @staticmethod
     def save_file_by_name(zipf, filepath, folder=""):

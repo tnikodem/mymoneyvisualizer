@@ -47,6 +47,8 @@ class Naming:
     optional = "optional"
     income = "income"
 
+    budget = "budget"
+
     # settings
     exclude_tags = "exclude_tags"
     average_tags = "average_tags"

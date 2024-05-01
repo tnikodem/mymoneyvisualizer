@@ -26,13 +26,13 @@ class SummaryGraphWidget(QWidget):
         self.main = main
         self.parent = parent
 
-        self.layout = QHBoxLayout(self)
+        self.layout = QHBoxLayout()
 
         self.assign_tagcategories = AssignTagCategoryWidget(
             parent=self, main=main)
         self.layout.addWidget(self.assign_tagcategories)
 
-        vlayout = QVBoxLayout(self)
+        vlayout = QVBoxLayout()
         self.plot_basic = SummaryPlotWidget(self, main=main, category=nn.basic)
         vlayout.addWidget(self.plot_basic)
         self.plot_optional = SummaryPlotWidget(
@@ -41,12 +41,14 @@ class SummaryGraphWidget(QWidget):
 
         self.layout.addLayout(vlayout, 100)
 
+        self.setLayout(self.layout)
+
 
 class AggregationSelect(QWidget):
     def __init__(self, parent, main):
         super(AggregationSelect, self).__init__(parent)
         self.main = main
-        self.layout = QHBoxLayout(self)
+        self.layout = QHBoxLayout()
         self.label = QLabel("Aggregate months")
         self.label.setFixedWidth(100)
         self.layout.addWidget(self.label)
@@ -58,45 +60,32 @@ class AggregationSelect(QWidget):
         self.combobox.addItem('6')
         self.combobox.addItem('12')
         self.combobox.setFixedWidth(40)
+        self.combobox.setCurrentText(
+            str(self.main.config.settings[nn.plot_aggregation_month]))
         self.layout.addWidget(self.combobox)
 
-        self.update_combobox()
+        self.setLayout(self.layout)
 
         # add action
         self.combobox.currentTextChanged.connect(
             self.main.update_plot_aggregation_month)
 
-    def update_combobox(self):
-        current_text = "3"
-        if nn.plot_aggregation_month in self.main.config.settings:
-            current_text = str(
-                self.main.config.settings[nn.plot_aggregation_month])
-        self.combobox.setCurrentText(current_text)
-
 
 class WindowSummaryGraph(QMainWindow):
     def __init__(self, parent, config):
         super(WindowSummaryGraph, self).__init__(parent)
+
         self.config = config
         self.update_callbacks = []
         self.updateing = True
 
         self.df_summary = None
         self.df_summary_income = None
-        # TODO move into config settings
-        self.budgets = {nn.basic: 0.5,
-                        nn.optional: 0.3
-                        }
-
         self.statistics_numbers = {}
-
-        super().__init__()
-        logger.debug("starting main window")
 
         self.title = 'My Money Visualiser'
         self.left = 100
         self.top = 100
-
         self.width = 1200
         self.height = 1000
         self.setWindowTitle(self.title)
@@ -110,9 +99,6 @@ class WindowSummaryGraph(QMainWindow):
         # hlayout.addStretch(2)
         self.aggregation_select = AggregationSelect(parent=self, main=self)
         hlayout.addWidget(self.aggregation_select)
-
-        self.select_average_tags = SelectAverageTags(self, main=self)
-        hlayout.addWidget(self.select_average_tags)
 
         self.multi_select_excluded_tags = SelectExcludeTags(self, main=self)
         hlayout.addWidget(self.multi_select_excluded_tags)
@@ -159,12 +145,25 @@ class WindowSummaryGraph(QMainWindow):
             new_sorted_tags=new_sorted_tags)
         self.run_update_callbacks()
 
-    def update_budget_factor(self, category, budget):
-        self.budgets[category] = budget
+    def update_budget_period(self, category, start, end):
+        self.config.settings[nn.budget][nn.basic]["start"] = start
+        self.config.settings[nn.budget][nn.basic]["end"] = end
+        self.config.settings[nn.budget][nn.optional]["start"] = start
+        self.config.settings[nn.budget][nn.optional]["end"] = end
+
+        self.config.save_settings()
+        self.run_update_callbacks()
+
+    def update_budget_factor(self, category, budget_factor):
+        self.config.settings[nn.budget][category]["factor"] = budget_factor
+        self.config.save_settings()
         self.run_update_callbacks()
 
     def get_data(self):
+        budget_period_start = self.config.settings[nn.budget]["basic"]["start"]
+        budget_period_end = self.config.settings[nn.budget]["basic"]["end"]
 
+        # get df with all transactions
         dfs = []
         account_names = []
         for acc in self.config.accounts.get():
@@ -173,31 +172,29 @@ class WindowSummaryGraph(QMainWindow):
             if len(df) < 1:
                 continue
             dfs += [df]
-
         if len(dfs) < 1:
             return
         df = pd.concat(dfs, sort=False)
         df = df.loc[~(df[nn.tag].isin(account_names)), :]
-
-        if nn.exclude_tags in self.config.settings and len(self.config.settings[nn.exclude_tags]) > 0:
+        if len(self.config.settings[nn.exclude_tags]) > 0:
             df = df.loc[~(df[nn.tag].isin(
                 set(self.config.settings[nn.exclude_tags]))), :]
-
         if len(df) < 1:
             return
-
         # TODO change "tag" to "base tag", as this is what it really is here..
         df[nn.tag] = df[nn.tag].str.split(".").str[0]
         df = df[[nn.date, nn.value, nn.tag]]
 
+        first_date = df[nn.date].min()
+        last_date = df[nn.date].max()
+
         # Fill holes
-        temp_dates = pd.date_range(
-            df[nn.date].min(), df[nn.date].max(), freq='1ME')
-        temp_values = pd.DataFrame({nn.date: temp_dates,
-                                    nn.value: [0]*len(temp_dates),
-                                    nn.tag: [" "]*len(temp_dates),
+        fill_dates = pd.date_range(first_date, last_date, freq='1ME')
+        fill_values = pd.DataFrame({nn.date: fill_dates,
+                                    nn.value: [0]*len(fill_dates),
+                                    nn.tag: [" "]*len(fill_dates),
                                     })
-        df = pd.concat([df, temp_values], sort=False)
+        df = pd.concat([df, fill_values], sort=False)
 
         # Pivot Table
         aggregate_months = self.config.settings.get(
@@ -208,82 +205,48 @@ class WindowSummaryGraph(QMainWindow):
                         values=["value"]).fillna(0.)
         dfp.columns = dfp.columns.get_level_values(1)
 
-        # Average columns
-        if nn.average_tags in self.config.settings:
-            index = (dfp.index.astype(np.int64)*1e-12).astype(int)
-            for tag in self.config.settings[nn.average_tags]:
-                # assume first and last entry are not complete
-                center_index = index[1:-1]
-                center_series = dfp[tag][1:-1]
-                coef = np.polyfit(x=center_index, y=center_series, deg=1)
-                poly1d_fn = np.poly1d(coef)
-                values = index.map(poly1d_fn)
-                mean_rel_diff = np.mean(np.abs((dfp[tag] - values) / values))
-                if mean_rel_diff > 1:
-                    coef = np.polyfit(x=center_index, y=center_series, deg=0)
-                    poly0d_fn = np.poly1d(coef)
-                    values = index.map(poly0d_fn)
-                dfp[tag] = values
-
-        # assume first row is not complete
-        dfp = dfp[1:]
-
-        # Add missing in tag categories
+        # Add missing base_tags in tag_categories
         for col in dfp.columns:
             if col not in self.config.tag_categories:
-                self.config.tag_categories.add(name=col, category="basic")
+                self.config.tag_categories.add(name=col, category=nn.basic)
 
         self.df_summary = dfp
 
-        # get income series
-        self.df_summary_income = np.zeros(len(dfp))
+        # get average income series + extrapolation
+        if len(dfp) < 3:
+            return
+
+        ds_income = np.zeros(len(dfp))
         for tag_cat in self.config.tag_categories.get():
             if tag_cat.category != nn.income:
                 continue
             if tag_cat.name not in dfp.columns:
                 continue
-            self.df_summary_income += dfp[tag_cat.name]
+            ds_income += dfp[tag_cat.name]
 
-        # calculate budget numbers
-        # for the moment calculate budget for last year, make it later choosable
-        budget_year = df[nn.date].max().year
-        budget_dates = pd.date_range(datetime.date(budget_year-1, 12, 31),
-                                     datetime.date(budget_year, 12, 31),
-                                     freq=f"{aggregate_months}ME")
-        budget_dates = budget_dates[1:]
+        # assume first and last value not complete
+        fit_dates = dfp.index.values[1:-1]
+        x_fit = (fit_dates.astype(np.int64)*1e-12).astype(int)
+        y_fit = ds_income[1:-1]
 
-        if len(budget_dates) < 1:
-            return
-
-        # calculated expected income in last year
-        index = (dfp.index.astype(np.int64)*1e-12).astype(int)
-        center_index = index[1:-1]
-        center_series = self.df_summary_income[1:-1]
-        deg = 1
-        if len(center_series) < 1:
-            return
-        elif len(center_series) < 2:
-            deg = 0
-        coef = np.polyfit(x=center_index, y=center_series, deg=deg)
+        coef = np.polyfit(x=x_fit, y=y_fit, deg=1)
         poly1d_fn = np.poly1d(coef)
-        budget_index = (budget_dates.astype(np.int64)*1e-12).astype(int)
-        expected_income = budget_index.map(poly1d_fn)
-        expected_income = np.sum(expected_income)
+
+        analysis_period_start = min(datetime.datetime(
+            budget_period_start-1, 12, 31), first_date)
+        analysis_period_end = max(
+            datetime.datetime(budget_period_end, 12, 31),
+            datetime.datetime(last_date.year, 12, 31),)
+        analysis_period_dates = pd.date_range(analysis_period_start, analysis_period_end,
+                                              freq=f"{aggregate_months}ME")
+        x_analysis_period = (analysis_period_dates.astype(
+            np.int64)*1e-12).astype(int)
+        average_income = x_analysis_period.map(poly1d_fn)
+
+        self.df_summary_income = pd.DataFrame(index=analysis_period_dates,
+                                              data=dict(average_income=average_income))
+
         self.statistics_numbers = dict(
-            budget_year=budget_year,
-            expected_income=expected_income,
-            last_date=df[nn.date].max(),
-            consumed_budget=dict()
+            first_date=first_date,
+            last_date=last_date
         )
-
-        exclude_tags = set()
-        if nn.exclude_tags in self.config.settings and len(self.config.settings[nn.exclude_tags]) > 0:
-            exclude_tags = set(self.config.settings[nn.exclude_tags])
-
-        df_budget_year = df.query(f"{nn.date} > {budget_year}")
-        for tag_cat in self.config.tag_categories.values():
-            if tag_cat.name in exclude_tags:
-                continue
-
-            self.statistics_numbers["consumed_budget"][tag_cat.name] = df_budget_year.query(
-                f"{nn.tag} == '{tag_cat.name}'")[nn.value].sum()
