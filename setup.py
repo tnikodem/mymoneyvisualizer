@@ -25,7 +25,7 @@ setup(
     platforms='any',
     python_requires='>=3.10',
     install_requires=[
-        'numpy==1.26.*',
+        'numpy>=1.26,<2.1',
         'pandas==2.2.*',
         'pyyaml==6.0.*',
         'pyqt6==6.6.*',
