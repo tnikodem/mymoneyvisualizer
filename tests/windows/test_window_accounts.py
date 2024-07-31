@@ -1,12 +1,7 @@
 # -*- coding: utf-8 -*-
 
-import sys
-import time
-import datetime
 import os
-import pandas as pd
 
-from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import Qt
 
 from mymoneyvisualizer.naming import Naming as nn
@@ -81,10 +76,3 @@ def test_money_transfer(tmp_path, qtbot, window_main_two_accounts_tagged):
     assert set(qt_df_cash[nn.tag].unique()) == {"cash", "grocery"}
     assert abs(float(
         window_main.accounts_window.tab_widget.tab_widgets[1].saldo_textbox.text()) - 40.0) < 0.0001
-
-
-# TODO test save load project
-
-    # window_main.show()
-    # qtbot.wait_for_window_shown(window_main)
-    # qtbot.stopForInteraction()

@@ -1,13 +1,7 @@
 # -*- coding: utf-8 -*-
 
-import time
 import datetime
-import os
-import pandas as pd
-
 from PyQt6.QtCore import Qt, QDate
-
-from mymoneyvisualizer.windows.window_main import WindowMain
 
 from .utils import CallbackCounter
 

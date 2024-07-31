@@ -68,17 +68,12 @@ def test_add_and_delete(tmp_path, qtbot, config, window_main_account_full, test_
     # add 3
     for i in range(3):
         tag = "tag"+str(i)
-        qtbot.mouseClick(
-            window_main.tagger_overview_window.button_add, Qt.MouseButton.LeftButton)
+        qtbot.mouseClick(window_main.tagger_overview_window.button_add, Qt.MouseButton.LeftButton)
 
-        qtbot.keyClicks(
-            window_main.tagger_window.tagger_widget.tagger_definition_widget.recipient_regex_textbox, "rec b")
-        qtbot.keyClicks(
-            window_main.tagger_window.tagger_widget.tagger_definition_widget.description_regex_textbox, "des "+str(i+1))
-        qtbot.keyClicks(
-            window_main.tagger_window.tagger_widget.tag_textbox, tag)
-        qtbot.mouseClick(
-            window_main.tagger_window.tagger_widget.button_ok, Qt.MouseButton.LeftButton)
+        qtbot.keyClicks(window_main.tagger_window.tagger_widget.tagger_definition_widget.recipient_regex_textbox, "rec b")
+        qtbot.keyClicks(window_main.tagger_window.tagger_widget.tagger_definition_widget.description_regex_textbox, "des "+str(i+1))
+        qtbot.keyClicks(window_main.tagger_window.tagger_widget.tag_textbox, tag)
+        qtbot.mouseClick(window_main.tagger_window.tagger_widget.button_ok, Qt.MouseButton.LeftButton)
 
         qt_df_taggeroverview = qt_table_to_dataframe(taggeroverview_table)
         assert len(qt_df_taggeroverview) == i+1

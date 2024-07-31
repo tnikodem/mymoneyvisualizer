@@ -85,15 +85,19 @@ class MyTaggerWidget(QWidget):
         self.layout.addWidget(self.tagger_definition_widget)
 
         # Create Table
-        self.multi_account_table = MultiAccountTable(
-            self, main=self.main, get_first_row_color=self.get_first_row_color)
+        self.multi_account_table = MultiAccountTable(self, main=self.main, get_first_row_color=self.get_first_row_color)
         self.layout.addWidget(self.multi_account_table)
+
+        # Init
+        self.update_tag_completer()
 
         # Actions
         self.button_ok.clicked.connect(self.save)
         self.button_cancel.clicked.connect(self.parent().close)
         self.button_onetimetag.clicked.connect(self.toggle_one_time_tag)
         self.tag_textbox.textChanged.connect(self.main.update)
+
+        self.main.config.accounts.add_update_callback(self.update_tag_completer)
 
     def toggle_one_time_tag(self):
         if self.main.window_mode == WindowModes.tagger:
@@ -116,14 +120,22 @@ class MyTaggerWidget(QWidget):
         return first_row_color
 
     def set_tagger_text(self, tagger):
+        if self.tag_textbox.text() != tagger.tag:
+            self.tag_textbox.setText(tagger.tag)
         if self.tagger_definition_widget.name_textbox.text() != tagger.name:
             self.tagger_definition_widget.name_textbox.setText(tagger.name)
         if self.tagger_definition_widget.recipient_regex_textbox.text() != tagger.regex_recipient:
-            self.tagger_definition_widget.recipient_regex_textbox.setText(
-                tagger.regex_recipient)
+            self.tagger_definition_widget.recipient_regex_textbox.setText(tagger.regex_recipient)
         if self.tagger_definition_widget.description_regex_textbox.text() != tagger.regex_description:
-            self.tagger_definition_widget.description_regex_textbox.setText(
-                tagger.regex_description)
+            self.tagger_definition_widget.description_regex_textbox.setText(tagger.regex_description)
+
+    def update_tag_completer(self):
+        unique_tags = self.main.config.accounts.get_unique_tags()
+        logger.debug(f"unique tags: {unique_tags}")
+        tag_completer = QCompleter(unique_tags)
+        tag_completer.setFilterMode(Qt.MatchFlag.MatchContains)
+        tag_completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+        self.tag_textbox.setCompleter(tag_completer)
 
     def update(self):
         # Get and set color of elements
@@ -141,20 +153,8 @@ class MyTaggerWidget(QWidget):
         else:
             description_color = RED_BACKGROUND_COLOR
 
-        self.tagger_definition_widget.recipient_regex_textbox.setStyleSheet(
-            f"QLineEdit {{ background : rgb{recipient_color};}}")
-        self.tagger_definition_widget.description_regex_textbox.setStyleSheet(
-            f"QLineEdit {{ background : rgb{description_color};}}")
-
-        # Update tag completer
-        # TODO every time create a new autocompleter??!! update compelte text of autocompleter instead if possible?!
-        unique_tags = self.main.config.accounts.get_unique_tags()
-        logger.debug(f"unique tags: {unique_tags}")
-        tag_completer = QCompleter(unique_tags)
-        self.tag_textbox.setText(self.main.tagger.tag)
-        tag_completer.setFilterMode(Qt.MatchFlag.MatchContains)
-        tag_completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
-        self.tag_textbox.setCompleter(tag_completer)
+        self.tagger_definition_widget.recipient_regex_textbox.setStyleSheet(f"QLineEdit {{ background : rgb{recipient_color};}}")
+        self.tagger_definition_widget.description_regex_textbox.setStyleSheet(f"QLineEdit {{ background : rgb{description_color};}}")
 
         # Update table
         self.multi_account_table.update_table()
@@ -201,12 +201,10 @@ class WindowTagger(ResizeMainWindow):
 
     def open_or_create_tagger(self, tagger_name="", description="", recipient="", tag="", transaction_id=None, overwrite=False):
         self.updateing = True
-        logger.debug(
-            f"open or create {tagger_name}, {description}, {recipient}, {tag}, {transaction_id}, overwrite {overwrite}")
+        logger.debug(f"open or create {tagger_name}, {description}, {recipient}, {tag}, {transaction_id}, overwrite {overwrite}")
         if overwrite and self.tagger is not None:
             if self.tagger.name != tagger_name:
-                self.tagger.name = self.config.taggers.get_free_tagger_name(
-                    tagger_name)
+                self.tagger.name = self.config.taggers.get_free_tagger_name(tagger_name)
             self.tagger.regex_recipient = recipient
             self.tagger.regex_description = description
             self.tagger.tag = tag
@@ -240,10 +238,8 @@ class WindowTagger(ResizeMainWindow):
                     df.loc[~mask]
                 ])
 
-            self.mask_recipient_matches = self.tagger.recipient_matches(
-                test_string=df[nn.recipient].values[0])
-            self.mask_description_matches = self.tagger.description_matches(
-                test_string=df[nn.description].values[0])
+            self.mask_recipient_matches = self.tagger.recipient_matches(test_string=df[nn.recipient].values[0])
+            self.mask_description_matches = self.tagger.description_matches(test_string=df[nn.description].values[0])
         else:
             self.mask_recipient_matches = None
             self.mask_description_matches = None

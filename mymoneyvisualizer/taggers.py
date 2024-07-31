@@ -10,8 +10,19 @@ from mymoneyvisualizer.utils.datacontainer import OrderedDataContainer
 logger = logging.getLogger(__name__)
 
 CONTAINER_FILEPATH = "/taggers.yaml"
-
 ONE_TIME_TAG_TAGGER_NAME = "one_time_tag"
+
+
+def regex_mask(df, column, regex):
+    mask = pd.Series(True, index=df.index)
+    if regex != "":
+        try:
+            mask = df[column].str.contains(pat=regex, na=False, regex=True)
+        except Exception as e:
+            logger.error(f"could not handle: {regex}")
+            logger.error(e)
+            mask = pd.Series(False, index=df.index)
+    return mask
 
 
 class Taggers(OrderedDataContainer):
@@ -118,33 +129,9 @@ class Tagger:
             logger.error(e)
             return False
 
-    def mask_recipient(self, df):
-        mask = pd.Series(True, index=df.index)
-        if self.regex_recipient != "":
-            try:
-                mask = df[nn.recipient].str.contains(
-                    pat=self.regex_recipient, na=False, regex=True)
-            except Exception as e:
-                logger.error(f"could not handle: {self.regex_recipient}")
-                logger.error(e)
-                mask = None
-        return mask
-
-    def mask_description(self, df):
-        mask = pd.Series(True, index=df.index)
-        if self.regex_description != "":
-            try:
-                mask = df[nn.description].str.contains(
-                    pat=self.regex_description, na=False, regex=True)
-            except Exception as e:
-                logger.error(f"could not handle: {self.regex_description}")
-                logger.error(e)
-                mask = None
-        return mask
-
     def tag_df(self, df):
-        mask = self.mask_recipient(df)
-        mask &= self.mask_description(df)
+        mask = regex_mask(df=df, column=nn.recipient, regex=self.regex_recipient)
+        mask &= regex_mask(df=df, column=nn.description, regex=self.regex_description)
         mask &= df[nn.tagger_name] != ONE_TIME_TAG_TAGGER_NAME
         if mask is None:
             return df
