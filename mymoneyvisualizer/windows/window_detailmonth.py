@@ -16,15 +16,13 @@ class DetailMonthWidget(QWidget):
         self.main = main
 
         self.layout = QVBoxLayout(self)
-        self.multi_account_table = MultiAccountTable(
-            self, main=self.main, double_click_action=self.main.open_tagger_window)
+        self.multi_account_table = MultiAccountTable(self, main=self.main, double_click_action=self.main.open_tagger_window)
         self.layout.addWidget(self.multi_account_table)
 
         # add callbacks
         self.main.config.accounts.add_update_callback(self.update)
 
     def update(self):
-        logger.debug("update")
         self.main.get_multi_account_df()
         self.multi_account_table.update_table()
 
@@ -76,6 +74,5 @@ class WindowDetailMonth(ResizeMainWindow):
         self.show()
 
     def open_tagger_window(self, row_dict):
-        print(row_dict)
         self.main_window.tagger_window.open_or_create_tagger(tagger_name=row_dict[nn.tagger_name],
                                                              transaction_id=row_dict[nn.transaction_id])

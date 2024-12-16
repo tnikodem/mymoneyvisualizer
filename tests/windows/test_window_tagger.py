@@ -71,7 +71,3 @@ def test_one_time_tag(tmp_path, qtbot, config, window_main_account_full):
     qt_df_accounts = qt_table_to_dataframe(account_table)
     assert len(qt_df_accounts.query("tag == 'one_time_test'")) == 1
     assert counter.counter == 1
-
-    # with qtbot.waitExposed(window_main, timeout=5000):
-    #     window_main.show()
-    # qtbot.stop()

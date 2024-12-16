@@ -197,12 +197,9 @@ class WindowSummaryGraph(QMainWindow):
         df = pd.concat([df, fill_values], sort=False)
 
         # Pivot Table
-        aggregate_months = self.config.settings.get(
-            nn.plot_aggregation_month, 3)
-        dfg = df.groupby([nn.tag, pd.Grouper(freq=f"{aggregate_months}ME", key=nn.date)]).agg(
-            {nn.value: "sum"}).reset_index()
-        dfp = dfg.pivot(index=nn.date, columns=nn.tag,
-                        values=["value"]).fillna(0.)
+        aggregate_months = self.config.settings.get(nn.plot_aggregation_month, 3)
+        dfg = df.groupby([nn.tag, pd.Grouper(freq=f"{aggregate_months}ME", key=nn.date)]).agg({nn.value: "sum"}).reset_index()
+        dfp = dfg.pivot(index=nn.date, columns=nn.tag, values=["value"]).fillna(0.)
         dfp.columns = dfp.columns.get_level_values(1)
 
         # Add missing base_tags in tag_categories
@@ -215,7 +212,6 @@ class WindowSummaryGraph(QMainWindow):
         # get average income series + extrapolation
         if len(dfp) < 3:
             return
-
         ds_income = np.zeros(len(dfp))
         for tag_cat in self.config.tag_categories.get():
             if tag_cat.category != nn.income:
@@ -223,28 +219,26 @@ class WindowSummaryGraph(QMainWindow):
             if tag_cat.name not in dfp.columns:
                 continue
             ds_income += dfp[tag_cat.name]
+        analysis_period_start = min(datetime.datetime(budget_period_start-1, 12, 31), first_date)
+        analysis_period_end = max(datetime.datetime(budget_period_end, 12, 31), datetime.datetime(last_date.year, 12, 31),)
+        analysis_period_dates = pd.date_range(analysis_period_start, analysis_period_end, freq=f"{aggregate_months}ME")
 
-        # assume first and last value not complete
-        fit_dates = dfp.index.values[1:-1]
-        x_fit = (fit_dates.astype(np.int64)*1e-12).astype(int)
-        y_fit = ds_income[1:-1]
-
-        coef = np.polyfit(x=x_fit, y=y_fit, deg=1)
-        poly1d_fn = np.poly1d(coef)
-
-        analysis_period_start = min(datetime.datetime(
-            budget_period_start-1, 12, 31), first_date)
-        analysis_period_end = max(
-            datetime.datetime(budget_period_end, 12, 31),
-            datetime.datetime(last_date.year, 12, 31),)
-        analysis_period_dates = pd.date_range(analysis_period_start, analysis_period_end,
-                                              freq=f"{aggregate_months}ME")
-        x_analysis_period = (analysis_period_dates.astype(
-            np.int64)*1e-12).astype(int)
-        average_income = x_analysis_period.map(poly1d_fn)
-
-        self.df_summary_income = pd.DataFrame(index=analysis_period_dates,
-                                              data=dict(average_income=average_income))
+        # TODO make fit optional
+        if True:
+            # assume first and last value not complete
+            degree_fit = 1
+            fit_dates = dfp.index.values[1:-1]
+            x_fit = (fit_dates.astype(np.int64)*1e-12).astype(int)
+            y_fit = ds_income[1:-1]
+            coef = np.polyfit(x=x_fit, y=y_fit, deg=degree_fit)
+            poly1d_fn = np.poly1d(coef)
+            x_analysis_period = (analysis_period_dates.astype(np.int64)*1e-12).astype(int)
+            average_income = x_analysis_period.map(poly1d_fn)
+            self.df_summary_income = pd.DataFrame(index=analysis_period_dates,
+                                                  data=dict(average_income=average_income))
+        else:
+            self.df_summary_income = pd.DataFrame(index=analysis_period_dates,
+                                                  data=dict(average_income=ds_income))
 
         self.statistics_numbers = dict(
             first_date=first_date,

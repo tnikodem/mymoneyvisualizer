@@ -60,10 +60,9 @@ class Configuration:
         self.settings = overwrite_dict(
             old_dict=self.settings, new_dict=loaded_settings)
 
-        print(self.settings)
-
 
 # TODO refactor store and reading zip to "backup" or similar
+
 
     @staticmethod
     def save_file_by_name(zipf, filepath, folder=""):

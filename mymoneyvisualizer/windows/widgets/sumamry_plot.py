@@ -105,8 +105,8 @@ class SummaryPlotWidget(QWidget):
         <font size='4' type='Consolas'>
         <table>
         <tr>
-            <td><b>{"Total" if is_complete_year else "Expected"}:</b></td>
-            <td>{round(expected_total_budget)} €</td>
+            <td><b>{"Total" if is_complete_year else "Expected budget"}:</b></td>
+            <td align="right">{round(expected_total_budget)} €</td>
         </tr>
         <tr>
         </tr>
@@ -116,6 +116,7 @@ class SummaryPlotWidget(QWidget):
             df_summary.index <= timestamp_end)
         df_summary_budget = df_summary[mask]
         total_consumed = 0
+        consumed_by_catagory = list()
         for tag_cat in reversed(list(self.main.config.tag_categories.get())):
             if tag_cat.category != self.category:
                 continue
@@ -123,22 +124,28 @@ class SummaryPlotWidget(QWidget):
                 continue
             consumed = -df_summary_budget[tag_cat.name].sum()
             total_consumed += consumed
-
+            consumed_by_catagory += [dict(tag_cat_name=tag_cat.name,
+                                          consumed=round(consumed)
+                                          )]
+        df_consumed_by_catagory = pd.DataFrame(consumed_by_catagory)
+        df_consumed_by_catagory = df_consumed_by_catagory.sort_values("consumed", ascending=False)
+        for _, row in df_consumed_by_catagory.iterrows():
+            tag_cat_name = row["tag_cat_name"]
+            consumed = row["consumed"]
             # TODO think about how to refactor this in a good way
-            tag_cat_name = tag_cat.name
             if tag_cat_name in ["", " "]:
                 tag_cat_name = "unassigned"
             budget_text += f"""
             <tr>
                 <td>{tag_cat_name}:</td>
-                <td>{round(consumed)} €</td>
+                <td align="right">{round(consumed)} €</td>
             </tr>
             """
 
         budget_text += f"""
         <tr>
             <td><b>Consumed total:</b></td>
-            <td><b>{round(total_consumed)} €</b></td>
+            <td align="right"><b>{round(total_consumed)} €</b></td>
         </tr>
         <tr>
         </tr>
@@ -147,22 +154,22 @@ class SummaryPlotWidget(QWidget):
             budget_text += f"""
             <tr>
                 <td>Difference:</td>
-                <td>{round(expected_total_budget-total_consumed)} €</td>
+                <td align="right">{round(expected_total_budget-total_consumed)} €</td>
             </tr>
             """
         else:
             budget_text += f"""
             <tr>
                 <td>Remaining total:</td>
-                <td>{round(expected_total_budget-total_consumed)} €</td>
+                <td align="right">{round(expected_total_budget-total_consumed)} €</td>
             </tr>
             <tr>
                 <td>Remaining per month:</td>
-                <td>{round((expected_total_budget-total_consumed)/remaining_months)} €</td>
+                <td align="right">{round((expected_total_budget-total_consumed)/remaining_months)} €</td>
             </tr>
             <tr>
                 <td>Trend end of year: </td>
-                <td>{round((expected_total_budget - (total_consumed * total_days / covered_days)))} €</td>
+                <td align="right">{round((expected_total_budget - (total_consumed * total_days / covered_days)))} €</td>
             </tr>"""
         budget_text += """
         </table>

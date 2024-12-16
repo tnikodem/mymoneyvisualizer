@@ -69,7 +69,7 @@ class Accounts(OrderedDataContainer):
         dfs = []
         for account in self.values():
             if base_tag != "":
-                mask = account.df[nn.tag].str.split(".").str[0] == base_tag
+                mask = account.df[nn.tag].str.startswith(base_tag)
                 dftmp = account.df[mask]
             else:
                 dftmp = account.df
@@ -137,6 +137,22 @@ class Accounts(OrderedDataContainer):
         logger.debug("dfs tagged")
         self.run_update_callbacks()
 
+    def get_summary_df(self, date_from, date_upto):
+        dfs = []
+        # account_names = []
+        for acc in self:
+            # account_names += [acc.name]
+            df = acc.df
+            df = df[(df[nn.date] >= date_from) & (df[nn.date] < date_upto)]
+            if len(df) < 1:
+                continue
+            dfs += [df]
+        if len(dfs) < 1:
+            return
+        df = pd.concat(dfs)
+        # df = df.loc[~(df[nn.tag].isin(account_names)), :]
+        return df
+
 
 class Account(object):
     def __init__(self, parent, name, db_filepath):
@@ -163,14 +179,13 @@ class Account(object):
         if self.db_filepath is not None and os.path.isfile(self.db_filepath):
             self.df = pd.read_csv(self.db_filepath)
             self.df[nn.date] = pd.to_datetime(self.df[nn.date])
-            self.df[nn.recipient] = self.df[nn.recipient].fillna(
-                "").astype(str)
-            self.df[nn.description] = self.df[nn.description].fillna(
-                "").astype(str)
+            self.df[nn.recipient] = self.df[nn.recipient].fillna("").astype(str)
+            self.df[nn.description] = self.df[nn.description].fillna("").astype(str)
             self.df[nn.tag] = self.df[nn.tag].fillna("").astype(str)
             if nn.transaction_id not in self.df.columns:
-                self.df[nn.transaction_id] = self.df.apply(
-                    lambda x: str(uuid.uuid4()), axis=1)
+                self.df[nn.transaction_id] = self.df.apply(lambda x: str(uuid.uuid4()), axis=1)
+            mask_noid = self.df[nn.transaction_id].isnull()
+            self.df.loc[mask_noid, nn.transaction_id] = self.df.loc[mask_noid, nn.transaction_id].apply(lambda x: str(uuid.uuid4()))
         else:
             self.df = pd.DataFrame({nn.transaction_id: [], nn.date: [], nn.recipient: [], nn.description: [], nn.value: [], nn.tag: [],
                                     nn.tagger_name: []})

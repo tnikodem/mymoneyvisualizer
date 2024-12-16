@@ -39,8 +39,7 @@ class MyTableWidget(QWidget):
 
         # FIXME not working correctly??! update after sorting is enabled
         # self.table_widget.setSortingEnabled(True)
-        self.table_widget.setEditTriggers(
-            QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.table_widget.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
 
         self.layout = QVBoxLayout(self)
         self.layout.addWidget(self.table_widget)
