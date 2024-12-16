@@ -37,7 +37,7 @@ setup(
         'dev': [
             'pytest>=8.1,<8.4',
             'pytest-qt==4.4.*',
-            'pytest-cov==5.0.*',
+            'pytest-cov>=5.0,<6.1',
         ]
     },
     entry_points={
