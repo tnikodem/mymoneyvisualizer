@@ -3,7 +3,7 @@ import datetime
 import pandas as pd
 
 from PyQt6.QtWidgets import QWidget, QMainWindow, QVBoxLayout, QHBoxLayout
-from PyQt6.QtWidgets import QPushButton, QComboBox, QLabel
+from PyQt6.QtWidgets import QPushButton, QComboBox, QLabel, QLineEdit
 
 from mymoneyvisualizer.naming import Naming as nn
 from mymoneyvisualizer.windows.widgets.summary_table import SummaryTableWidget
@@ -29,6 +29,11 @@ class SummaryWidget(QWidget):
         self.button_after.setFixedWidth(250)
         layout_control_buttons.addWidget(self.button_after)
 
+        # Exclude tags
+        self.multi_select = SelectExcludeTags(self, main)
+        self.multi_select.setFixedWidth(250)
+        layout_control_buttons.addWidget(self.multi_select)
+
         # Set tag level
         self.tag_level_label = QLabel("Tag Level:", self)
         self.tag_level_label.setFixedWidth(50)
@@ -40,26 +45,29 @@ class SummaryWidget(QWidget):
         self.tag_level_combobox.addItem('Three')
         layout_control_buttons.addWidget(self.tag_level_combobox)
 
-        # Exclude tags
-        self.multi_select = SelectExcludeTags(self, main)
-        self.multi_select.setFixedWidth(250)
-        layout_control_buttons.addWidget(self.multi_select)
+        # Filter tags
+        self.filter_tag_label = QLabel("Filter Tag:", self)
+        self.filter_tag_label.setFixedWidth(50)
+        layout_control_buttons.addWidget(self.filter_tag_label)
+        self.filter_tag_textbox = QLineEdit(self)
+        self.filter_tag_textbox.setFixedWidth(175)
+        layout_control_buttons.addWidget(self.filter_tag_textbox)
 
         layout_control_buttons.addStretch()
 
         self.layout.addLayout(layout_control_buttons)
 
+        # Summary Table
         self.table = SummaryTableWidget(parent=self, main=self.main, type="all")
         self.layout.addWidget(self.table, 1)
-
         self.table_total = SummaryTableWidget(parent=self, main=self.main, type="total")
         self.layout.addWidget(self.table_total)
 
         # Actions
         self.button_before.clicked.connect(self.main.month_before)
         self.button_after.clicked.connect(self.main.month_after)
-
         self.tag_level_combobox.currentIndexChanged.connect(self.main.tag_level_changed)
+        self.filter_tag_textbox.textChanged.connect(self.main.set_tag_filter)
 
 
 class WindowSummaryTable(QMainWindow):
@@ -78,6 +86,7 @@ class WindowSummaryTable(QMainWindow):
         self.date_upto = datetime.datetime(date_upto.year, date_upto.month, 1)
         self.date_from = datetime.datetime(date_upto.year - 1, date_upto.month, 1)
 
+        self.tag_filter = ""
         self.tag_level = 0
 
         self.left = 50
@@ -109,7 +118,12 @@ class WindowSummaryTable(QMainWindow):
         self.excluded_tags = set(tags)
         self.run_update_callbacks()
 
+    def set_tag_filter(self, text):
+        self.tag_filter = text
+        self.run_update_callbacks()
+
     def month_before(self):
+        # get correct handling of change of year
         date_upto = self.date_upto - datetime.timedelta(days=2)
         self.date_upto = datetime.datetime(date_upto.year, date_upto.month, 1)
         self.date_from = datetime.datetime(date_upto.year - 1, date_upto.month, 1)
@@ -148,15 +162,20 @@ class WindowSummaryTable(QMainWindow):
     # TODO unittest method
 
     def update_summary_df(self):
-        logger.debug(f"request summary df from {self.date_from} upto {self.date_upto}")
-
         df = self.config.accounts.get_summary_df(date_from=self.date_from, date_upto=self.date_upto)
         if df is None:
-            return None
+            self.summary_df_all = None
+            self.summary_df_total = None
+            return
+        # Filter df
+        if self.tag_filter != "":
+            df = df[df[nn.tag].str.startswith(self.tag_filter)]
         if len(self.excluded_tags) > 0:
             df = df[~(df[nn.tag].isin(self.excluded_tags))]
         if len(df) < 1:
-            return None
+            self.summary_df_all = None
+            self.summary_df_total = None
+            return
 
         df[nn.tag] = df[nn.tag].apply(self.get_base_tag)
 
@@ -175,5 +194,3 @@ class WindowSummaryTable(QMainWindow):
         df_total = pd.DataFrame({**dfp.sum().to_dict()}, index=["total"])
         df_total[nn.tag] = "total"
         self.summary_df_total = df_total
-
-        return dfp

@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
 
 import datetime
-import os
-import pandas as pd
 
 from PyQt6.QtCore import Qt
 
@@ -68,21 +66,3 @@ def test_overview(tmp_path, qtbot, config, window_main_account_full, test_input_
     #     with qtbot.waitExposed(window_main, timeout=5000):
     #         window_main.show()
     #     qtbot.stop()
-
-
-# TODO remove money transfer
-# def test_money_transfer(tmp_path, qtbot, config, window_main_two_accounts_tagged):
-#     window_main = window_main_two_accounts_tagged
-#     summary_table = window_main.summary_window.summary_widget.table
-
-#     window_main.summary_window.date_from = datetime.datetime(2018, 5, 1)
-#     window_main.summary_window.date_upto = datetime.datetime(2019, 5, 1)
-#     config.accounts.run_update_callbacks()
-#     qtbot.mouseClick(window_main.summary_button, Qt.MouseButton.LeftButton)
-
-#     qt_df_summary = qt_table_to_dataframe(summary_table)
-#     assert len(qt_df_summary) == 2
-#     assert abs(float(qt_df_summary.query(
-#         "tag == 'grocery'")["total"][0]) + 10.) < 0.001
-#     assert abs(float(qt_df_summary.query(
-#         "tag == 'total'")["total"][1]) + 10.) < 0.001
