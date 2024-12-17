@@ -2,7 +2,6 @@
 import os
 import pathlib
 import logging
-import datetime
 import warnings
 import numpy as np
 import pandas as pd
@@ -256,15 +255,6 @@ class Account(object):
     def get_entries(self, date, recipient, description):
         mask = self.df[nn.date] == date
         return self.df[mask].query(f"{nn.recipient} == '{recipient}' and {nn.description} == '{description}'")
-
-    def delete_entries(self, date, recipient, description):
-        n_entries_before = len(self.df)
-        mask = self.df[nn.date] != date
-        mask |= self.df[nn.recipient] != recipient
-        mask |= self.df[nn.description] != description
-        self.df = self.df[mask]
-        self.df = self.df.reset_index(drop=True)
-        self.save()
 
     def add_entry(self, date, recipient, description, value):
         newdf = pd.DataFrame({

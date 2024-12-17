@@ -2,9 +2,7 @@
 
 import logging
 from PyQt6.QtWidgets import QMainWindow, QPushButton
-from PyQt6.QtWidgets import QWidget, QMainWindow, QVBoxLayout, QHBoxLayout
 
-from mymoneyvisualizer.windows.window_addtransaction import WindowAddTransaction
 from mymoneyvisualizer.windows.window_tagger import WindowTagger
 from mymoneyvisualizer.windows.window_taggeroverview import WindowTaggerOverview
 from mymoneyvisualizer.windows.window_accounts import WindowAccounts
@@ -45,8 +43,6 @@ class WindowMain(QMainWindow):
 
         # # TODO optimize window imports. Which window must be initialised here, which can also in subwindows?
         # # Make sure you still have the overview which window is connected to which
-        self.addtrans_window = WindowAddTransaction(
-            parent=self, config=self.config)
         self.tagger_window = WindowTagger(parent=self, config=self.config)
         self.importdata_window = WindowImportData(parent=self, config=self.config,
                                                   tagger_window=self.tagger_window)
@@ -57,7 +53,6 @@ class WindowMain(QMainWindow):
         self.accounts_window = WindowAccounts(parent=self, config=self.config,
                                               tagger_window=self.tagger_window,
                                               tagger_overview_window=self.tagger_overview_window,
-                                              addtrans_window=self.addtrans_window,
                                               importdata_window=self.importdata_window,
                                               )
         self.detail_month_window = WindowDetailMonth(

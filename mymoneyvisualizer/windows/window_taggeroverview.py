@@ -2,7 +2,7 @@
 import logging
 import pandas as pd
 
-from PyQt6.QtWidgets import QWidget, QMainWindow, QVBoxLayout, QPushButton, QTableWidget, QTableWidgetItem
+from PyQt6.QtWidgets import QWidget, QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget, QTableWidgetItem
 from PyQt6.QtWidgets import QAbstractItemView
 from PyQt6.QtCore import Qt
 
@@ -70,31 +70,39 @@ class WindowTaggerOverview(QMainWindow):
         self.config = config
         self.tagger_window = tagger_window
 
-        self.title = 'Taggers'
         self.left = 50
         self.top = 50
         self.width = 900
         self.height = 800
-        self.setWindowTitle(self.title)
+        self.setWindowTitle("Taggers")
         self.setGeometry(self.left, self.top, self.width, self.height)
 
-        self.table = MyTaggerOverviewWidget(parent=self, main=self)
-        self.table.resize(835, 770)
-        self.table.move(30, 30)
+        layout = QVBoxLayout()
 
+        layout_control_buttons = QHBoxLayout()
         self.button_ok = QPushButton('OK', self)
-        self.button_ok.resize(250, 32)
-        self.button_ok.move(40, 0)
-        self.button_ok.clicked.connect(self.close)
-
+        self.button_ok.setFixedWidth(250)
+        layout_control_buttons.addWidget(self.button_ok)
         self.button_add = QPushButton('Add Tagger', self)
-        self.button_add.resize(250, 32)
-        self.button_add.move(280, 0)
-        self.button_add.clicked.connect(self.add_tagger)
-
+        self.button_add.setFixedWidth(250)
+        layout_control_buttons.addWidget(self.button_add)
         self.button_delete = QPushButton('Delete Tagger', self)
-        self.button_delete.resize(250, 32)
-        self.button_delete.move(520, 0)
+        self.button_delete.setFixedWidth(250)
+        layout_control_buttons.addWidget(self.button_delete)
+        layout_control_buttons.addStretch(1)
+        layout.addLayout(layout_control_buttons)
+
+        self.table = MyTaggerOverviewWidget(parent=self, main=self)
+        layout.addWidget(self.table)
+
+        # Window
+        widget = QWidget()
+        widget.setLayout(layout)
+        self.setCentralWidget(widget)
+
+        # Actions
+        self.button_ok.clicked.connect(self.close)
+        self.button_add.clicked.connect(self.add_tagger)
         self.button_delete.clicked.connect(self.delete_tagger)
 
     def open(self):

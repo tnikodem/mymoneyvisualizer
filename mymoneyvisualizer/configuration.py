@@ -77,20 +77,15 @@ class Configuration:
         """
         with zipfile.ZipFile(filepath, 'w', zipfile.ZIP_DEFLATED) as zipf:
             self.importers.save()
-            self.save_file_by_name(
-                zipf=zipf, filepath=self.importers.container_filepath)
+            self.save_file_by_name(zipf=zipf, filepath=self.importers.container_filepath)
             self.taggers.save()
-            self.save_file_by_name(
-                zipf=zipf, filepath=self.taggers.container_filepath)
+            self.save_file_by_name(zipf=zipf, filepath=self.taggers.container_filepath)
             self.tag_categories.save()
-            self.save_file_by_name(
-                zipf=zipf, filepath=self.tag_categories.container_filepath)
+            self.save_file_by_name(zipf=zipf, filepath=self.tag_categories.container_filepath)
             for acc in self.accounts.get():
                 acc.save()
-                self.save_file_by_name(
-                    zipf=zipf, filepath=acc.db_filepath, folder="accounts/")
-            self.save_file_by_name(
-                zipf=zipf, filepath=self.accounts.container_filepath)
+                self.save_file_by_name(zipf=zipf, filepath=acc.db_filepath, folder="accounts/")
+            self.save_file_by_name(zipf=zipf, filepath=self.accounts.container_filepath)
 
     def _load_accounts(self, myzip):
         for name in myzip.namelist():

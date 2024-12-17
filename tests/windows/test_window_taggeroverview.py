@@ -22,21 +22,15 @@ def test_add_single_tagger(tmp_path, qtbot, config, window_main_account_full, te
     taggeroverview_table = window_main.tagger_overview_window.table
     account_table = window_main.accounts_window.tab_widget.tab_widgets[0].table
 
-    qtbot.mouseClick(window_main.accounts_window.taggers_button,
-                     Qt.MouseButton.LeftButton)
-    qtbot.mouseClick(
-        window_main.tagger_overview_window.button_add, Qt.MouseButton.LeftButton)
+    qtbot.mouseClick(window_main.accounts_window.taggers_button, Qt.MouseButton.LeftButton)
+    qtbot.mouseClick(window_main.tagger_overview_window.button_add, Qt.MouseButton.LeftButton)
     assert len(qt_table_to_dataframe(tagger_table)) == len(test_input_df)
 
     window_main.tagger_window.tagger_widget.tagger_definition_widget.name_textbox.clear()
-    qtbot.keyClicks(
-        window_main.tagger_window.tagger_widget.tagger_definition_widget.name_textbox, "tagger1")
-    qtbot.keyClicks(
-        window_main.tagger_window.tagger_widget.tagger_definition_widget.recipient_regex_textbox, "rec b")
-    qtbot.keyClicks(
-        window_main.tagger_window.tagger_widget.tagger_definition_widget.description_regex_textbox, "des 7")
-    qtbot.keyClicks(
-        window_main.tagger_window.tagger_widget.tag_textbox, "tag1")
+    qtbot.keyClicks(window_main.tagger_window.tagger_widget.tagger_definition_widget.name_textbox, "tagger1")
+    qtbot.keyClicks(window_main.tagger_window.tagger_widget.tagger_definition_widget.recipient_regex_textbox, "rec b")
+    qtbot.keyClicks(window_main.tagger_window.tagger_widget.tagger_definition_widget.description_regex_textbox, "des 7")
+    qtbot.keyClicks(window_main.tagger_window.tagger_widget.tag_textbox, "tag1")
 
     qtbot.keyClick(window_main.tagger_window, Qt.Key.Key_Return)
     assert len(qt_table_to_dataframe(tagger_table)) == 1
