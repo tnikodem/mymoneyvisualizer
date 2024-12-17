@@ -44,35 +44,3 @@ def test_create_account(tmp_path, qtbot, config):
     expected_filepath2 = default_db_filepath+test_account_name + ".csv"
     assert os.path.isfile(expected_filepath2)
     assert not os.path.isfile(expected_filepath)
-
-    # saldo correction
-    saldo_textbox = window_main.accounts_window.tab_widget.tab_widgets[0].saldo_textbox
-    saldo_textbox.clear()
-    qtbot.keyClicks(saldo_textbox, "13.37")
-    qtbot.keyClick(saldo_textbox, Qt.Key.Key_Return)
-
-    assert abs(float(saldo_textbox.text()) - 13.37) < 0.0001
-
-    # should saldo correction entry be visible?
-    assert window_main.accounts_window.tab_widget.tab_widgets[0].table.table_widget.rowCount(
-    ) == 1
-
-
-def test_money_transfer(tmp_path, qtbot, window_main_two_accounts_tagged):
-    window_main = window_main_two_accounts_tagged
-    table_credit = window_main.accounts_window.tab_widget.tab_widgets[0].table
-    table_cash = window_main.accounts_window.tab_widget.tab_widgets[1].table
-
-    qtbot.mouseClick(window_main.accounts_button, Qt.MouseButton.LeftButton)
-
-    qt_df_credit = qt_table_to_dataframe(table_credit)
-    assert len(qt_df_credit) == 1
-    assert set(qt_df_credit[nn.tag].unique()) == {"cash"}
-    assert abs(float(
-        window_main.accounts_window.tab_widget.tab_widgets[0].saldo_textbox.text()) + 50.0) < 0.0001
-
-    qt_df_cash = qt_table_to_dataframe(table_cash)
-    assert len(qt_df_cash) == 2
-    assert set(qt_df_cash[nn.tag].unique()) == {"cash", "grocery"}
-    assert abs(float(
-        window_main.accounts_window.tab_widget.tab_widgets[1].saldo_textbox.text()) - 40.0) < 0.0001

@@ -39,8 +39,7 @@ class MultiAccountTable(QWidget):
         self.get_first_row_color = get_first_row_color
 
         self.table_widget = QTableWidget()
-        self.table_widget.setEditTriggers(
-            QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.table_widget.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table_widget.setColumnCount(len(TABLE_COLUMNS))
         self.table_widget.setHorizontalHeaderLabels(TABLE_COLUMNS)
         self.table_widget.verticalHeader().setVisible(False)

@@ -21,6 +21,7 @@ class SummaryTableWidget(QWidget):
         self.columns = []
 
         self.table_widget = QTableWidget()
+        self.table_widget.setMinimumWidth(1350)
         self.table_widget.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table_widget.verticalHeader().setVisible(False)
         # self.table_widget.verticalHeader().setDefaultSectionSize(30)

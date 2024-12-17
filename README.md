@@ -34,17 +34,6 @@ Each transaction can be given a tag. Either double click on a transaction or use
 Each *tagger* gives all transactions based on recipient and description a tag using regex.
 You can define subtags by splitting tag and subtag with a point, e.g. "household.food.grocery". 
 
-Money Transfer
---------------
-If you have two or more accounts you probably also transfer money between them.
-
-#### Two transaction entries
-If you have a transaction log in both accounts the proposed strategy is to give both transaction entries the same tag, e.g. "transfer".
-In that case in the summary overview both transactions should cancel out.
-
-#### One Transaction entry
-In case you only have one transaction log, for example one bank account and *cash*, you can define as tag the name of the other account.
-The money will be automatically associated with the other account, if the tag is equal to the account name.
 
 Development
 -----------

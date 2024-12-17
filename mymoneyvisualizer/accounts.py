@@ -139,9 +139,7 @@ class Accounts(OrderedDataContainer):
 
     def get_summary_df(self, date_from, date_upto):
         dfs = []
-        # account_names = []
         for acc in self:
-            # account_names += [acc.name]
             df = acc.df
             df = df[(df[nn.date] >= date_from) & (df[nn.date] < date_upto)]
             if len(df) < 1:
@@ -150,7 +148,6 @@ class Accounts(OrderedDataContainer):
         if len(dfs) < 1:
             return
         df = pd.concat(dfs)
-        # df = df.loc[~(df[nn.tag].isin(account_names)), :]
         return df
 
 
@@ -255,31 +252,6 @@ class Account(object):
         if tagger.transaction_id is not None:
             mask |= df[nn.transaction_id] == tagger.transaction_id
         return df.loc[mask]
-
-    def get_saldo(self):
-        return self.df[nn.value].sum()
-
-    def correct_saldo(self, saldo):
-        if saldo is None or self.get_saldo() is None:
-            return
-        if abs(saldo - self.get_saldo()) < 0.1:
-            return
-        df_saldocor = pd.DataFrame({
-            nn.transaction_id: [str(uuid.uuid4())],
-            nn.date: [datetime.datetime(1970, 1, 1)],
-            nn.recipient: [""],
-            nn.description: ["saldo correction"],
-            nn.value: [saldo - self.get_saldo()],
-            nn.tag: [""],
-            nn.tagger_name: [""]
-        })
-        if len(self.df) > 0:
-            self.df = pd.concat([self.df, df_saldocor], sort=False)
-        else:
-            self.df = df_saldocor
-        self.df = self.df.sort_values(
-            [nn.date], ascending=False).reset_index(drop=True)
-        logger.info("corrected saldo")
 
     def get_entries(self, date, recipient, description):
         mask = self.df[nn.date] == date

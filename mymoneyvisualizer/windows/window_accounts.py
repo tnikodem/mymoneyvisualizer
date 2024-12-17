@@ -109,15 +109,6 @@ class SingleAccountWidget(QWidget):
         self.name_textbox.resize(200, 40)
         self.name_textbox.returnPressed.connect(self.click_save)
 
-        # Create textbox "Saldo"
-        self.saldo_label = QLabel(self)
-        self.saldo_label.setText('Saldo:')
-        self.saldo_label.move(350, 20)
-        self.saldo_textbox = QLineEdit(self)
-        self.saldo_textbox.move(400, 20)
-        self.saldo_textbox.resize(200, 40)
-        self.saldo_textbox.returnPressed.connect(self.click_save)
-
         # Create Button "Import"
         self.import_button = QPushButton('Import', self)
         self.import_button.resize(250, 32)
@@ -154,8 +145,6 @@ class SingleAccountWidget(QWidget):
 
     def update_view(self):
         df = self.main.get_account_df(self.tab_index)
-        if df is not None:
-            self.saldo_textbox.setText(str(round(df[nn.value].sum(), 2)))
         self.table.update_table(df=df)
 
     def click_import(self):
@@ -165,15 +154,9 @@ class SingleAccountWidget(QWidget):
     def click_save(self):
         logger.debug(f"saving account {self.tab_index}")
         acc_name = self.name_textbox.text()
-        saldo = self.saldo_textbox.text()
         self.main.set_tab_text(index=self.tab_index, text=acc_name)
-        try:
-            saldo = float(saldo)
-        except ValueError:
-            saldo = None
         account = self.main.get_account(self.tab_index)
         account.name = acc_name
-        account.correct_saldo(saldo=saldo)
         account.save()
 
     def click_add_entry(self):
