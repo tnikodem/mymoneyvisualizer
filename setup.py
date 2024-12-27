@@ -25,7 +25,7 @@ setup(
     platforms='any',
     python_requires='>=3.10',
     install_requires=[
-        'numpy>=1.26,<2.2',
+        'numpy>=1.26,<2.3',
         'pandas==2.2.*',
         'pyyaml==6.0.*',
         'pyqt6==6.6.*',
@@ -37,7 +37,7 @@ setup(
         'dev': [
             'pytest>=8.1,<8.4',
             'pytest-qt==4.4.*',
-            'pytest-cov==5.0.*',
+            'pytest-cov>=5.0,<6.1',
         ]
     },
     entry_points={
