@@ -185,8 +185,9 @@ class WindowSummaryTable(QMainWindow):
         timeseries_complete_range = pd.date_range(start=self.date_from, end=self.date_upto, freq="1ME")
         dfp = dfp.reindex(timeseries_complete_range).resample("1ME").sum()
         dfp = dfp.T
+        n_month = len(dfp.columns)
         dfp["total"] = dfp.sum(axis=1)
-        dfp["monthly average"] = dfp["total"] / len(dfp.columns)
+        dfp["monthly average"] = dfp["total"] / n_month
         dfp = dfp.reset_index()
         self.summary_df_all = dfp
 
