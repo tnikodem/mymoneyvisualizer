@@ -15,6 +15,8 @@ class Naming:
     regex_description = "regex_description"
     tag = "tag"
 
+    total = "total"
+
     date_range = "date_range"
 
     account = "account"

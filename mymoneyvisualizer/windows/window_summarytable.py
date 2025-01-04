@@ -3,7 +3,7 @@ import datetime
 import pandas as pd
 
 from PyQt6.QtWidgets import QWidget, QMainWindow, QVBoxLayout, QHBoxLayout
-from PyQt6.QtWidgets import QPushButton, QComboBox, QLabel, QLineEdit
+from PyQt6.QtWidgets import QComboBox, QLabel, QLineEdit
 
 from mymoneyvisualizer.naming import Naming as nn
 from mymoneyvisualizer.windows.widgets.summary_table import SummaryTableWidget
@@ -20,14 +20,26 @@ class SummaryWidget(QWidget):
 
         self.layout = QVBoxLayout(self)
 
-        # Month selection
         layout_control_buttons = QHBoxLayout()
-        self.button_before = QPushButton('previous month', self)
-        self.button_before.setFixedWidth(250)
-        layout_control_buttons.addWidget(self.button_before)
-        self.button_after = QPushButton('next month', self)
-        self.button_after.setFixedWidth(250)
-        layout_control_buttons.addWidget(self.button_after)
+
+        # Month selection
+        self.start_month_label = QLabel("Start Month:", self)
+        layout_control_buttons.addWidget(self.start_month_label)
+        self.start_month_combobox = QComboBox()
+        layout_control_buttons.addWidget(self.start_month_combobox)
+        self.end_month_label = QLabel("End Month:", self)
+        layout_control_buttons.addWidget(self.end_month_label)
+        self.end_month_combobox = QComboBox()
+        layout_control_buttons.addWidget(self.end_month_combobox)
+        time = datetime.datetime.now()
+        time = datetime.datetime(time.year, time.month, 1)
+        for i in range(0, 12*12):
+            self.start_month_combobox.addItem(time.strftime('%Y-%m'))
+            self.end_month_combobox.addItem(time.strftime('%Y-%m'))
+            time = time - datetime.timedelta(days=2)
+            time = datetime.datetime(time.year, time.month, 1)
+        self.end_month_combobox.setCurrentIndex(1)
+        self.start_month_combobox.setCurrentIndex(11)
 
         # Exclude tags
         self.multi_select = SelectExcludeTags(self, main)
@@ -58,14 +70,12 @@ class SummaryWidget(QWidget):
         self.layout.addLayout(layout_control_buttons)
 
         # Summary Table
-        self.table = SummaryTableWidget(parent=self, main=self.main, type="all")
+        self.table = SummaryTableWidget(parent=self, main=self.main)
         self.layout.addWidget(self.table, 1)
-        self.table_total = SummaryTableWidget(parent=self, main=self.main, type="total")
-        self.layout.addWidget(self.table_total)
 
         # Actions
-        self.button_before.clicked.connect(self.main.month_before)
-        self.button_after.clicked.connect(self.main.month_after)
+        self.start_month_combobox.currentTextChanged.connect(self.main.set_date_from)
+        self.end_month_combobox.currentTextChanged.connect(self.main.set_date_upto)
         self.tag_level_combobox.currentIndexChanged.connect(self.main.tag_level_changed)
         self.filter_tag_textbox.textChanged.connect(self.main.set_tag_filter)
 
@@ -76,15 +86,19 @@ class WindowSummaryTable(QMainWindow):
         self.config = config
         self.detail_month_window = detail_month_window
 
-        self.summary_df_all = None
-        self.summary_df_total = None
+        self.sort_column = nn.total
+        self.sort_order = 0
+
+        time = datetime.datetime.now()
+        time = datetime.datetime(time.year, time.month, 1)
+        self.date_upto = time
+        for i in range(12):
+            time = time - datetime.timedelta(days=2)
+            time = datetime.datetime(time.year, time.month, 1)
+        self.date_from = time
 
         self.excluded_tags = set()
-        self.update_callbacks = [self.update_summary_df]
-        now = datetime.datetime.now()
-        date_upto = datetime.datetime(now.year, now.month, 1) + datetime.timedelta(days=32)
-        self.date_upto = datetime.datetime(date_upto.year, date_upto.month, 1)
-        self.date_from = datetime.datetime(date_upto.year - 1, date_upto.month, 1)
+        self.update_callbacks = []
 
         self.tag_filter = ""
         self.tag_level = 0
@@ -122,17 +136,23 @@ class WindowSummaryTable(QMainWindow):
         self.tag_filter = text
         self.run_update_callbacks()
 
-    def month_before(self):
-        # get correct handling of change of year
-        date_upto = self.date_upto - datetime.timedelta(days=2)
-        self.date_upto = datetime.datetime(date_upto.year, date_upto.month, 1)
-        self.date_from = datetime.datetime(date_upto.year - 1, date_upto.month, 1)
+    def set_date_from(self, date_str):
+        date = datetime.datetime.strptime(date_str, "%Y-%m")
+        date_from = datetime.datetime(date.year, date.month, 1)
+        if date_from >= self.date_upto:
+            date_upto = date + datetime.timedelta(days=2)
+            self.date_upto = datetime.datetime(date_upto.year, date_upto.month, 1)
+        self.date_from = date_from
         self.run_update_callbacks()
 
-    def month_after(self):
-        date_upto = self.date_upto + datetime.timedelta(days=32)  # month at most 31 days
-        self.date_upto = datetime.datetime(date_upto.year, date_upto.month, 1)
-        self.date_from = datetime.datetime(date_upto.year - 1, date_upto.month, 1)
+    def set_date_upto(self, date_str):
+        date = datetime.datetime.strptime(date_str, "%Y-%m")
+        date_upto = date + datetime.timedelta(days=32)
+        date_upto = datetime.datetime(date_upto.year, date_upto.month, 1)
+        if date_upto <= self.date_from:
+            date_from = date_upto - datetime.timedelta(days=2)
+            self.date_from = datetime.datetime(date_from.year, date_from.month, 1)
+        self.date_upto = date_upto
         self.run_update_callbacks()
 
     def tag_level_changed(self, index):
@@ -153,19 +173,14 @@ class WindowSummaryTable(QMainWindow):
             tag_out = ".".join(tags[0:self.tag_level+1])
         return tag_out
 
-    def summary_df(self, type):
-        if type == "all":
-            return self.summary_df_all
-        elif type == "total":
-            return self.summary_df_total
+    # TODO unittest this method
 
-    # TODO unittest method
+    def get_summary_df(self):
 
-    def update_summary_df(self):
+        if self.date_from is None or self.date_upto is None:
+            return
         df = self.config.accounts.get_summary_df(date_from=self.date_from, date_upto=self.date_upto)
         if df is None:
-            self.summary_df_all = None
-            self.summary_df_total = None
             return
         # Filter df
         if self.tag_filter != "":
@@ -173,8 +188,6 @@ class WindowSummaryTable(QMainWindow):
         if len(self.excluded_tags) > 0:
             df = df[~(df[nn.tag].isin(self.excluded_tags))]
         if len(df) < 1:
-            self.summary_df_all = None
-            self.summary_df_total = None
             return
 
         df[nn.tag] = df[nn.tag].apply(self.get_base_tag)
@@ -186,12 +199,23 @@ class WindowSummaryTable(QMainWindow):
         dfp = dfp.reindex(timeseries_complete_range).resample("1ME").sum()
         dfp = dfp.T
         n_month = len(dfp.columns)
-        dfp["total"] = dfp.sum(axis=1)
-        dfp["monthly average"] = dfp["total"] / n_month
+        dfp[nn.total] = dfp.sum(axis=1)
+        dfp["monthly average"] = dfp[nn.total] / n_month
         dfp = dfp.reset_index()
-        self.summary_df_all = dfp
+
+        for col in dfp.columns:
+            if isinstance(col, datetime.datetime):
+                col_str = col.strftime("%Y-%m")
+            else:
+                col_str = str(col)
+            if col_str == self.sort_column:
+                dfp = dfp.sort_values(by=col, ascending=self.sort_order == 0)
+                break
 
         # Calculate Total expenses
-        df_total = pd.DataFrame({**dfp.sum().to_dict()}, index=["total"])
-        df_total[nn.tag] = "total"
-        self.summary_df_total = df_total
+        df_total = pd.DataFrame({**dfp.sum().to_dict()}, index=[nn.total])
+        df_total[nn.tag] = nn.total
+
+        df_combined = pd.concat([dfp, df_total])
+
+        return df_combined
