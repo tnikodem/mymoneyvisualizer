@@ -26,7 +26,7 @@ setup(
     python_requires='>=3.10',
     install_requires=[
         'numpy>=1.26,<2.3',
-        'pandas==2.2.*',
+        'pandas>=2.2,<2.4',
         'pyyaml==6.0.*',
         'pyqt6==6.6.*',
         'PyQt6_Qt6==6.6.*',
