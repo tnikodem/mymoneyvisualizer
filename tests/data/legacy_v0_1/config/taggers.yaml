@@ -1,0 +1,12 @@
+- name: baecker
+  regex_description: ''
+  regex_recipient: "B\xE4ckerei"
+  tag: "k\xFCche.brot"
+- name: gehalt
+  regex_description: Gehalt
+  regex_recipient: ''
+  tag: income
+- name: sparen
+  regex_description: ^Sparen$
+  regex_recipient: ''
+  tag: spar

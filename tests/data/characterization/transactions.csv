@@ -1,0 +1,394 @@
+account,transaction_id,date,recipient,description,value
+giro,8b4ae5f1-a941-46a0-956a-26afbccdafe5,2022-01-01,ACME GmbH,Gehalt,3000.0
+giro,62f90a94-5f56-43c6-8227-6ad5ab2da739,2022-01-03,Vermieter,Miete,-900.0
+giro,4551370e-99b2-474c-b427-fa48d732a1df,2022-01-03,REWE,Einkauf,-81.52
+giro,e9e15a77-8978-4e37-a1a5-57d8e5a70329,2022-01-04,Ich,Sparen,-200.0
+giro,b72f45b3-5223-479f-ae79-4d57037e2cfd,2022-01-08,Kiosk,Zeitung,-2.19
+giro,6b236b82-481b-49fe-a30d-c3ce3be4ebca,2022-01-14,ShareNow,Fahrt,-18.32
+giro,1ef7677a-1f13-4a81-8d88-2195a100b28d,2022-01-20,Shell,Tankstelle,-53.3
+giro,5e19a621-f9bd-4ccc-a139-7c1ec795ca77,2022-01-23,EDEKA,Bio Einkauf,-57.02
+giro,70aca1e9-2611-4901-9d06-f27f8f063cd2,2022-01-24,EDEKA,Bio Einkauf,-88.54
+giro,48dc03d1-7a88-434d-8552-7357a2e64647,2022-01-24,REWE,Einkauf,-85.61
+giro,f03e2fb8-1f22-4f41-92c5-8efd5185f071,2022-01-25,Shell,Tankstelle,-64.68
+giro,0bb4db71-be57-4209-851d-3d24f4c0cf83,2022-02-01,ACME GmbH,Gehalt,3000.0
+giro,fe4363f8-2f47-4977-8955-f6ced681cbea,2022-02-03,Vermieter,Miete,-900.0
+giro,116e3ab5-1681-44a3-b4fe-c70a68b3e4bd,2022-02-04,Ich,Sparen,-200.0
+giro,7c9311f8-5e04-49b1-9f7e-c0e156f65a33,2022-02-06,REWE,Einkauf,-70.98
+giro,1fe6ac2f-88a6-4182-8697-93f0aad6ded8,2022-02-11,Kiosk,Zeitung,-2.57
+giro,693a179e-0d02-4ed4-a58b-e7a9ebc28a27,2022-02-21,Shell,Tankstelle,-49.77
+giro,83bc45fe-e9ee-4403-a79b-e11854444131,2022-02-22,REWE,Einkauf,-32.63
+giro,85452a44-f318-437f-88cd-1e614f235d3f,2022-02-24,EDEKA,Einkauf,-76.7
+giro,7179ced2-c8f8-44a1-b472-ff70ce369d83,2022-02-25,EDEKA,Einkauf,-51.27
+giro,22e791b8-80ee-495e-bf0d-307d2fbaf400,2022-02-26,Shell,Tankstelle,-69.03
+giro,1d43a788-5563-4144-ab66-03f7b2725de1,2022-02-26,ShareNow,Fahrt,-17.04
+giro,b4b80eba-7c5c-4d81-921b-ea9cee1810df,2022-03-01,ACME GmbH,Gehalt,3000.0
+giro,27ed600d-e320-4a67-8930-7fd37899c118,2022-03-01,Kiosk,Zeitung,-3.99
+giro,d5169faf-26cd-4b5c-b0c8-aba44d972299,2022-03-03,Vermieter,Miete,-900.0
+giro,ca7bf101-3ccd-48ab-8ab4-a6039954e84c,2022-03-04,Ich,Sparen,-200.0
+giro,32202c99-8e82-4252-ac49-c4394c7d7326,2022-03-05,EDEKA,Bio Einkauf,-79.96
+giro,1e2d8270-76f7-449a-b8fa-197271be53a3,2022-03-08,Shell,Tankstelle,-44.19
+giro,819af667-4394-43f7-aa5f-93f32c810a37,2022-03-11,Allianz,Versicherung KFZ,-600.0
+giro,e8c7b41b-9a1d-4b0f-9806-00a974d63b63,2022-03-15,REWE,Einkauf,-43.61
+giro,5b6aaf61-b288-4bd0-aecf-a76661622361,2022-03-20,REWE,Einkauf,-79.94
+giro,1e764c93-aa38-4ffa-bd0a-6a6412b20997,2022-03-22,EDEKA,Bio Einkauf,-47.3
+giro,442b128c-dad7-4bad-8f8a-eef42a0b9a26,2022-03-22,Shell,Tankstelle,-46.0
+giro,d74fc78f-2562-4870-9097-a55b5510543d,2022-03-25,ShareNow,Fahrt,-21.8
+giro,aadf7488-f892-4121-9138-7ad86aca56d8,2022-04-01,ACME GmbH,Gehalt,3000.0
+giro,531c927b-931f-48f1-ae79-5b9b331767e7,2022-04-03,Vermieter,Miete,-900.0
+giro,bd2f5d95-e57b-4791-836d-840f4e665460,2022-04-03,Shell,Tankstelle,-49.12
+giro,a8b8287a-6f4b-4952-8957-5d7277d456c0,2022-04-04,Ich,Sparen,-200.0
+giro,cc489fb6-511f-4e09-a5d7-2bf834e04fe0,2022-04-11,ShareNow,Fahrt,-13.22
+giro,1783d53e-c944-458d-9d28-960c44b0382e,2022-04-14,REWE,Einkauf,-63.91
+giro,28ca4991-e02a-4d77-a79f-edc206d2318c,2022-04-14,Kiosk,Zeitung,-3.23
+giro,12dbe8f5-331d-4991-bf01-e64710dd3c25,2022-04-15,EDEKA,Bio Einkauf,-64.12
+giro,8135bbfb-885d-4469-99a4-9b36402a4f3d,2022-04-17,Shell,Tankstelle,-40.92
+giro,93438e60-788d-41e2-b9a1-31f8130b3ea4,2022-04-21,EDEKA,Einkauf,-63.21
+giro,f4d21690-a049-4531-b555-0ec0193a8bed,2022-04-22,REWE,Einkauf,-36.87
+giro,7066c1cd-7109-4507-9a93-3ee857db751f,2022-05-01,ACME GmbH,Gehalt,3000.0
+giro,f223726a-d906-47f7-89f7-c61bd80163a8,2022-05-03,Vermieter,Miete,-900.0
+giro,e393ddd8-0845-4d6b-ad90-efd8aba2b4d0,2022-05-04,Ich,Sparen,-200.0
+giro,e648caff-7704-4c26-9227-a069c392f4ee,2022-05-06,Shell,Tankstelle,-42.7
+giro,969be487-a440-47c3-aa52-04cabbf9bfe8,2022-05-10,Shell,Tankstelle,-40.68
+giro,24b7db0e-504f-4d97-8686-934768f005af,2022-05-14,REWE,Einkauf,-77.03
+giro,0d5a23dd-b465-4c5a-889b-43e76ea3e384,2022-05-21,EDEKA,Bio Einkauf,-78.84
+giro,cf6b3cbe-b4af-4ecf-b21c-d3a408f80223,2022-05-23,Kiosk,Zeitung,-2.48
+giro,b361c24e-f366-4301-b8b4-79933822c3c0,2022-05-24,ShareNow,Fahrt,-16.93
+giro,d8faef6e-9e6c-40df-81db-a9aeb5301e58,2022-05-27,REWE,Einkauf,-47.62
+giro,c9a356ba-91d7-4f6d-a4ee-3a14ebd41386,2022-05-31,REWE,Einkauf,-33.5
+giro,9a633f7c-3499-43cb-863d-c4f3ea335483,2022-06-01,ACME GmbH,Gehalt,3000.0
+giro,e56f6416-8344-41b9-ab41-0c3bade3f639,2022-06-03,Vermieter,Miete,-900.0
+giro,5fc3d3d4-e1e6-486d-be5b-1df267ebd0e0,2022-06-04,Ich,Sparen,-200.0
+giro,5cae654f-2c42-48f2-b265-d7ddd7eec592,2022-06-08,EDEKA,Bio Einkauf,-35.26
+giro,3eb486fc-6bb3-4e57-9a96-372332a38245,2022-06-10,REWE,Einkauf,-87.71
+giro,e6a7dc16-2ddc-48f3-954a-0f38ee52c971,2022-06-11,Shell,Tankstelle,-60.99
+giro,b7e22d1b-ad8d-4d2d-97fb-1065837b9758,2022-06-16,REWE,Einkauf,-52.86
+giro,8c2557f3-b724-4b85-abab-20e604ae83e5,2022-06-23,ShareNow,Fahrt,-21.68
+giro,0f4a6231-2e48-4232-9dc3-f3e848e3f55c,2022-06-28,REWE,Einkauf,-71.78
+giro,9952c333-8026-4bfa-8adf-76282c4bf983,2022-06-28,Shell,Tankstelle,-47.98
+giro,385d98c4-6901-46be-98f0-9c9384aaa594,2022-06-30,Kiosk,Zeitung,-4.15
+giro,db83b518-4e54-4711-b50a-853f3b46146e,2022-07-01,ACME GmbH,Gehalt,3000.0
+giro,3201a929-59ec-4e84-886a-928a82af70f3,2022-07-03,Vermieter,Miete,-900.0
+giro,752175d0-b84d-45d7-84b6-df97679fc61c,2022-07-03,ShareNow,Fahrt,-11.27
+giro,6bd92e60-843c-414e-a9b1-0320c6161bf6,2022-07-04,Ich,Sparen,-200.0
+giro,b4b3532c-8644-4d98-9aaf-c374303fc6a8,2022-07-06,Reisebuero,Urlaub,-2000.0
+giro,0cbf564c-b39c-4a55-8b53-769e1763f565,2022-07-10,EDEKA,Einkauf,-73.17
+giro,1d9b09ae-7037-4dad-9acf-5c4f1bf192b7,2022-07-14,EDEKA,Bio Einkauf,-42.14
+giro,dd682f78-c626-4136-85d5-ae4ceedf5bea,2022-07-14,Shell,Tankstelle,-57.52
+giro,d2e329bb-4b06-4233-bc2f-422be3f0fa0c,2022-07-21,Shell,Tankstelle,-58.82
+giro,2a4527bf-1f43-419a-9622-a5e8199fac7a,2022-07-21,Kiosk,Zeitung,-3.25
+giro,01b68222-5ceb-4ea1-b0b2-cbebdc33b8f8,2022-07-23,REWE,Einkauf,-40.61
+giro,9304ebbe-937c-4140-821f-57c9e09458ce,2022-07-25,REWE,Einkauf,-35.78
+giro,25aa8269-e52e-4ea2-89eb-1d172060132f,2022-08-01,ACME GmbH,Gehalt,3000.0
+giro,73813de5-4e93-40ba-b714-50d7f0fffa1c,2022-08-02,REWE,Einkauf,-36.2
+giro,2a6828bc-7b69-460f-aba1-77ada22a5969,2022-08-03,Vermieter,Miete,-900.0
+giro,a6c9753e-e0f9-4a09-b3c1-4c4ec8a82397,2022-08-04,Ich,Sparen,-200.0
+giro,917d1feb-cb9f-41e9-95b4-afb1e84452cd,2022-08-06,REWE,Einkauf,-85.51
+giro,34f84a42-b572-4540-8d84-ebb4c644a23f,2022-08-13,ShareNow,Fahrt,-21.74
+giro,660828f3-f037-4030-963e-c7f8f2912a91,2022-08-15,Kiosk,Zeitung,-2.25
+giro,854fc5bd-a361-40e0-9e99-ade3ce42f785,2022-08-19,REWE,Einkauf,-50.81
+giro,840dfed0-7815-47ea-9662-124cac66f10b,2022-08-19,Shell,Tankstelle,-40.68
+giro,559b922b-4f02-4107-ac03-3e6f0ad92c05,2022-08-19,Shell,Tankstelle,-68.76
+giro,596dd200-d379-47c3-8acb-25b30760b2d0,2022-08-25,REWE,Einkauf,-49.79
+giro,21138f16-c631-4505-83e4-ab744787814f,2022-09-01,ACME GmbH,Gehalt,3000.0
+giro,8136f091-7322-47f0-b0f4-88db5b58d489,2022-09-03,Vermieter,Miete,-900.0
+giro,dccfa9a9-e610-41dc-947a-816f658210cc,2022-09-04,Ich,Sparen,-200.0
+giro,ae7893a4-2831-44cf-9bc5-f86fb46574a8,2022-09-09,REWE,Einkauf,-86.27
+giro,c9f4a43c-e2e0-49cd-b214-d9772635c7f5,2022-09-09,REWE,Einkauf,-31.3
+giro,440f3a27-5105-4b1c-afad-244dd7a169a0,2022-09-10,ShareNow,Fahrt,-11.63
+giro,a3da8ae6-a756-40da-b4b7-1604af4efb0c,2022-09-11,Shell,Tankstelle,-66.88
+giro,992a6637-da29-4a9c-9d09-ab3c86eff530,2022-09-15,REWE,Einkauf,-58.41
+giro,d2ea5020-0f38-46cc-bc55-784de60c5050,2022-09-17,Kiosk,Zeitung,-4.02
+giro,7316edc2-c288-4b93-8364-74609de3280a,2022-09-25,REWE,Einkauf,-61.24
+giro,dfd72394-5e6d-4256-bb08-88d756a86851,2022-09-25,Shell,Tankstelle,-44.21
+giro,10e42ec0-766e-43e1-b939-897f491c8132,2022-10-01,ACME GmbH,Gehalt,3000.0
+giro,ea0dc495-f925-4a92-bdbf-d362261e85a3,2022-10-03,Vermieter,Miete,-900.0
+giro,426b5e43-7454-4d9b-8bd9-36cb858ea318,2022-10-04,EDEKA,Einkauf,-76.12
+giro,eb4f52e5-4417-4b61-904f-65293bd5b540,2022-10-04,Ich,Sparen,-200.0
+giro,3c55975c-b14b-4153-9b09-65151118d8b8,2022-10-08,REWE,Einkauf,-79.79
+giro,9e702374-f5d7-43a9-8189-1c0debc8c7a1,2022-10-09,REWE,Einkauf,-84.96
+giro,f1a50b2a-ce47-4f90-88d8-0ea2acb5def1,2022-10-10,Kiosk,Zeitung,-2.77
+giro,2da57c50-f4a0-45de-a6fa-48776a3998e4,2022-10-15,Shell,Tankstelle,-49.51
+giro,9060e97d-0d51-4ba6-b43a-61a93206f536,2022-10-20,ShareNow,Fahrt,-17.73
+giro,ef7b6223-32df-4829-93c2-d05818f7d506,2022-10-26,Shell,Tankstelle,-68.59
+giro,1468a1e9-ce28-4ad2-9a87-79af1c02b3cd,2022-10-31,REWE,Einkauf,-63.29
+giro,2a705998-389f-4119-abcd-3997c8006e61,2022-11-01,ACME GmbH,Gehalt,3000.0
+giro,c2a23c98-eb3e-4f14-8d42-3158a40db3c0,2022-11-01,Shell,Tankstelle,-59.85
+giro,496afcd7-448d-4b22-b02b-2631591396a9,2022-11-03,Vermieter,Miete,-900.0
+giro,32dc6be7-7f64-4e21-9f61-78809cd41922,2022-11-03,Kiosk,Zeitung,-2.79
+giro,22da3cd8-d185-4421-9480-fba3589bcd14,2022-11-04,Ich,Sparen,-200.0
+giro,f1cdc54b-d206-4e37-bd81-f3b5283c563f,2022-11-05,EDEKA,Einkauf,-83.61
+giro,ac2fd9c5-abeb-4c94-9e23-54e0d6bcb84c,2022-11-24,Shell,Tankstelle,-51.21
+giro,3d3b7a35-0133-4154-9e53-86dabdd91975,2022-11-27,REWE,Einkauf,-48.96
+giro,a8b8192a-9817-4a13-ba3c-1433abd35fc3,2022-11-27,ShareNow,Fahrt,-21.2
+giro,d661544e-0c4d-495f-90a5-b3a968171e8a,2022-11-29,REWE,Einkauf,-89.54
+giro,a4142cae-3b17-4fd4-b3b3-4f864a7d7960,2022-11-30,REWE,Einkauf,-32.69
+giro,da9985d7-78ec-404e-9bd4-f6c0050232d5,2022-12-01,ACME GmbH,Gehalt,3100.0
+giro,ee3b0505-8aee-4f6f-b5e3-6b2e1ebe48e2,2022-12-01,REWE,Einkauf,-37.37
+giro,169b407c-c94d-439e-9124-e6da04a1e82f,2022-12-03,Vermieter,Miete,-900.0
+giro,4fa60c36-45a8-42bf-b642-63a33eb586e5,2022-12-04,Ich,Sparen,-200.0
+giro,08ac62b9-9832-4010-855f-233bef84ce84,2022-12-05,Shell,Tankstelle,-46.89
+giro,c5f7c347-751f-4844-8fb7-e1bfc0293f89,2022-12-05,Kiosk,Zeitung,-2.37
+giro,6b065af1-75e4-48c1-8253-c8d0c2c5da30,2022-12-09,ShareNow,Fahrt,-20.16
+giro,d3d40c74-d763-4818-a3b8-9ca9e1f431ba,2022-12-12,EDEKA,Bio Einkauf,-48.62
+giro,2f4a9cd9-a46f-48ac-b0df-5b552d58e85e,2022-12-14,Shell,Tankstelle,-40.42
+giro,d047f211-08f8-46c6-9922-a988a97365d3,2022-12-19,EDEKA,Einkauf,-60.04
+giro,e4f1e2dd-f682-4860-b549-0d4f5e55fcb5,2022-12-30,EDEKA,Bio Einkauf,-40.76
+giro,de0f3221-42ac-41b8-8b78-c26723652cff,2023-01-01,ACME GmbH,Gehalt,3000.0
+giro,afa2cea2-0719-4ef0-93b2-f6caa37dd0d7,2023-01-03,Vermieter,Miete,-900.0
+giro,5c0b14c5-666b-4761-a508-2c08ffdda4d4,2023-01-04,Ich,Sparen,-200.0
+giro,b9368c52-99cd-46b8-b324-aa344f59de71,2023-01-05,REWE,Einkauf,-48.06
+giro,d99ba825-106d-4060-8c9b-1f579a1b766b,2023-01-05,Shell,Tankstelle,-59.89
+giro,28c944f8-049d-4b8c-b1a5-2e05d269bdb8,2023-01-09,Kiosk,Zeitung,-2.07
+giro,fa048716-c90f-41c6-9470-6d9ab2fa1f65,2023-01-10,EDEKA,Einkauf,-41.99
+giro,9264f44f-4b97-47a4-8acd-a03262d4372f,2023-01-16,EDEKA,Einkauf,-74.34
+giro,df39f979-8ceb-4808-8a5e-9f57f75c25d8,2023-01-16,Shell,Tankstelle,-68.67
+giro,7aa2ea6e-96c0-488a-9372-551ae96b3463,2023-01-17,ShareNow,Fahrt,-23.87
+giro,eff9c2df-b13a-4ec2-a6f0-4a97f003f8c1,2023-01-26,REWE,Einkauf,-85.65
+giro,cd0b1fcb-63eb-4723-a04c-910707d3a7c2,2023-02-01,ACME GmbH,Gehalt,3000.0
+giro,965b00ed-7ae5-41fe-9a43-ef20238de225,2023-02-03,Vermieter,Miete,-900.0
+giro,61694042-78e9-4079-92a2-512714be5508,2023-02-04,Ich,Sparen,-200.0
+giro,aea74c6f-beda-4017-96f6-bbade826e5fc,2023-02-05,EDEKA,Einkauf,-58.04
+giro,347fee88-8f1d-4093-83ac-5af31ff33e72,2023-02-09,Shell,Tankstelle,-63.9
+giro,75a44f74-12f0-47ea-b1b0-5cc0d9149a37,2023-02-10,ShareNow,Fahrt,-19.09
+giro,960586d8-3575-44c4-847f-7a25f2764e11,2023-02-15,Kiosk,Zeitung,-4.6
+giro,c90fde5f-5d9a-4aeb-8d0e-a441a3ec951f,2023-02-16,REWE,Einkauf,-87.97
+giro,51d9b356-c1e9-41b6-b640-85e9f46448d3,2023-02-17,EDEKA,Bio Einkauf,-38.42
+giro,03a7731b-c5c0-431d-b4c4-b52d9c42432d,2023-02-17,EDEKA,Bio Einkauf,-36.55
+giro,11eb43ed-e0b3-49c0-b1ad-d7da1c5cc830,2023-02-24,Shell,Tankstelle,-46.98
+giro,96967d72-076f-41b8-ae11-6f3f99067c74,2023-03-01,ACME GmbH,Gehalt,3000.0
+giro,df9e94ba-bdc3-480e-87d0-98f08e05d0fe,2023-03-03,Vermieter,Miete,-900.0
+giro,6f7f7eb4-d093-47a0-96f6-0f7bc5ee4489,2023-03-04,Ich,Sparen,-200.0
+giro,44ba36c7-6199-4f48-9a7d-f3d2bb232384,2023-03-11,Allianz,Versicherung KFZ,-600.0
+giro,3d3528f1-a631-472f-9fce-2f2a693e7cab,2023-03-15,ShareNow,Fahrt,-12.19
+giro,be24ffa8-ed92-4f3f-9b17-dd0fdf68e464,2023-03-19,REWE,Einkauf,-69.12
+giro,8cbbb2da-7ab8-4f44-b324-c442395be586,2023-03-19,Kiosk,Zeitung,-4.47
+giro,de1c484a-3acc-41e3-944c-b740953494ea,2023-03-24,REWE,Einkauf,-52.45
+giro,3cbb9e91-5a22-48dc-b16b-739b8655f77b,2023-03-26,Shell,Tankstelle,-42.0
+giro,e569c66c-8441-4408-843e-86fc4ea8da80,2023-03-27,REWE,Einkauf,-74.76
+giro,7bfe90d7-f1af-451f-9c70-fe2a8548222d,2023-03-27,Shell,Tankstelle,-43.16
+giro,179d94be-8e6f-483a-a5c7-c6835addf91f,2023-03-30,REWE,Einkauf,-44.87
+giro,b152b02e-bf98-49df-a6d2-0e626f46eb2d,2023-04-01,ACME GmbH,Gehalt,3000.0
+giro,f4807756-1cf1-4799-8586-f7fb4079ff10,2023-04-02,Shell,Tankstelle,-60.42
+giro,0f5cbe40-eb20-4522-ad6b-e6569b20fa1c,2023-04-03,Vermieter,Miete,-900.0
+giro,a8dd57ca-6510-48d4-9f7e-d0fcf677d5c2,2023-04-04,Ich,Sparen,-200.0
+giro,9eaf3c71-52a0-447f-8941-a48bcf8c3aea,2023-04-05,REWE,Einkauf,-40.48
+giro,07e4468b-f0d9-46fa-bfb7-d5f6ab200cf1,2023-04-10,REWE,Einkauf,-85.26
+giro,9375633e-2401-4d3b-848c-9aaddcdc4bf8,2023-04-10,REWE,Einkauf,-47.08
+giro,4e93e9da-9ad8-4fe1-bfc1-9919433ecec2,2023-04-12,Kiosk,Zeitung,-3.51
+giro,3c0077d3-e389-4335-b6f3-83bc8569a881,2023-04-18,REWE,Einkauf,-31.27
+giro,c7a9cfca-6f19-400a-91ea-3bc3bad4ba50,2023-04-25,Shell,Tankstelle,-57.73
+giro,253b8983-1d94-4e3c-8d77-eae905660e77,2023-04-25,ShareNow,Fahrt,-14.77
+giro,dd684cb3-a341-45ae-9208-20f997b955bc,2023-05-01,ACME GmbH,Gehalt,3000.0
+giro,47edc456-fa92-484d-bcd8-f0539e80ea2a,2023-05-03,Vermieter,Miete,-900.0
+giro,5d3fd961-78d8-4b93-855e-56701a18bdcd,2023-05-04,Shell,Tankstelle,-41.56
+giro,be75c4d1-aa15-48f3-bca5-e537d049f96e,2023-05-04,Ich,Sparen,-200.0
+giro,80f8e119-5011-4c48-a97d-a195318b42cd,2023-05-13,ShareNow,Fahrt,-11.49
+giro,1d9fb697-149e-4627-aefa-414bdf10b483,2023-05-18,REWE,Einkauf,-61.43
+giro,d7a3a4f8-44cb-4554-8bcc-13d88dd8c7ef,2023-05-20,REWE,Einkauf,-32.96
+giro,4e5d4c32-efe9-4db2-afb4-1236d6e1fc20,2023-05-20,Elektromarkt,Laptop,-1500.0
+giro,e811c914-fc9e-4bc1-8d19-92c82150742a,2023-05-23,EDEKA,Bio Einkauf,-40.89
+giro,2eb1e364-6c75-41eb-95fb-51d6c195bd98,2023-05-28,REWE,Einkauf,-44.96
+giro,67c48147-7616-4017-a061-a22b354526f7,2023-05-28,Shell,Tankstelle,-65.0
+giro,910c2776-7873-4db3-adee-00cd0d4fc8a4,2023-05-29,Kiosk,Zeitung,-4.53
+giro,f3c3513c-3e2f-46d5-bb92-0fb8c38ac755,2023-06-01,ACME GmbH,Gehalt,3000.0
+giro,94b43174-0da5-4eab-bd3c-bd6abe798335,2023-06-03,Vermieter,Miete,-900.0
+giro,18ede5e9-f5fc-4b73-b613-6b1e8ffe8da1,2023-06-04,Ich,Sparen,-200.0
+giro,cb9ca2f3-c620-4390-975c-fc661736e08e,2023-06-14,ShareNow,Fahrt,-16.25
+giro,d8156309-1904-4fee-87bd-3da15697230a,2023-06-15,Kiosk,Zeitung,-2.7
+giro,24137bc3-79be-4a77-8e3a-a9791ddeb868,2023-06-17,REWE,Einkauf,-53.11
+giro,492ab5ee-1be9-48bb-ab77-87f581b1b215,2023-06-20,Shell,Tankstelle,-44.19
+giro,d0d9130e-860f-4fb8-8345-c2892ceaf685,2023-06-21,Shell,Tankstelle,-47.99
+giro,2bcd0e0b-a035-4c8d-b559-4488c86fe8c4,2023-06-25,EDEKA,Einkauf,-76.77
+giro,6fa976cc-ff61-4303-9f0c-caa7706d56f5,2023-06-25,REWE,Einkauf,-81.45
+giro,cdb73b21-0b7b-4810-ba18-7abc8bdb53ba,2023-06-28,EDEKA,Einkauf,-38.07
+giro,05797dca-e3d0-4d97-a089-fc5223e5e138,2023-07-01,ACME GmbH,Gehalt,3000.0
+giro,d835eb02-d282-4f32-8e85-d348c5e2f1e0,2023-07-03,Vermieter,Miete,-900.0
+giro,a2d885e1-1e96-4f80-a6f0-d40f744d8956,2023-07-04,Ich,Sparen,-200.0
+giro,78237d6c-e57b-4477-9c45-7512c7a265c1,2023-07-06,Reisebuero,Urlaub,-2000.0
+giro,d853d01b-4a7d-4f8d-aebe-bb6cd18c9ace,2023-07-08,EDEKA,Einkauf,-58.85
+giro,167f6c27-92ba-4f77-83a2-5cd36c94d19e,2023-07-10,REWE,Einkauf,-62.13
+giro,7d5a7f83-c6c7-4532-a10d-38be12664c74,2023-07-11,REWE,Einkauf,-49.65
+giro,7f76ced5-15cd-42c0-b253-e9ee029f12b5,2023-07-12,REWE,Einkauf,-71.14
+giro,10a4d62a-efef-49be-bfd5-41ece6de6361,2023-07-17,Kiosk,Zeitung,-2.86
+giro,570ec219-4149-4e8e-aa1b-7a4a68ac6565,2023-07-18,ShareNow,Fahrt,-19.49
+giro,96b13da7-24dd-4ea4-b935-c96a520df867,2023-07-27,Shell,Tankstelle,-64.13
+giro,6e35bb09-5e85-44d1-a972-e75dd86997ad,2023-07-30,Shell,Tankstelle,-59.58
+giro,d70f5d60-952a-40d8-9a1a-be16d98305c9,2023-08-01,ACME GmbH,Gehalt,3000.0
+giro,aef75ef6-3585-4172-aaf1-1ac1470580b6,2023-08-03,Vermieter,Miete,-900.0
+giro,efe9a1c1-58e3-4bad-8cea-0c40eab16695,2023-08-03,REWE,Einkauf,-87.53
+giro,b0a340ed-e8fb-425f-b57e-1c3fc672d894,2023-08-04,Ich,Sparen,-200.0
+giro,012b87e5-6dc3-4d08-9606-9bb404d4c963,2023-08-06,REWE,Einkauf,-71.69
+giro,d2b71161-cc5c-4e6b-81d1-9b1c78c9f82e,2023-08-06,Shell,Tankstelle,-57.81
+giro,dd5f617e-60ac-4d8e-9c39-fcd4dd532caa,2023-08-20,EDEKA,Bio Einkauf,-86.16
+giro,56b8f8db-15d4-4edc-a0c1-4449fbb05c94,2023-08-23,EDEKA,Bio Einkauf,-66.86
+giro,99f4ea57-a296-4a4a-9101-eda2a2f2fc4a,2023-08-25,Shell,Tankstelle,-63.48
+giro,ba919b82-14d8-405a-87a5-5c52d8728772,2023-08-25,Kiosk,Zeitung,-2.76
+giro,30626e3f-a44c-456e-b127-7a918950c2ff,2023-08-31,ShareNow,Fahrt,-24.19
+giro,a763fdda-322a-4c60-8c8c-cc551ca25344,2023-09-01,ACME GmbH,Gehalt,3000.0
+giro,3bf7418a-9451-497e-9817-4e137682b132,2023-09-01,REWE,Einkauf,-61.36
+giro,12d23a51-6af2-47e2-be66-904f98dc6b7e,2023-09-03,Vermieter,Miete,-900.0
+giro,a0af334d-8a11-4b33-b8d4-2288142d0a51,2023-09-04,Kiosk,Zeitung,-3.97
+giro,915d5884-ce11-4fb4-9d05-5dcd7f6740c5,2023-09-04,Ich,Sparen,-200.0
+giro,828d3f77-cc3b-4cd3-a0e1-c028ad914279,2023-09-08,Shell,Tankstelle,-67.94
+giro,02643839-a8b9-46dd-a7d1-1d3a227c1e50,2023-09-18,REWE,Einkauf,-63.9
+giro,c41a8dfe-4005-456b-9f7a-25478b03fbd3,2023-09-18,EDEKA,Einkauf,-59.53
+giro,e50d66cf-b3cb-45c4-875c-46adbfde4375,2023-09-18,Shell,Tankstelle,-43.59
+giro,cc8f4fef-e69f-4faf-ae6d-7321083ac312,2023-09-22,REWE,Einkauf,-66.97
+giro,f577eed2-f647-445f-b10e-f3a84561bf8b,2023-09-24,ShareNow,Fahrt,-11.32
+giro,ea605f98-9816-43d1-b58c-9d7dbd34f871,2023-10-01,ACME GmbH,Gehalt,3000.0
+giro,1e11ac3e-c9fa-4c0f-af37-be243267d3ae,2023-10-03,Vermieter,Miete,-900.0
+giro,81456362-c32d-46b5-bdde-80ce49091132,2023-10-04,Ich,Sparen,-200.0
+giro,5bd38e3b-37b0-4d41-8459-7665cc1f4611,2023-10-06,ShareNow,Fahrt,-24.04
+giro,03f7c130-6d15-4186-9ed1-98e275148aa1,2023-10-12,REWE,Einkauf,-86.17
+giro,df8fe461-2f55-4a60-a453-2e4502261da3,2023-10-13,EDEKA,Einkauf,-46.23
+giro,06299958-f3f3-444a-995f-e3dbd955574e,2023-10-14,Shell,Tankstelle,-61.89
+giro,c422172a-c3ce-4234-afac-8a13b1fa48f6,2023-10-18,Shell,Tankstelle,-51.5
+giro,b69f19a4-0fad-446c-8307-77f8821097c5,2023-10-18,Kiosk,Zeitung,-4.34
+giro,b81d5e94-e394-443f-afab-e35cdf10b3a4,2023-10-23,EDEKA,Einkauf,-50.02
+giro,727befe3-a320-4542-a9e1-8e4a8f54fe79,2023-10-25,REWE,Einkauf,-39.46
+giro,563138cb-a65e-4cc4-9e8f-c1604fb0f27c,2023-11-01,ACME GmbH,Gehalt,3000.0
+giro,e41f6ac4-6fcc-45ec-ad31-114838c408a8,2023-11-03,Vermieter,Miete,-900.0
+giro,4bc17203-e086-492f-82a6-89664093402a,2023-11-04,Ich,Sparen,-200.0
+giro,4eb2b537-784d-4b41-af51-e1e694f40770,2023-11-09,EDEKA,Bio Einkauf,-65.3
+giro,3f73035c-a901-492c-ac71-83f12f688848,2023-11-10,ShareNow,Fahrt,-14.53
+giro,6debf8dd-3b94-42f6-9e45-153816429a06,2023-11-14,Kiosk,Zeitung,-4.76
+giro,cc434265-adec-40c0-a713-060e7ec60558,2023-11-15,EDEKA,Einkauf,-37.11
+giro,0cd10098-2cbf-439e-9148-7bcdd76787c4,2023-11-19,REWE,Einkauf,-89.2
+giro,008d2c62-9025-4b70-9b08-633bf774cba3,2023-11-22,Shell,Tankstelle,-48.86
+giro,a02a337f-902f-4e22-bd83-76d276735623,2023-11-25,Shell,Tankstelle,-53.76
+giro,131faf12-a14d-4f7d-914d-ba1188f14724,2023-11-26,EDEKA,Bio Einkauf,-57.26
+giro,016cea21-16d7-4a75-ad66-a5292249b529,2023-12-01,ACME GmbH,Gehalt,3100.0
+giro,134ed506-7596-4ea9-b0cd-99fbbd62b099,2023-12-01,Shell,Tankstelle,-44.29
+giro,0adc7878-02c8-4cd1-a2ce-daabf1b83129,2023-12-02,EDEKA,Einkauf,-69.01
+giro,28ab2b06-4224-4745-9c15-6ac33563ddca,2023-12-03,Vermieter,Miete,-900.0
+giro,94f5169c-b0d3-4eec-9f33-3f361bd1bbe4,2023-12-04,REWE,Einkauf,-83.82
+giro,98ebdd24-7282-461d-a6ee-cd46aa11b150,2023-12-04,Ich,Sparen,-200.0
+giro,4a924882-8807-4f2f-a2f1-2873bb27fc9d,2023-12-23,REWE,Einkauf,-89.82
+giro,aa42ab25-b714-4468-96c6-afd2108be76a,2023-12-25,EDEKA,Bio Einkauf,-80.21
+giro,8b52941a-b623-4ff4-ace8-8e0b00d1dde2,2023-12-25,Kiosk,Zeitung,-4.73
+giro,aa902296-ed25-47ab-bf98-c7546194a80c,2023-12-27,Shell,Tankstelle,-47.22
+giro,f9f29c5b-5349-4fc5-9030-09f2a4aabd36,2023-12-27,ShareNow,Fahrt,-12.97
+giro,73dd2260-321e-479c-b6c1-5cc3e8077eaa,2024-01-01,ACME GmbH,Gehalt,3000.0
+giro,f8708eca-2bfc-4bad-9241-1b63713ff591,2024-01-03,Vermieter,Miete,-900.0
+giro,2ce04a8e-0a2f-41ed-a623-8d0336654647,2024-01-04,Ich,Sparen,-200.0
+giro,06acf832-e8fc-41f3-8084-2de521cb9c9b,2024-01-09,REWE,Einkauf,-30.33
+giro,dbd26fc4-4624-4255-b47d-ae613cec4b83,2024-01-21,REWE,Einkauf,-66.36
+giro,57b1b942-c8cf-44b1-8854-5799f101ca6b,2024-01-25,REWE,Einkauf,-78.06
+giro,3073106b-3f5e-4921-816a-d38dfe762c2f,2024-01-26,ShareNow,Fahrt,-10.6
+giro,65e66345-6b92-4d4d-ab78-25f9f7639072,2024-01-26,Kiosk,Zeitung,-2.61
+giro,719a6917-3bf6-4056-95a9-34872de8d613,2024-01-29,Shell,Tankstelle,-60.94
+giro,8c3d9d43-1517-4704-88b9-40656d5760b9,2024-01-31,REWE,Einkauf,-80.96
+giro,0808beb9-2caa-4ad9-a6e2-9bf380286ac1,2024-01-31,Shell,Tankstelle,-63.16
+giro,bb53da60-fd82-4eda-aa98-a02f4e9d3b67,2024-02-01,ACME GmbH,Gehalt,3000.0
+giro,74e08750-d330-46d0-b7f3-1b8404611a1e,2024-02-02,Shell,Tankstelle,-41.27
+giro,c819465b-9bbe-4600-b93a-69176bb176c9,2024-02-03,Vermieter,Miete,-900.0
+giro,a03fadf1-6081-473e-ac2b-cb1330957924,2024-02-04,REWE,Einkauf,-74.71
+giro,7d2bfb0e-3c7b-4bcc-a0a7-690c023cb3af,2024-02-04,EDEKA,Einkauf,-39.31
+giro,95b60881-1024-4b15-8bb6-f831dfad3546,2024-02-04,Ich,Sparen,-200.0
+giro,305913ea-7245-4b84-b590-5759ba050409,2024-02-07,ShareNow,Fahrt,-20.64
+giro,30636eb7-22df-40b3-85ed-516ccd662a21,2024-02-15,Shell,Tankstelle,-58.49
+giro,9ee259c2-fbb5-40f0-aa9e-5ec19ce7be44,2024-02-22,EDEKA,Einkauf,-66.69
+giro,fc7528cb-b4d7-4036-9f6d-a03ae73d8044,2024-02-24,REWE,Einkauf,-46.25
+giro,98dc6392-93f2-418c-9178-ac26b031bcd8,2024-02-26,Kiosk,Zeitung,-2.52
+giro,3d3ddde8-4375-4350-9b4f-3c953ad8ffa0,2024-03-01,ACME GmbH,Gehalt,3000.0
+giro,6f001c5e-43e5-4774-8f3c-a1b45661c3dc,2024-03-03,Vermieter,Miete,-900.0
+giro,dbeaf3ef-9a8a-4ba2-b48e-833393bb8cbd,2024-03-03,REWE,Einkauf,-77.04
+giro,42e0d299-5daa-444e-9b8f-56825167b713,2024-03-04,Ich,Sparen,-200.0
+giro,3eafdae7-792e-46bb-b656-207dfcca5747,2024-03-05,ShareNow,Fahrt,-17.63
+giro,256fb0dc-6616-4378-9c81-820d68a121dc,2024-03-05,Kiosk,Zeitung,-3.21
+giro,49e7ad2b-ccc0-4560-aa70-377d846c94b9,2024-03-08,REWE,Einkauf,-38.71
+giro,a216eb6a-74da-4472-8dfe-c3617bccba49,2024-03-11,Allianz,Versicherung KFZ,-600.0
+giro,076dfbeb-041c-4e4a-9c01-b3b7ffa1fac1,2024-03-12,REWE,Einkauf,-88.8
+giro,2c25211f-c892-4506-832e-6653bb7c81f6,2024-03-17,Shell,Tankstelle,-59.48
+giro,908ffa2a-7c0d-4cb2-ad57-ef24d7783263,2024-03-20,EDEKA,Bio Einkauf,-64.68
+giro,77daa28f-fb83-4eb6-9ebb-9b3a87c06934,2024-03-22,Shell,Tankstelle,-68.22
+giro,f57c612f-2ab4-472c-a617-dab41d132510,2024-04-01,ACME GmbH,Gehalt,3000.0
+giro,4bd7e7cb-65f5-4d77-827c-407433aae236,2024-04-03,Vermieter,Miete,-900.0
+giro,8bd2db3b-6218-475e-829b-de904a1d92c2,2024-04-04,Ich,Sparen,-200.0
+giro,e27cd572-9015-45dd-8be2-6bf3300bf8dd,2024-04-09,ShareNow,Fahrt,-17.11
+giro,8df6b864-7cc4-471f-b1ee-edda13e880e2,2024-04-13,REWE,Einkauf,-43.06
+giro,69603103-6f06-4701-9722-227de2728f85,2024-04-13,Kiosk,Zeitung,-2.68
+giro,6e0e079f-4553-4245-8911-be132edd7e92,2024-04-15,REWE,Einkauf,-48.28
+giro,20072b59-896f-4b11-893a-e8d778ac4598,2024-04-18,Shell,Tankstelle,-41.08
+giro,65ca578d-eec5-4881-8d37-a2862d503a13,2024-04-19,EDEKA,Einkauf,-54.71
+giro,1b97685b-7010-40bd-a256-fee38ac72aec,2024-04-28,REWE,Einkauf,-38.05
+giro,4812d8d2-2707-4279-b33b-4bcd42eafacd,2024-04-29,Shell,Tankstelle,-49.51
+giro,28deff49-8a5b-49d0-80ab-d46d2bd63478,2024-05-01,ACME GmbH,Gehalt,3000.0
+giro,edb190fa-d2a8-4174-b42d-6bc0a575f3f7,2024-05-03,Vermieter,Miete,-900.0
+giro,4d04e8f9-bc5a-4451-9717-5667fd4bae0a,2024-05-03,REWE,Einkauf,-72.12
+giro,e1898275-3c8c-4d95-8305-6cc6bff8ad7d,2024-05-04,Ich,Sparen,-200.0
+giro,2d4c832d-5cdd-4614-8f9b-f911dd4b5f91,2024-05-08,REWE,Einkauf,-55.89
+giro,0bbbe9f7-81a5-4b8c-8e60-9a70a291b932,2024-05-16,Kiosk,Zeitung,-4.4
+giro,372f8bbf-1b46-4764-ac2c-3a035f7d4327,2024-05-18,EDEKA,Einkauf,-48.97
+giro,bc4c169d-881b-4592-bc7f-8cafb01893c0,2024-05-23,Shell,Tankstelle,-67.63
+giro,1db2df3b-1588-4df4-ac63-5d92060e5494,2024-05-25,EDEKA,Bio Einkauf,-60.76
+giro,c2b32186-8a4c-49a5-9d25-3cc85057d952,2024-05-26,Shell,Tankstelle,-66.59
+giro,38eb98c3-4d5f-4b96-a1b9-41122fe282cd,2024-05-27,ShareNow,Fahrt,-17.8
+giro,a31af2e1-7b53-44d1-a91f-4594691b9522,2024-06-01,ACME GmbH,Gehalt,3000.0
+giro,d5609225-21fe-451b-bb14-65d4ae0061d1,2024-06-02,REWE,Einkauf,-48.83
+giro,73dab1ac-fa11-42ec-a21c-449be553ee19,2024-06-02,Shell,Tankstelle,-40.44
+giro,bb0a66d3-6d92-418b-9e10-d6d780ebd2bb,2024-06-03,Vermieter,Miete,-900.0
+giro,103dfeb2-b353-4731-9499-f67da44b3378,2024-06-04,Ich,Sparen,-200.0
+giro,390d0751-4329-4c67-980b-83691ec02145,2024-06-08,EDEKA,Bio Einkauf,-36.95
+giro,54c002c5-dcc4-4d5f-b846-70b20ec1ac8a,2024-06-10,REWE,Einkauf,-80.52
+giro,1e708e9a-9e3b-42d9-949b-e82ec40608e9,2024-06-22,ShareNow,Fahrt,-15.58
+giro,c17b4f62-e981-403f-abcd-b3b8cf5e762c,2024-06-23,Shell,Tankstelle,-64.82
+giro,66e69e68-66f9-48af-bd67-b02c7a1b268f,2024-06-25,REWE,Einkauf,-50.05
+giro,524433b4-5686-450b-b864-97884f701955,2024-06-26,Kiosk,Zeitung,-2.46
+giro,273360c9-acf2-482b-9391-282874f3ad7c,2024-07-01,ACME GmbH,Gehalt,3000.0
+giro,a241c1f9-4323-4786-a0cd-0b960d2cd9be,2024-07-03,Vermieter,Miete,-900.0
+giro,75d195f8-d28b-490d-9997-88db547a6f37,2024-07-04,Ich,Sparen,-200.0
+giro,1189b87f-5845-4d23-b829-1532f83ed748,2024-07-06,Reisebuero,Urlaub,-2000.0
+giro,e2f4387a-3531-4c70-b972-4bb2c3892124,2024-07-08,REWE,Einkauf,-51.9
+giro,b41bc370-f7cb-46ce-a5b5-ea4272e0984f,2024-07-10,EDEKA,Bio Einkauf,-42.54
+giro,dc7d7b7b-2f12-4c74-b5aa-a59a9cd068a9,2024-07-13,ShareNow,Fahrt,-24.84
+giro,00482fc3-9b53-4fc0-b621-c6d0a6bec81d,2024-07-14,EDEKA,Einkauf,-53.27
+giro,c4259b7b-918f-4bdf-87c4-fa8b5c2b8d29,2024-07-17,Shell,Tankstelle,-44.98
+giro,63d649e1-c04e-465a-9a92-ac9660746afb,2024-07-19,EDEKA,Einkauf,-76.33
+giro,bd8fb2e0-8f99-49c8-9c98-104080b64103,2024-07-24,Shell,Tankstelle,-44.91
+giro,9d338b3e-72bd-4382-b073-8c7d1282572a,2024-07-26,Kiosk,Zeitung,-3.67
+giro,dbdcde39-173c-445b-b208-1b6864a33a96,2024-08-01,ACME GmbH,Gehalt,3000.0
+giro,f5e2c6bb-61ad-4747-a60d-b361fc64ae08,2024-08-03,Vermieter,Miete,-900.0
+giro,3b56a8f8-cff8-4870-a41e-d94c13a23b9a,2024-08-03,ShareNow,Fahrt,-17.35
+giro,d3ae5c42-b3a2-4354-a511-a0ceca8553c1,2024-08-04,EDEKA,Bio Einkauf,-56.89
+giro,1b89cc63-d0de-4e4f-aac2-6d0f2d1d68bc,2024-08-04,Shell,Tankstelle,-41.34
+giro,5f46126b-7966-4db6-8362-d8d2b20ab879,2024-08-04,Ich,Sparen,-200.0
+giro,d91d6ecb-7be2-42ef-942d-89ae4ccd5925,2024-08-05,Kiosk,Zeitung,-3.76
+giro,24491d37-2e91-4ae3-bb25-5889a08906eb,2024-08-12,REWE,Einkauf,-40.86
+giro,7771b1c5-129c-4e41-9339-f436737c9067,2024-08-13,REWE,Einkauf,-34.8
+giro,da986f6d-4100-46c1-9a6b-9eddbe431c68,2024-08-13,REWE,Einkauf,-58.16
+giro,f365dc7e-4b46-4c40-83d5-5b72b9cdb723,2024-08-14,Shell,Tankstelle,-46.99
+spar,6dcb81db-3f65-4f9c-9bdc-5d1d8fc83f0b,2022-01-04,Ich,Sparen Eingang,200.0
+spar,c92b3879-8741-4c17-ac90-963ec766888a,2022-02-04,Ich,Sparen Eingang,200.0
+spar,be3b3f7f-1183-43df-8375-c517b4e786a9,2022-03-04,Ich,Sparen Eingang,200.0
+spar,f6e81a0e-584d-4306-a0f5-6bb8b588475f,2022-04-04,Ich,Sparen Eingang,200.0
+spar,96226df8-d446-4703-bcb2-bdddd8e1e2a0,2022-05-04,Ich,Sparen Eingang,200.0
+spar,f0a3d85f-5fa4-4169-8f35-e2b6b9f839ec,2022-06-04,Ich,Sparen Eingang,200.0
+spar,355049c1-e34a-4177-adc9-023cb637cba0,2022-07-04,Ich,Sparen Eingang,200.0
+spar,f692ea1b-f9b4-4f2a-9872-651da12189ad,2022-08-04,Ich,Sparen Eingang,200.0
+spar,63a4134e-232f-4f21-a891-19d4b6e150c4,2022-09-04,Ich,Sparen Eingang,200.0
+spar,d39dade1-b6d7-4d74-a32d-2cfe182341a8,2022-10-04,Ich,Sparen Eingang,200.0
+spar,d1c0f9bc-7e54-49e8-ac7e-4cbbc531ed44,2022-11-04,Ich,Sparen Eingang,200.0
+spar,2cd1048f-9998-4020-bcc0-78e329552c2f,2022-12-04,Ich,Sparen Eingang,200.0
+spar,6cf7110e-7874-4ecc-a6c5-5e737c5effa4,2022-12-31,Bank,Zinsen,20.0
+spar,41af9a40-2af3-41eb-989b-055d56c32e63,2023-01-04,Ich,Sparen Eingang,200.0
+spar,e317371c-01e6-4550-93bf-c8637659ee4f,2023-02-04,Ich,Sparen Eingang,200.0
+spar,0903b0fe-8e4f-4665-811e-e8f1eac572ca,2023-03-04,Ich,Sparen Eingang,200.0
+spar,9d1164d5-5330-4db5-ab0a-a04bbe8085d9,2023-04-04,Ich,Sparen Eingang,200.0
+spar,e7acde39-4f3c-436a-a48e-9300add92eb1,2023-05-04,Ich,Sparen Eingang,200.0
+spar,60ed9f11-90c0-4d8c-ab51-dfc2c138fc12,2023-06-04,Ich,Sparen Eingang,200.0
+spar,773b5828-ee67-4ad3-a0ed-d5ccbac38661,2023-07-04,Ich,Sparen Eingang,200.0
+spar,0b4302c6-367b-49f2-8eb0-f747fa479ae3,2023-08-04,Ich,Sparen Eingang,200.0
+spar,fd85a082-a26c-440e-8555-332e717e9abb,2023-09-04,Ich,Sparen Eingang,200.0
+spar,3fa1e328-1bf8-4d23-8622-9e0bfc194952,2023-10-04,Ich,Sparen Eingang,200.0
+spar,7db5faf4-46df-4e79-b8e8-15d942cfdb03,2023-11-04,Ich,Sparen Eingang,200.0
+spar,0c09a954-2a43-4e08-806f-a1dadef4b8d4,2023-12-04,Ich,Sparen Eingang,200.0
+spar,4b5223ae-39a6-43ea-8dd7-0ff09b2364fd,2023-12-31,Bank,Zinsen,20.0
+spar,b452b26c-c3b5-49e6-96cd-fab8f9c432ae,2024-01-04,Ich,Sparen Eingang,200.0
+spar,ea38f5bf-b2ec-42c3-a9a8-46d2da54ac9b,2024-02-04,Ich,Sparen Eingang,200.0
+spar,66425ed5-8584-4138-af45-ea9ac4376745,2024-03-04,Ich,Sparen Eingang,200.0
+spar,93c7c9c1-ec7a-4e12-b1f6-0f62283ad243,2024-04-04,Ich,Sparen Eingang,200.0
+spar,481f762e-45c0-4a2a-ae64-c58839a7819e,2024-05-04,Ich,Sparen Eingang,200.0
+spar,32ea917f-a959-4deb-a07d-3bf1a1dff611,2024-06-04,Ich,Sparen Eingang,200.0
+spar,17cda0f2-f58f-4e21-aa04-339ce8effc76,2024-07-04,Ich,Sparen Eingang,200.0
+spar,d7b00bda-55b3-4721-bc2c-f557271e00f9,2024-08-04,Ich,Sparen Eingang,200.0

@@ -1,0 +1,5 @@
+transaction_id,date,description,recipient,value,tag,tagger_name
+b72daf49-41cb-4d8a-a2f0-7aeeb5cdefa9,2024-01-31,Gehalt,ACME GmbH,2500.0,income,gehalt
+29e75bac-2033-40b7-86b1-63810c5ec1c2,2024-01-05,Sparen,Ich,-200.0,spar,sparen
+baf50524-fc60-42a8-a24d-e1d6e7f92e4d,2024-01-03,Kaffee,Kiosk,-2.5,hobby,one_time_tag
+aec5a612-9129-4e71-94ed-614d6e86edfe,2024-01-02,Brötchen,Bäckerei Müller,-3.5,küche.brot,baecker
