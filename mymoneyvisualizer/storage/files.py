@@ -44,21 +44,13 @@ def write_yaml(path: Path, data: Any) -> None:
 
 
 def read_yaml(path: Path) -> Any:
-    """Content of a YAML file or ``None`` if it does not exist.
-
-    Version 0.1 wrote YAML in the platform encoding (cp1252 on Windows), so that is accepted as well.
-    """
+    """Content of a YAML file or ``None`` if it does not exist."""
     if not path.is_file():
         return None
-    raw = path.read_bytes()
     try:
-        text = raw.decode("utf-8")
-    except UnicodeDecodeError:
-        text = raw.decode("cp1252", errors="replace")
-    try:
-        return yaml.safe_load(text)
-    except yaml.YAMLError as e:
-        raise StorageError(f"{path} is not valid YAML: {e}") from e
+        return yaml.safe_load(path.read_text(encoding="utf-8"))
+    except (UnicodeDecodeError, yaml.YAMLError) as e:
+        raise StorageError(f"{path} is not a valid UTF-8 YAML file: {e}") from e
 
 
 def write_csv(path: Path, df: pd.DataFrame) -> None:
@@ -67,13 +59,9 @@ def write_csv(path: Path, df: pd.DataFrame) -> None:
 
 def read_csv(path: Path) -> pd.DataFrame:
     """All cells as strings; an empty file is an empty table."""
-    for encoding in ("utf-8", "cp1252", "latin-1"):
-        try:
-            return pd.read_csv(path, dtype=str, keep_default_na=False, encoding=encoding)
-        except UnicodeDecodeError:
-            continue
-        except pd.errors.EmptyDataError:
-            return pd.DataFrame()
-        except pd.errors.ParserError as e:
-            raise StorageError(f"{path} is not a valid CSV file: {e}") from e
-    raise StorageError(f"cannot decode {path}")  # pragma: no cover - latin-1 decodes every byte
+    try:
+        return pd.read_csv(path, dtype=str, keep_default_na=False, encoding="utf-8")
+    except pd.errors.EmptyDataError:
+        return pd.DataFrame()
+    except (UnicodeDecodeError, pd.errors.ParserError) as e:
+        raise StorageError(f"{path} is not a valid UTF-8 CSV file: {e}") from e

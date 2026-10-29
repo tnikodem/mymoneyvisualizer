@@ -55,7 +55,7 @@ def restore_backup(zip_path: str | Path, data_dir: str | Path) -> Path | None:
                 target = staging / member.replace("\\", "/")
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_bytes(archive.read(member))
-        Repository(staging).load()  # validates and migrates old backups
+        Repository(staging).load()  # fails on broken files before the current data is touched
     except Exception:
         shutil.rmtree(staging, ignore_errors=True)
         raise

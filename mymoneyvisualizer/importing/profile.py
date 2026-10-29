@@ -82,8 +82,6 @@ class ImportProfile:
     def from_dict(cls, data: Mapping[str, Any]) -> ImportProfile:
         known = {f.name for f in fields(cls)}
         values = {k: v for k, v in data.items() if k in known and v is not None}
-        if "separator" not in values and data.get("seperator") is not None:  # spelling of version 0.1
-            values["separator"] = data["seperator"]
         for key in ("name", "encoding", "separator", "decimal", "thousands", *MAPPING_FIELDS):
             if key in values:
                 values[key] = str(values[key])

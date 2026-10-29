@@ -35,9 +35,7 @@ def recurring_to_float(value: int | None) -> float:
 
 
 def _str(value: Any) -> str:
-    if value is None or (isinstance(value, float) and math.isnan(value)):
-        return ""
-    return str(value)
+    return "" if value is None else str(value)
 
 
 @dataclass
@@ -99,13 +97,8 @@ class TagCategory:
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> TagCategory:
-        name = _str(data.get("name"))
-        # older versions stored untagged transactions as " "
-        name = "" if name.strip() == "" else name
-        category = _str(data.get("category")) or CATEGORY_BASIC
-        if category not in CATEGORIES:
-            category = CATEGORY_BASIC
-        return cls(name=name, category=category)
+        category = _str(data.get("category"))
+        return cls(name=_str(data.get("name")), category=category if category in CATEGORIES else CATEGORY_BASIC)
 
     def to_dict(self) -> dict[str, Any]:
         return {"name": self.name, "category": self.category}
@@ -128,27 +121,21 @@ class Settings:
         settings = cls()
         if not data:
             return settings
-        excluded = data.get("excluded_tags", data.get("exclude_tags"))
+        excluded = data.get("excluded_tags")
         if isinstance(excluded, Sequence) and not isinstance(excluded, str):
             settings.excluded_tags = [str(t) for t in excluded]
         if "hide_transfers" in data:
             settings.hide_transfers = bool(data["hide_transfers"])
 
-        budget = data.get("budget") or {}
-        if not isinstance(budget, Mapping):
-            budget = {}
-        if "start" in budget or "end" in budget or "factors" in budget:
-            start, end = budget.get("start"), budget.get("end")
-            factors = budget.get("factors") or {}
-        else:
-            # legacy format: {"basic": {"factor", "start", "end"}, "optional": {...}}
-            basic = budget.get(CATEGORY_BASIC) or {}
-            start, end = basic.get("start"), basic.get("end")
-            factors = {cat: (budget.get(cat) or {}).get("factor") for cat in EXPENSE_CATEGORIES}
+        budget = data.get("budget")
+        budget = budget if isinstance(budget, Mapping) else {}
+        start, end = budget.get("start"), budget.get("end")
         if isinstance(start, int) and isinstance(end, int):
             settings.budget_start, settings.budget_end = min(start, end), max(start, end)
+        factors = budget.get("factors")
+        factors = factors if isinstance(factors, Mapping) else {}
         for cat in EXPENSE_CATEGORIES:
-            factor = factors.get(cat) if isinstance(factors, Mapping) else None
+            factor = factors.get(cat)
             if isinstance(factor, int | float) and 0 <= factor <= 1:
                 settings.budget_factors[cat] = float(factor)
         return settings

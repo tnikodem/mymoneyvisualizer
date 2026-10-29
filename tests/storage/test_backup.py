@@ -1,6 +1,4 @@
-import shutil
 import zipfile
-from pathlib import Path
 
 import pytest
 
@@ -10,8 +8,6 @@ from mymoneyvisualizer.storage.files import StorageError
 from mymoneyvisualizer.storage.repository import Repository, State
 
 from ..helpers import transactions
-
-LEGACY = Path(__file__).parents[1] / "data" / "legacy_v0_1"
 
 
 def _state():
@@ -44,24 +40,6 @@ def test_restore_into_missing_directory(tmp_path):
     create_backup(source, tmp_path / "b.zip")
     assert restore_backup(tmp_path / "b.zip", tmp_path / "new") is None
     assert list(Repository(tmp_path / "new").load().accounts) == ["giro"]
-
-
-def test_restore_backup_of_version_0_1(tmp_path, monkeypatch):
-    monkeypatch.chdir(tmp_path)  # no ./config here, the files must come from the zip
-    restore_backup(LEGACY / "mmv_backup.zip", tmp_path / "data")
-    state = Repository(tmp_path / "data").load()
-    assert list(state.accounts) == ["Giro Konto", "spar"]
-    assert len(state.accounts["Giro Konto"]) == 4
-    assert len(state.one_time_tags) == 1
-
-
-def test_restore_old_backup_ignores_live_config_of_working_directory(tmp_path, monkeypatch):
-    live = tmp_path / "config"
-    shutil.copytree(LEGACY / "config", live)
-    (live / "accounts" / "Giro_Konto.csv").write_text("transaction_id,date,recipient,description,value\n")
-    monkeypatch.chdir(tmp_path)
-    restore_backup(LEGACY / "mmv_backup.zip", tmp_path / "data")
-    assert len(Repository(tmp_path / "data").load().accounts["Giro Konto"]) == 4
 
 
 @pytest.mark.parametrize("kind", ["not-a-zip", "foreign-zip", "broken-content"])

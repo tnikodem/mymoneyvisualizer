@@ -28,7 +28,7 @@ def test_normalize_fills_missing_values_and_ids():
             Col.date: ["2024-01-02", "2024-01-03 00:00:00", "2024-01-04"],
             Col.recipient: ["x", np.nan, None],
             Col.value: ["1.5", 2, "bad"],
-            "tag": ["legacy", "", ""],
+            "tag": ["derived", "", ""],
         }
     )
     out = normalize_transactions(df)

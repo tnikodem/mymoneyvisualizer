@@ -1,6 +1,6 @@
 """Load and save the application state.
 
-Layout of the data directory (compatible with version 0.1)::
+Layout of the data directory::
 
     accounts.yaml          list of {name, file}
     accounts/<name>.csv    transaction_id, date, recipient, description, value
@@ -13,7 +13,6 @@ Layout of the data directory (compatible with version 0.1)::
 
 from __future__ import annotations
 
-import logging
 import re
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
@@ -21,12 +20,10 @@ from pathlib import Path
 
 import pandas as pd
 
-from mymoneyvisualizer.domain.columns import ONE_TIME_TAGGER, RAW_COLUMNS, Col, normalize_transactions
-from mymoneyvisualizer.domain.models import OneTimeTag, Settings, TagCategory, Tagger, clean_recurring
+from mymoneyvisualizer.domain.columns import RAW_COLUMNS, normalize_transactions
+from mymoneyvisualizer.domain.models import OneTimeTag, Settings, TagCategory, Tagger
 from mymoneyvisualizer.importing.profile import ImportProfile
 from mymoneyvisualizer.storage.files import StorageError, read_csv, read_yaml, write_csv, write_yaml
-
-logger = logging.getLogger(__name__)
 
 ACCOUNTS_FILE = "accounts.yaml"
 ACCOUNTS_DIR = "accounts"
@@ -88,28 +85,13 @@ class Repository:
             tag = OneTimeTag.from_dict(entry)
             state.one_time_tags[tag.transaction_id] = tag
 
-        migrated_tags = False
         self._account_files = {}
         for entry in _as_list(read_yaml(self.path(ACCOUNTS_FILE)), ACCOUNTS_FILE):
-            name = str(entry.get("name", "")).strip()
-            if not name or name in state.accounts:
-                continue
-            relative, legacy = self._account_location(entry)
-            self._account_files[name] = relative
-            df, one_time, needs_rewrite = self._load_account_file(legacy or self.path(relative))
-            for tag in one_time:
-                if tag.transaction_id not in state.one_time_tags:
-                    state.one_time_tags[tag.transaction_id] = tag
-                    migrated_tags = True
-            state.accounts[name] = df
-            if needs_rewrite or legacy is not None:
-                logger.info("migrating account file of %s to %s", name, relative)
-                self.save_account(name, df)
-
-        if migrated_tags:
-            self.save_one_time_tags(state.one_time_tags.values())
-        if (self.path(ACCOUNTS_FILE).is_file() and self._accounts_file_is_legacy()) or migrated_tags:
-            self.save_account_index(state.accounts)
+            name, relative = entry.get("name"), entry.get("file")
+            if not name or not relative:
+                raise StorageError(f"{ACCOUNTS_FILE}: every account needs a name and a file")
+            self._account_files[str(name)] = str(relative)
+            state.accounts[str(name)] = self._load_account_file(self.path(str(relative)))
         return state
 
     def _load_categories(self) -> list[TagCategory]:
@@ -119,49 +101,11 @@ class Repository:
             categories.setdefault(category.name, category)
         return list(categories.values())
 
-    def _account_location(self, entry: Mapping) -> tuple[str, Path | None]:
-        """Relative file of an account; for version 0.1 entries also the existing legacy file (if any)."""
-        if entry.get("file"):
-            return str(entry["file"]).replace("\\", "/"), None
-        taken = set(self._account_files.values())
-        relative = account_file_name(str(entry["name"]), taken)
-        legacy = entry.get("db_filepath")
-        if not legacy:
-            return relative, None
-        legacy = Path(str(legacy))
-        # files inside this data directory first: an old backup must not pick up the live ./config files
-        candidates = [self.path(ACCOUNTS_DIR) / legacy.name, legacy if legacy.is_absolute() else Path.cwd() / legacy]
-        for candidate in candidates:
-            if candidate.is_file():
-                return relative, candidate
-        return relative, None
-
-    def _accounts_file_is_legacy(self) -> bool:
-        entries = _as_list(read_yaml(self.path(ACCOUNTS_FILE)), ACCOUNTS_FILE)
-        return any("file" not in e for e in entries)
-
     @staticmethod
-    def _load_account_file(path: Path) -> tuple[pd.DataFrame, list[OneTimeTag], bool]:
-        """``(transactions, one_time_tags, needs_rewrite)``; old files also stored the derived tag columns."""
+    def _load_account_file(path: Path) -> pd.DataFrame:
         if not path.is_file():
-            return normalize_transactions(pd.DataFrame(columns=list(RAW_COLUMNS))), [], False
-        raw = read_csv(path)
-        one_time: list[OneTimeTag] = []
-        if Col.tagger_name in raw.columns and Col.transaction_id in raw.columns:
-            rows = raw.loc[raw[Col.tagger_name] == ONE_TIME_TAGGER]
-            for _, row in rows.iterrows():
-                if row[Col.transaction_id]:
-                    one_time.append(
-                        OneTimeTag(
-                            transaction_id=row[Col.transaction_id],
-                            tag=str(row.get(Col.tag, "")).strip(),
-                            recurring=clean_recurring(row.get(Col.recurring)),
-                        )
-                    )
-        missing_ids = Col.transaction_id not in raw.columns or (raw[Col.transaction_id] == "").any()
-        df = normalize_transactions(raw)
-        needs_rewrite = missing_ids or list(raw.columns) != list(RAW_COLUMNS)
-        return df, one_time, needs_rewrite
+            return normalize_transactions(pd.DataFrame(columns=list(RAW_COLUMNS)))
+        return normalize_transactions(read_csv(path))
 
     # ------------------------------------------------------------------ save
     def save_account_index(self, names: Iterable[str]) -> None:

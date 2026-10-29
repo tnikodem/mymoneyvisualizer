@@ -19,8 +19,7 @@ Start:
 
 Your data is stored in the user data directory (e.g. `%LOCALAPPDATA%\MyMoneyVisualizer` on Windows,
 `~/.local/share/MyMoneyVisualizer` on Linux). Choose another place with `mmv --data-dir PATH` or the
-environment variable `MMV_DATA_DIR`. Version 0.1 kept the data in `./config` of the directory `mmv` was started
-from; if such a directory exists it is still used and migrated automatically.
+environment variable `MMV_DATA_DIR`.
 
 Importing Data
 --------------
@@ -67,7 +66,7 @@ Structure of the package:
 |---------------------------------|----------------------------------------------------------------------------|
 | `mymoneyvisualizer.domain`      | pure logic on pandas tables: tagging, summary table, budget, models        |
 | `mymoneyvisualizer.importing`   | CSV format detection, import profiles, duplicate detection                 |
-| `mymoneyvisualizer.storage`     | data directory (CSV + YAML), atomic writes, migration of 0.1, backups      |
+| `mymoneyvisualizer.storage`     | data directory (CSV + YAML), atomic writes, backups                        |
 | `mymoneyvisualizer.app`         | `AppModel`: state and use cases, emits `changed(topics)`; no Qt            |
 | `mymoneyvisualizer.ui`          | PyQt6 windows; they only display data and call `AppModel`                  |
 

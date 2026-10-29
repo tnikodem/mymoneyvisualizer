@@ -38,11 +38,10 @@ def test_recurring_to_float():
     assert recurring_to_float(2) == 2.0
 
 
-def test_tagger_roundtrip_and_legacy_values():
+def test_tagger_roundtrip_and_missing_values():
     tagger = Tagger(name="t", tag="food", regex_recipient="REWE", regex_description="", recurring=2)
     assert Tagger.from_dict(tagger.to_dict()) == tagger
-    legacy = Tagger.from_dict({"name": "t", "tag": None, "regex_recipient": math.nan, "recurring": math.nan})
-    assert legacy == Tagger(name="t")
+    assert Tagger.from_dict({"name": "t", "tag": None, "recurring": None}) == Tagger(name="t")
 
 
 def test_one_time_tag_roundtrip():
@@ -50,8 +49,8 @@ def test_one_time_tag_roundtrip():
     assert OneTimeTag.from_dict(tag.to_dict()) == tag
 
 
-def test_tag_category_legacy_blank_name_and_unknown_category():
-    assert TagCategory.from_dict({"name": " ", "category": "income"}) == TagCategory("", "income")
+def test_tag_category_unknown_category():
+    assert TagCategory.from_dict({"name": "", "category": "income"}) == TagCategory("", "income")
     assert TagCategory.from_dict({"name": "x", "category": "nonsense"}).category == "basic"
     assert TagCategory.from_dict({"name": "x"}).to_dict() == {"name": "x", "category": "basic"}
 
@@ -65,7 +64,7 @@ def test_settings_defaults_use_current_year():
 
 def test_settings_instances_do_not_share_state():
     """Regression: loading a configuration overwrote the module level DEFAULT_SETTINGS dict."""
-    first = Settings.from_dict({"exclude_tags": ["a"], "budget": {"factors": {"basic": 0.9}}})
+    first = Settings.from_dict({"excluded_tags": ["a"], "budget": {"factors": {"basic": 0.9}}})
     first.excluded_tags.append("b")
     first.budget_factors["optional"] = 0.1
     second = Settings()
@@ -79,18 +78,6 @@ def test_settings_roundtrip():
     assert Settings.from_dict(settings.to_dict()) == settings
 
 
-def test_settings_reads_legacy_format():
-    legacy = {
-        "exclude_tags": ["giro"],
-        "budget": {"basic": {"factor": 0.25, "start": 2019, "end": 2021}, "optional": {"factor": 0.6}},
-        "plot_aggregation_month": 3,
-    }
-    settings = Settings.from_dict(legacy)
-    assert settings.excluded_tags == ["giro"]
-    assert (settings.budget_start, settings.budget_end) == (2019, 2021)
-    assert settings.budget_factors == {"basic": 0.25, "optional": 0.6}
-
-
 @pytest.mark.parametrize(
     "data",
     [
@@ -99,7 +86,8 @@ def test_settings_reads_legacy_format():
         {"budget": "garbage"},
         {"budget": {"start": 2020}},
         {"budget": {"factors": {"basic": 7}}},
-        {"exclude_tags": "not-a-list"},
+        {"budget": {"factors": "garbage"}},
+        {"excluded_tags": "not-a-list"},
     ],
 )
 def test_settings_ignore_invalid_values(data):

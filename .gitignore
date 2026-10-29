@@ -29,6 +29,7 @@ coverage/
 
 test_input.csv
 
-# user data of version 0.1 (kept in the start directory); test data below tests/ is versioned
+# local data directories and backups with real financial data must never be committed
 /config/
+/data/
 /mmv_backup*

@@ -1,6 +1,4 @@
-import pandas as pd
 import pytest
-import yaml
 
 from mymoneyvisualizer.app import (
     ACCOUNTS,
@@ -15,7 +13,7 @@ from mymoneyvisualizer.app import (
     InvalidTaggerError,
 )
 from mymoneyvisualizer.domain.columns import ONE_TIME_TAGGER, Col
-from mymoneyvisualizer.domain.models import TagCategory, Tagger
+from mymoneyvisualizer.domain.models import Tagger
 from mymoneyvisualizer.importing.profile import ImportProfile
 
 from .helpers import transactions
@@ -279,11 +277,3 @@ def test_backup_restore_reloads_state(filled, tmp_path, events):
     assert previous is not None
     assert filled.account_names == ["giro", "spar"]
     assert events[-1] == ALL_TOPICS
-
-
-def test_open_existing_legacy_data(tmp_path):
-    (tmp_path / "taggers.yaml").write_text(yaml.safe_dump([{"name": "t", "tag": "x", "recurring": float("nan")}]))
-    model = AppModel.open(tmp_path)
-    assert model.tagger("t").recurring is None
-    assert isinstance(model.transactions(), pd.DataFrame)
-    assert TagCategory("", "basic") not in model.categories

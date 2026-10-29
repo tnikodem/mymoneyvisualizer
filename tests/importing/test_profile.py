@@ -8,25 +8,20 @@ def test_roundtrip():
     assert ImportProfile.from_dict(profile.to_dict()) == profile
 
 
-def test_reads_profile_of_version_0_1():
-    legacy = {
-        "name": "importer_1",
-        "seperator": ",",
+def test_from_dict_coerces_types_and_ignores_unknown_keys():
+    data = {
+        "name": 1,
+        "separator": ",",
         "thousands": "",
-        "decimal": ".",
-        "dayfirst": False,
+        "dayfirst": 0,
         "skiprows": "9",
-        "encoding": "latin-1",
-        "col_date": "date",
-        "col_recipient": "rec",
         "col_description": None,
-        "col_value": "value",
-        "available_columns": ["x"],
+        "unknown": ["x"],
     }
-    profile = ImportProfile.from_dict(legacy)
-    assert profile.separator == ","
-    assert profile.thousands == ""
+    profile = ImportProfile.from_dict(data)
+    assert (profile.name, profile.separator, profile.thousands) == ("1", ",", "")
     assert profile.skiprows == 9
+    assert profile.dayfirst is False
     assert profile.col_description == ""
     assert profile.drop_duplicates is True
 
