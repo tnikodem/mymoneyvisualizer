@@ -1,0 +1,25 @@
+Umsatzanzeige;Datei erstellt am: 29.10.2026 08:14
+;Letztes Update: aktuell
+
+IBAN;DE10 5001 0517 5419 3388 21
+Kontoname;Girokonto
+Bank;ING
+Kunde;Max Mustermann
+Zeitraum;01.08.2026 - 29.10.2026
+Saldo;3.112,58;EUR
+
+Sortierung;Datum absteigend
+
+In der CSV-Datei finden Sie alle bereits gebuchten Umsätze. Die vorgemerkten Umsätze werden nicht aufgenommen, auch wenn sie in Ihrem Internetbanking angezeigt werden.
+
+Buchung;Wertstellungsdatum;Auftraggeber/Empfänger;Buchungstext;Verwendungszweck;Saldo;Währung;Betrag;Währung
+28.10.2026;28.10.2026;EDEKA Center Kaiser;Lastschrift;EDEKA SAGT DANKE 8124 Kartenzahlung girocard;3.112,58;EUR;-56,21;EUR
+27.10.2026;27.10.2026;PayPal Europe S.a.r.l. et Cie S.C.A;Lastschrift;1046127386542/PP.7741.PP/. Spotify AB, Ihr Einkauf bei Spotify AB;3.168,79;EUR;-10,99;EUR
+15.10.2026;15.10.2026;Musterfirma GmbH;Gehalt/Rente;Gehalt Oktober 2026;3.179,78;EUR;3.245,67;EUR
+05.10.2026;05.10.2026;Max Mustermann;Ueberweisung;Uebertrag auf Extra-Konto;-65,89;EUR;-300,00;EUR
+01.10.2026;01.10.2026;Wohnungsbaugenossenschaft Süd eG;Dauerauftrag/Terminueberw.;Miete 10/2026 Mitglieds-Nr. 4711;234,11;EUR;-890,00;EUR
+30.09.2026;30.09.2026;VISA ARAL STATION 22;Lastschrift;ARAL Station 22 Muenchen Kartenzahlung girocard;1.124,11;EUR;-71,04;EUR
+15.09.2026;15.09.2026;Musterfirma GmbH;Gehalt/Rente;Gehalt September 2026;1.195,15;EUR;3.245,67;EUR
+03.09.2026;03.09.2026;Bargeldauszahlung;Bargeldauszahlung;ING Geldautomat Muenchen Hbf;-2.050,52;EUR;-200,00;EUR
+01.09.2026;01.09.2026;Wohnungsbaugenossenschaft Süd eG;Dauerauftrag/Terminueberw.;Miete 09/2026 Mitglieds-Nr. 4711;-1.850,52;EUR;-890,00;EUR
+15.08.2026;15.08.2026;Musterfirma GmbH;Gehalt/Rente;Gehalt August 2026;-960,52;EUR;3.245,67;EUR

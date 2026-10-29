@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import dataclasses
 from pathlib import Path
 
 import pandas as pd
@@ -19,16 +18,23 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from pyqt6_multiselect_combobox import MultiSelectComboBox
 
 from mymoneyvisualizer.app import AppModel
 from mymoneyvisualizer.domain.columns import Col
-from mymoneyvisualizer.importing.profile import MAPPING_FIELDS, ImportProfile, find_profile, guess_mapping
-from mymoneyvisualizer.importing.reader import ImportFormatError, ImportPreview, preview_import, read_table
-from mymoneyvisualizer.importing.sniff import sniff_format
+from mymoneyvisualizer.importing.profile import MAPPING_FIELDS, ImportProfile
+from mymoneyvisualizer.importing.reader import (
+    ImportFormatError,
+    ImportPreview,
+    preview_import,
+    propose_profile,
+    read_table,
+)
+from mymoneyvisualizer.importing.sniff import MIXED_ENCODING
 from mymoneyvisualizer.ui.common import Window
 from mymoneyvisualizer.ui.table_model import DATE, MONEY, Column, DataFrameModel, DataFrameView
 
-ENCODINGS = ("utf-8", "utf-8-sig", "cp1252", "latin-1")
+ENCODINGS = ("utf-8", "utf-8-sig", MIXED_ENCODING, "cp1252", "latin-1", "utf-16")
 PREVIEW_COLUMNS = [
     Column(Col.date, "date", DATE, 90),
     Column(Col.recipient, "recipient", width=280),
@@ -37,9 +43,12 @@ PREVIEW_COLUMNS = [
 ]
 MAPPING_LABELS = {
     "col_date": "Date",
-    "col_recipient": "Recipient",
-    "col_description": "Description",
+    "col_recipient": "Recipient (optional)",
+    "col_description": "Description (optional)",
     "col_value": "Value",
+    "col_debit": "Debit amounts (optional)",
+    "col_credit": "Credit amounts (optional)",
+    "col_sign": "Debit/credit mark, e.g. S/H (optional)",
 }
 
 
@@ -75,9 +84,12 @@ class ImportWindow(Window):
         self.since_edit.setCalendarPopup(True)
         self.since_edit.setDisplayFormat("dd.MM.yyyy")
         self.column_combos = {f: QComboBox(self) for f in MAPPING_FIELDS}
+        self.extra_combo = MultiSelectComboBox(self)
+        self.extra_combo.setPlaceholderText("none")
+        self.extra_combo.setMinimumWidth(160)
 
         self.name_edit.setFixedWidth(180)
-        format_row, mapping_row = QHBoxLayout(), QHBoxLayout()
+        format_row, mapping_row, value_row = QHBoxLayout(), QHBoxLayout(), QHBoxLayout()
         for label, widget in (
             ("Profile", self.name_edit),
             ("Encoding", self.encoding_combo),
@@ -92,9 +104,11 @@ class ImportWindow(Window):
             format_row.addLayout(self._labelled(label, widget))
         for field in MAPPING_FIELDS:
             self.column_combos[field].setMinimumWidth(160)
-            mapping_row.addLayout(self._labelled(MAPPING_LABELS[field], self.column_combos[field]))
-        format_row.addStretch(1)
-        mapping_row.addStretch(1)
+            row = mapping_row if field in ("col_date", "col_recipient", "col_description", "col_value") else value_row
+            row.addLayout(self._labelled(MAPPING_LABELS[field], self.column_combos[field]))
+        value_row.insertLayout(0, self._labelled("Add to value, e.g. fee/tax (optional)", self.extra_combo))
+        for row in (format_row, mapping_row, value_row):
+            row.addStretch(1)
 
         self.status_label = QLabel(self)
         self.error_label = QLabel(self)
@@ -113,6 +127,7 @@ class ImportWindow(Window):
         layout = QVBoxLayout(central)
         layout.addLayout(format_row)
         layout.addLayout(mapping_row)
+        layout.addLayout(value_row)
         layout.addWidget(self.error_label)
         layout.addLayout(buttons)
         layout.addWidget(self.table)
@@ -127,6 +142,7 @@ class ImportWindow(Window):
         self.since_edit.dateChanged.connect(self.refresh_preview)
         for combo in self.column_combos.values():
             combo.currentTextChanged.connect(self.refresh_preview)
+        self.extra_combo.selectionChanged.connect(self.refresh_preview)
         self.import_button.clicked.connect(self.import_transactions)
         self.cancel_button.clicked.connect(self.close)
 
@@ -140,13 +156,7 @@ class ImportWindow(Window):
     def open_file(self, path: str | Path, account: str) -> None:
         self.path, self.account = Path(path), account
         self.setWindowTitle(f"Import {self.path.name} into {account}")
-        fmt = sniff_format(self.path)
-        matched = find_profile(self.model.profiles, fmt.columns)
-        if matched is not None:
-            profile = matched
-        else:
-            values = {k: v for k, v in dataclasses.asdict(fmt).items() if k != "columns"}
-            profile = ImportProfile(**values).with_mapping(**guess_mapping(fmt.columns))
+        profile, matched = propose_profile(self.path, self.model.profiles)
         self.original_name = matched.name if matched else None
         self.set_profile(profile)
         self._loading = True
@@ -173,6 +183,7 @@ class ImportWindow(Window):
             self.duplicates_check.setChecked(profile.drop_duplicates)
             for combo in self.column_combos.values():
                 combo.clear()
+            self.extra_combo.clear()
             self._mapping = profile.mapping
         finally:
             self._loading = False
@@ -187,6 +198,7 @@ class ImportWindow(Window):
             dayfirst=self.dayfirst_check.isChecked(),
             skiprows=self.header_spin.value(),
             drop_duplicates=self.duplicates_check.isChecked(),
+            col_value_extra=[str(c) for c in self.extra_combo.currentData()],
             **{f: self.column_combos[f].currentText() for f in MAPPING_FIELDS},
         )
 
@@ -198,6 +210,11 @@ class ImportWindow(Window):
                 combo.clear()
                 combo.addItems(["", *columns])
                 combo.setCurrentText(wanted if wanted in columns else "")
+            extra = [c for c in self._mapping.get("col_value_extra", []) if c in columns]
+            self.extra_combo.clear()
+            for column in columns:
+                self.extra_combo.addItem(column, column)
+            self.extra_combo.setCurrentIndexes([columns.index(c) for c in extra])
         finally:
             self._loading = False
 
@@ -211,7 +228,9 @@ class ImportWindow(Window):
             return
         self.preview = None
         self.error_label.clear()
-        self._mapping = {f: c.currentText() for f, c in self.column_combos.items() if c.count()} or self._mapping
+        if any(c.count() for c in self.column_combos.values()):
+            self._mapping = {f: c.currentText() for f, c in self.column_combos.items()}
+            self._mapping["col_value_extra"] = [str(c) for c in self.extra_combo.currentData()]
         profile = self.profile()
         try:
             table = read_table(self.path, profile)

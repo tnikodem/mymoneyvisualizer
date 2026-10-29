@@ -15,6 +15,19 @@ from mymoneyvisualizer.domain.models import OneTimeTag, Tagger, recurring_to_flo
 logger = logging.getLogger(__name__)
 
 
+def regex_for(text: str) -> str:
+    """Regex matching ``text`` literally, also if it contains broken characters (``�``, ``Ã¤``).
+
+    Single spaces stay readable; other whitespace (line breaks, tabs, several spaces, U+2028) matches any
+    whitespace, because a line edit cannot hold line breaks.
+    """
+    return "".join(
+        (" " if part == " " else r"\s+") if part.isspace() else re.escape(part)
+        for part in re.split(r"(\s+)", text.strip())
+        if part
+    )
+
+
 def regex_error(pattern: str) -> str | None:
     """Error message if ``pattern`` is not a valid regular expression."""
     try:

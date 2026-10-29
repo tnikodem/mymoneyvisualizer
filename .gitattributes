@@ -1,0 +1,2 @@
+# Test exports must stay byte for byte as written (encodings, CRLF inside fields, NUL bytes).
+tests/data/test_csv/** -text

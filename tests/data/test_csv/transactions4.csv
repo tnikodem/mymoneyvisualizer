@@ -1,0 +1,15 @@
+"Kontonummer:";"DE02120300000000202051 / Girokonto";
+
+"Von:";"01.08.2021";
+"Bis:";"01.09.2021";
+"Kontostand vom 01.09.2021:";"1.222,33 EUR";
+
+"Buchungstag";"Wertstellung";"Buchungstext";"Auftraggeber / Beg�nstigter";"Verwendungszweck";"Kontonummer";"BLZ";"Betrag (EUR)";"Gl�ubiger-ID";"Mandatsreferenz";"Kundenreferenz";
+"01.09.2021";"01.09.2021";"Lastschrift";"Telekom Deutschland GmbH";"Festnetz Vertragskonto 123456789 RG 0815/09";"DE00000000000000000000";"BYLADEM1001";"-39,95";"";"";"";
+"31.08.2021";"31.08.2021";"Lastschrift";"Scalable Capital GmbH";"Sparplan ISIN IE00B4L5Y983";"DE00000000000000000000";"BYLADEM1001";"-100,00";"";"";"";
+"31.08.2021";"31.08.2021";"Lastschrift";"Spotify AB";"P0123456789 Spotify Premium";"DE00000000000000000000";"BYLADEM1001";"-9,99";"";"";"";
+"30.08.2021";"30.08.2021";"Gutschrift";"Musterfirma GmbH";"Gehalt August 2021";"DE00000000000000000000";"BYLADEM1001";"2.987,12";"";"";"";
+"16.08.2021";"16.08.2021";"Kartenzahlung/-abrechnung";"B�ckerei M�ller";"2021-08-14 Debitk.27 VISA Debit";"DE00000000000000000000";"BYLADEM1001";"-7,30";"";"";"";
+"05.08.2021";"05.08.2021";"Lastschrift";"Stadtwerke B�hl GmbH";"Abschlag Gas August 2021";"DE00000000000000000000";"BYLADEM1001";"-65,00";"";"";"";
+"02.08.2021";"02.08.2021";"Dauerauftrag";"Hausverwaltung Schr�der & S�hne";"Miete August 2021";"DE00000000000000000000";"BYLADEM1001";"-950,00";"";"";"";
+"02.08.2021";"02.08.2021";"Abschluss";"";"Kontof�hrungsgeb�hr 07/2021";"DE00000000000000000000";"BYLADEM1001";"-4,50";"";"";"";

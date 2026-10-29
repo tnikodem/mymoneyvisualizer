@@ -28,9 +28,16 @@ def test_from_dict_coerces_types_and_ignores_unknown_keys():
 
 def test_missing_columns():
     profile = ImportProfile(col_date="Datum", col_recipient="Name", col_value="Betrag")
-    assert profile.missing_columns(["Datum", "Name"]) == ["col_description", "col_value"]
+    assert profile.missing_columns(["Datum", "Name"]) == ["col_value"]
+    assert profile.missing_columns(["Datum", "Betrag"]) == ["col_recipient"]  # mapped, but not in the file
     assert profile.with_mapping(col_description="Text").missing_columns(["Datum", "Name", "Text", "Betrag"]) == []
+    assert ImportProfile().missing_columns(["x"]) == ["col_date", "col_value"]
     assert profile.mapping["col_date"] == "Datum"
+
+
+def test_recipient_and_description_are_optional():
+    profile = ImportProfile(col_date="Belegdatum", col_value="Betrag (€)")
+    assert profile.missing_columns(["Belegdatum", "Betrag (€)"]) == []
 
 
 @pytest.mark.parametrize(
@@ -111,6 +118,35 @@ def test_guess_mapping_for_common_banks(columns, expected):
 def test_guess_mapping_partial_and_unique():
     assert guess_mapping(["foo", "Datum"]) == {"col_date": "Datum"}
     assert guess_mapping([]) == {}
+
+
+def test_guess_mapping_prefers_booking_date_over_value_date():
+    """Regression: the DKB credit card export got "Wertstellung" instead of "Belegdatum" (exact match won)."""
+    columns = ["Belegdatum", "Wertstellung", "Status", "Beschreibung", "Umsatztyp", "Betrag (€)", "Fremdwährungsbetrag"]
+    assert guess_mapping(columns) == {
+        "col_date": "Belegdatum",
+        "col_description": "Beschreibung",
+        "col_value": "Betrag (€)",
+    }
+    assert guess_mapping(["Wertstellung", "Text", "Betrag"])["col_date"] == "Wertstellung"  # only as fallback
+    assert guess_mapping(["Valuta", "Text", "Betrag"])["col_date"] == "Valuta"
+
+
+def test_guess_mapping_broker_export():
+    columns = [
+        "datetime",
+        "date",
+        "type",
+        "name",
+        "amount",
+        "fee",
+        "tax",
+        "original_amount",
+        "description",
+        "counterparty_name",
+    ]
+    mapping = guess_mapping(columns)
+    assert (mapping["col_date"], mapping["col_recipient"], mapping["col_value"]) == ("date", "name", "amount")
 
 
 def test_find_profile():

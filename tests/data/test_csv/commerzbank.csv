@@ -1,0 +1,6 @@
+Buchungstag;Wertstellung;Umsatzart;Buchungstext;Betrag;Währung;Auftraggeberkonto;Bankleitzahl Auftraggeberkonto;IBAN Auftraggeberkonto;Kategorie
+28.10.2026;28.10.2026;Lastschrift;PENNY Markt GmbH//Musterstadt/DE 2026-10-27T18:34:00 KFN 1 VJ 2912;-22,18;EUR;1234567890;20040000;DE12200400000123456789;Lebensmittel
+24.10.2026;24.10.2026;Lastschrift;Amazon Payments Europe S.C.A. 028-1234567-1234567 Amazon.de 4G3HI8JK9LM;-45,98;EUR;1234567890;20040000;DE12200400000123456789;Shopping
+15.10.2026;15.10.2026;Gutschrift;Musterfirma GmbH Gehalt 10/2026 End-to-End-Ref.: NOTPROVIDED;3245,67;EUR;1234567890;20040000;DE12200400000123456789;Gehalt
+01.10.2026;01.10.2026;Dauerauftrag;Hausverwaltung Schröder & Söhne Miete Oktober 2026;-1050,00;EUR;1234567890;20040000;DE12200400000123456789;Wohnen
+30.09.2026;30.09.2026;Entgelt;Kontoführung 09/2026;-6,90;EUR;1234567890;20040000;DE12200400000123456789;Bankgebühren

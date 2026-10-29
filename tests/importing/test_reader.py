@@ -136,14 +136,44 @@ def test_rows_with_invalid_date_or_amount_are_counted(write):
     assert (invalid, zero) == (2, 0)
 
 
-def test_to_transactions_requires_complete_mapping(write):
-    path = write("Datum;Name;Betrag\n01.02.2024;A;-1,00\n")
+def test_to_transactions_requires_date_and_value(write):
+    path = write("Datum;Name;Saldo\n01.02.2024;A;-1,00\n")
     profile = _profile_for(path)
-    with pytest.raises(ImportFormatError, match="description"):
+    with pytest.raises(ImportFormatError, match="value"):
         to_transactions(read_table(path, profile), profile)
-    profile = profile.with_mapping(col_description="Name", decimal=",", thousands=",")
+    profile = profile.with_mapping(col_value="Saldo", decimal=",", thousands=",")
     with pytest.raises(ImportFormatError, match="thousands"):
         to_transactions(read_table(path, profile), profile)
+
+
+def test_import_credit_card_without_recipient(write):
+    """Regression: exports without a recipient column (DKB credit card) could not be imported."""
+    path = write(
+        '"Karte";"Visa Kreditkarte";"1234 •••• •••• 4321"\n""\n"Saldo vom 29.10.2026:";"-0 EUR"\n""\n'
+        '"Belegdatum";"Wertstellung";"Status";"Beschreibung";"Umsatztyp";"Betrag (€)";"Fremdwährungsbetrag"\n'
+        '"22.10.26";"23.10.26";"Gebucht";"Ausgleich Kreditkarte";"Lastschrift";"33,1";""\n'
+        '"22.10.26";"22.10.26";"Gebucht";"Kartenpreis";"Entgelt";"-5,49";""\n'
+        '"09.10.26";"12.10.26";"Gebucht";"Einkauf bei ABC";"Onlinezahlung";"-43,11";""\n',
+        encoding="utf-8-sig",
+    )
+    df, invalid, zero = _load(path)
+    assert (invalid, zero) == (0, 0)
+    assert list(df[Col.date]) == [pd.Timestamp("2026-10-22"), pd.Timestamp("2026-10-22"), pd.Timestamp("2026-10-09")]
+    assert list(df[Col.recipient]) == ["", "", ""]
+    assert list(df[Col.description]) == ["Ausgleich Kreditkarte", "Kartenpreis", "Einkauf bei ABC"]
+    assert list(df[Col.value]) == [33.1, -5.49, -43.11]
+
+
+def test_import_amounts_with_thousands_separator_only(write):
+    """DKB writes whole amounts as ``-1.000`` (thousand), next to ``-27,02``."""
+    path = write(
+        '"Buchungsdatum";"Zahlungsempfänger*in";"Verwendungszweck";"Betrag (€)"\n'
+        '"28.10.26";"Thomas";"Anlage";"-1.000"\n"28.10.26";"Thomas";"";"2.000"\n'
+        '"28.10.26";"Test";"Test sagt Danke";"-27,02"\n',
+        encoding="utf-8-sig",
+    )
+    df, _, _ = _load(path)
+    assert list(df[Col.value]) == [-1000.0, 2000.0, -27.02]
 
 
 def test_identical_transactions_on_one_day_are_kept_unchanged():

@@ -2,8 +2,9 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QMessageBox
 
 from mymoneyvisualizer.domain.columns import ONE_TIME_TAGGER, Col
+from mymoneyvisualizer.domain.tagging import regex_for
 from mymoneyvisualizer.ui.common import GREEN, GREY, RED
-from mymoneyvisualizer.ui.tagger_window import Mode, regex_for
+from mymoneyvisualizer.ui.tagger_window import Mode
 
 
 def _transaction(model, recipient):

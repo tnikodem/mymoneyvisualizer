@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import codecs
 import csv
+import io
 import math
 import re
 from collections import Counter
@@ -13,7 +14,12 @@ from pathlib import Path
 
 CANDIDATE_SEPARATORS = (";", ",", "\t", "|")
 
-_CURRENCY = re.compile(r"[€$£\s ']|EUR|USD|CHF")
+#: Pseudo encoding: UTF-8, but lines that are no valid UTF-8 are read as Windows-1252.
+MIXED_ENCODING = "utf-8 + cp1252"
+BOM = "\N{ZERO WIDTH NO-BREAK SPACE}"
+
+_UTF8_SEQUENCE = re.compile(rb"[\xc2-\xdf][\x80-\xbf]|[\xe0-\xef][\x80-\xbf]{2}|[\xf0-\xf4][\x80-\xbf]{3}")
+_CURRENCY = re.compile(r"[€$£\s']|EUR|USD|CHF")
 _NUMBER = re.compile(r"^[+-]?\(?\d[\d.,]*\)?[+-]?%?$")
 _DATE = re.compile(r"^\d{1,4}[./-]\d{1,2}[./-]\d{1,4}")
 _DAY_MONTH_YEAR = re.compile(r"^(\d{1,2})([./-])(\d{1,2})\2(\d{2}|\d{4})$")
@@ -40,32 +46,65 @@ class CsvFormat:
 
 
 def detect_encoding(raw: bytes) -> str:
-    """UTF-8 (with or without BOM) if the bytes decode as such, otherwise Windows-1252, otherwise Latin-1."""
+    """Encoding of a bank export.
+
+    UTF-8 (with or without BOM), UTF-16 (Excel "Unicode text"), UTF-8 with some Windows-1252 lines
+    (:data:`MIXED_ENCODING`, e.g. lines appended by hand), Windows-1252 or Latin-1 as last resort.
+    """
     if raw.startswith(codecs.BOM_UTF8):
         return "utf-8-sig"
-    for encoding in ("utf-8", "cp1252"):
-        try:
-            raw.decode(encoding)
-        except UnicodeDecodeError:
-            continue
-        return encoding
-    return "latin-1"
+    if raw.startswith((codecs.BOM_UTF16_LE, codecs.BOM_UTF16_BE)):
+        return "utf-16"
+    head = raw[:400]
+    if head and head.count(b"\x00") > len(head) // 4:  # UTF-16 without BOM: every other byte is 0
+        return "utf-16-le" if head[1:2] == b"\x00" else "utf-16-be"
+    try:
+        raw.decode("utf-8")
+        return "utf-8"
+    except UnicodeDecodeError:
+        pass
+    if _UTF8_SEQUENCE.search(raw):
+        return MIXED_ENCODING
+    try:
+        raw.decode("cp1252")
+        return "cp1252"
+    except UnicodeDecodeError:
+        return "latin-1"
+
+
+def decode(raw: bytes, encoding: str) -> str:
+    """Decode without ever failing; broken characters are kept as they are (or as U+FFFD), not repaired."""
+    if encoding == MIXED_ENCODING:
+        parts = []
+        for line in raw.splitlines(keepends=True):
+            try:
+                parts.append(line.decode("utf-8"))
+            except UnicodeDecodeError:
+                parts.append(line.decode("cp1252", errors="replace"))
+        text = "".join(parts)
+    else:
+        text = raw.decode(encoding, errors="replace")
+    return text.replace("\x00", "").removeprefix(BOM)
 
 
 def read_text(path: str | Path, encoding: str | None = None) -> tuple[str, str]:
     raw = Path(path).read_bytes()
     encoding = encoding or detect_encoding(raw)
     try:
-        return raw.decode(encoding, errors="replace"), encoding
+        return decode(raw, encoding), encoding
     except LookupError:  # unknown encoding name entered by the user
         encoding = detect_encoding(raw)
-        return raw.decode(encoding, errors="replace"), encoding
+        return decode(raw, encoding), encoding
+
+
+def lines(text: str) -> list[str]:
+    """Physical lines; unlike ``str.splitlines`` only ``\\r``, ``\\n`` and ``\\r\\n`` end a line, not e.g. U+2028."""
+    return io.StringIO(text, newline="").readlines()
 
 
 def split_records(text: str, separator: str) -> list[Record]:
     """Parse ``text`` as CSV; quoted fields may contain separators and line breaks."""
-    lines = text.splitlines(keepends=True)
-    reader = csv.reader(lines, delimiter=separator)
+    reader = csv.reader(lines(text), delimiter=separator)
     records = []
     start = 0
     try:
@@ -163,7 +202,7 @@ def clean_columns(names: Iterable[str]) -> list[str]:
     """Strip quotes/BOM, name empty columns and make names unique."""
     cleaned: list[str] = []
     for i, name in enumerate(names):
-        name = name.replace("﻿", "").strip().strip("'\"").strip() or f"column {i + 1}"
+        name = name.replace(BOM, "").strip().strip("'\"").strip() or f"column {i + 1}"
         unique, n = name, 2
         while unique in cleaned:
             unique, n = f"{name} ({n})", n + 1

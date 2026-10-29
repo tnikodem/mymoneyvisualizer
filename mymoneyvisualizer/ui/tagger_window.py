@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import enum
-import re
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QIntValidator
@@ -21,7 +20,7 @@ from PyQt6.QtWidgets import (
 from mymoneyvisualizer.app import TAGGERS, TRANSACTIONS, InvalidTaggerError
 from mymoneyvisualizer.domain.columns import ONE_TIME_TAGGER, Col
 from mymoneyvisualizer.domain.models import Tagger, clean_recurring
-from mymoneyvisualizer.domain.tagging import regex_error, tagger_matches
+from mymoneyvisualizer.domain.tagging import regex_error, regex_for, tagger_matches
 from mymoneyvisualizer.ui.common import GREEN, GREY, RED, Window, line_edit_style
 from mymoneyvisualizer.ui.table_model import DATE, MONEY, NUMBER, TAG, Column, DataFrameModel, DataFrameView
 
@@ -39,11 +38,6 @@ PREVIEW_COLUMNS = [
 class Mode(enum.Enum):
     TAGGER = "tagger"
     ONE_TIME = "one time tag"
-
-
-def regex_for(text: str) -> str:
-    """Regex that matches ``text`` literally (spaces kept readable)."""
-    return re.escape(text).replace("\\ ", " ")
 
 
 class TaggerWindow(Window):

@@ -1,0 +1,7 @@
+"Booking Date","Value Date","Partner Name","Partner Iban","Type","Payment Reference","Account Name","Amount (EUR)","Original Amount","Original Currency","Exchange Rate"
+2026-10-27,2026-10-27,"Lidl sagt Danke",,Presentment,"-","Main Account",-18.32,,,
+2026-10-25,2026-10-25,"Uber BV",,Presentment,"-","Main Account",-14.80,,,
+2026-10-15,2026-10-15,"Musterfirma GmbH",DE89370400440532013000,Credit Transfer,"Gehalt Oktober 2026","Main Account",3245.67,,,
+2026-10-02,2026-10-02,"Spotify AB",,Presentment,"-","Main Account",-10.99,,,
+2026-10-01,2026-10-01,"Hausverwaltung Schröder & Söhne",DE29100500000123456789,Debit Transfer,"Miete Oktober 2026","Main Account",-1050.00,,,
+2026-09-20,2026-09-20,"Booking.com",,Presentment,"-","Main Account",-264.00,,,
