@@ -91,7 +91,7 @@ class ImportWindow(Window):
         ):
             format_row.addLayout(self._labelled(label, widget))
         for field in MAPPING_FIELDS:
-            self.column_combos[field].setMinimumWidth(220)
+            self.column_combos[field].setMinimumWidth(160)
             mapping_row.addLayout(self._labelled(MAPPING_LABELS[field], self.column_combos[field]))
         format_row.addStretch(1)
         mapping_row.addStretch(1)

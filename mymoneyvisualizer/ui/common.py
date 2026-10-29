@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Sequence
 
-from PyQt6.QtCore import QObject, pyqtSignal
+from PyQt6.QtCore import QMargins, QObject, QPoint, QRect, QSize, pyqtSignal
 from PyQt6.QtGui import QColor, QShowEvent
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QMainWindow, QMessageBox, QWidget
 from pyqt6_multiselect_combobox import MultiSelectComboBox
@@ -55,8 +55,31 @@ class ModelBridge(QObject):
             self._attached = False
 
 
+#: Assumed height of the native title bar as long as the real frame is unknown (before the first show).
+TITLE_BAR_ESTIMATE = 40
+
+
+def fit_into(frame: QRect, available: QRect, minimum: QSize | None = None) -> QRect:
+    """Shrink and move ``frame`` so that it lies inside ``available``.
+
+    A frame that cannot shrink below ``minimum`` sticks out at the right/bottom, never at the top/left,
+    so the title bar stays reachable.
+    """
+    minimum = minimum or QSize(0, 0)
+    width = max(min(frame.width(), available.width()), minimum.width())
+    height = max(min(frame.height(), available.height()), minimum.height())
+    left = max(min(frame.left(), available.left() + available.width() - width), available.left())
+    top = max(min(frame.top(), available.top() + available.height() - height), available.top())
+    return QRect(left, top, width, height)
+
+
 class Window(QMainWindow):
-    """Window that refreshes itself when relevant model topics change, but only while it is visible."""
+    """Window that refreshes itself when relevant model topics change, but only while it is visible.
+
+    On its first show it is centered over its parent and kept completely on the screen. Qt centers windows
+    over their parent without looking at the screen, so tall windows opened from the small main window had
+    their title bar above the top of the screen.
+    """
 
     topics: frozenset[str] = frozenset()
 
@@ -64,7 +87,24 @@ class Window(QMainWindow):
         super().__init__(parent)
         self.model = model
         self._dirty = True
+        self._placed = False
         bridge.changed.connect(self._on_changed)
+
+    def place_on_screen(self) -> None:
+        parent = self.parentWidget()
+        screen = (parent or self).screen()
+        available = screen.availableGeometry()
+        handle = self.windowHandle()
+        margins = handle.frameMargins() if handle is not None else QMargins()
+        if margins.isNull():
+            margins = QMargins(0, TITLE_BAR_ESTIMATE, 0, 0)
+        frame = QRect(QPoint(0, 0), self.size().grownBy(margins))
+        if parent is not None and parent.isVisible():
+            frame.moveCenter(parent.frameGeometry().center())
+        else:
+            frame.moveCenter(available.center())
+        minimum = self.minimumSizeHint().expandedTo(self.minimumSize()).grownBy(margins)
+        self.setGeometry(fit_into(frame, available, minimum).marginsRemoved(margins))
 
     def _on_changed(self, topics: frozenset[str]) -> None:
         if not topics & self.topics:
@@ -75,6 +115,9 @@ class Window(QMainWindow):
             self._dirty = True
 
     def showEvent(self, event: QShowEvent) -> None:  # noqa: N802 (Qt API)
+        if not self._placed:
+            self._placed = True  # later the user decides where the window is
+            self.place_on_screen()
         if self._dirty:
             self.refresh()
         super().showEvent(event)

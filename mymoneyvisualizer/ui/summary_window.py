@@ -75,28 +75,30 @@ class SummaryWindow(Window):
         self.deviation_check = QCheckBox("Highlight unusual months", self)
         self.deviation_check.setChecked(True)
 
-        controls = QHBoxLayout()
+        # two rows, so the window also fits on small screens
+        selection, display = QHBoxLayout(), QHBoxLayout()
         for widget in (
             QLabel("From:", self),
             self.start_combo,
             QLabel("to:", self),
             self.end_combo,
-            self.exclude_select,
-            self.transfers_check,
             QLabel("Tag level:", self),
             self.level_combo,
             QLabel("Filter:", self),
             self.filter_edit,
-            self.deviation_check,
         ):
-            controls.addWidget(widget)
-        controls.addStretch(1)
+            selection.addWidget(widget)
+        for widget in (self.exclude_select, self.transfers_check, self.deviation_check):
+            display.addWidget(widget)
+        selection.addStretch(1)
+        display.addStretch(1)
 
         self.table_model = DataFrameModel([], self, background=self._background, tooltip=self._tooltip)
         self.table = DataFrameView(self.table_model, self, pinned=self._is_total_row)
         central = QWidget(self)
         layout = QVBoxLayout(central)
-        layout.addLayout(controls)
+        layout.addLayout(selection)
+        layout.addLayout(display)
         layout.addWidget(self.table)
         self.setCentralWidget(central)
 

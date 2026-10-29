@@ -44,7 +44,9 @@ class TaggerOverviewWindow(Window):
         central = QWidget(self)
         layout = QVBoxLayout(central)
         layout.addLayout(controls)
-        layout.addWidget(QLabel("Taggers are applied from top to bottom (unsorted); later ones win.", self))
+        hint = QLabel("Taggers are applied from top to bottom (unsorted); later ones win.", self)
+        hint.setWordWrap(True)
+        layout.addWidget(hint)
         layout.addWidget(self.table)
         self.setCentralWidget(central)
 
