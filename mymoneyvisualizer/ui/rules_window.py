@@ -40,7 +40,7 @@ class RulesWindow(Window):
         super().__init__(model, bridge, navigator)
         self.navigator = navigator
         self.setWindowTitle("Rules")
-        self.resize(900, 800)
+        self.resize(800, 800)
 
         self.ok_button = QPushButton("OK", self)
         self.add_button = QPushButton("Add Rule", self)

@@ -60,6 +60,8 @@ def test_rule_window_opens_on_screen(main):
 def test_window_is_centered_over_main_window(main):
     available = main.screen().availableGeometry()
     main.move(available.center().x() - main.width() // 2, available.center().y())
+    # small enough for any screen (CI: 800 px), so it is not moved to stay on the screen
+    main.rules_window.resize(400, 300)
     main.show_rules()
     window = main.rules_window
     assert abs(window.frameGeometry().center().x() - main.frameGeometry().center().x()) <= 1
