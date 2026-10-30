@@ -50,6 +50,7 @@ class TaggerWindow(Window):
         self.original_name: str | None = None
         self.transaction_id: str | None = None
         self._loading = False
+        self._matches: tuple[bool, bool] | None = None
 
         self.ok_button = QPushButton("OK", self)
         self.ok_button.setDefault(True)
@@ -93,7 +94,7 @@ class TaggerWindow(Window):
         self.setCentralWidget(central)
 
         for edit in (self.tag_edit, self.recurring_edit, self.name_edit, self.recipient_edit, self.description_edit):
-            edit.textChanged.connect(self.refresh)
+            edit.textChanged.connect(self._edited)
         self.ok_button.clicked.connect(self.accept)
         self.cancel_button.clicked.connect(self.close)
         self.mode_button.clicked.connect(self.toggle_mode)
@@ -193,32 +194,45 @@ class TaggerWindow(Window):
                 errors[field] = error
         return errors
 
+    def _edited(self, *_args) -> None:
+        """Validate at once, update the (possibly large) preview when typing pauses."""
+        if self._loading:
+            return
+        self.update_state()
+        self.schedule_refresh()
+
     def refresh(self, *_args) -> None:
         if self._loading:
             return
         super().refresh()
+        self.update_state()
+        self.table_model.set_frame(self.preview())
+
+    def update_state(self) -> None:
+        """Title, regex colors and the OK button; cheap enough for every key press."""
         self.setWindowTitle("One time tag" if self.mode == Mode.ONE_TIME else self.draft().name or "Tagger")
         errors = self.errors()
+        self._matches = self.selected_matches(errors)
         for field, edit in (("regex_recipient", self.recipient_edit), ("regex_description", self.description_edit)):
             edit.setStyleSheet(line_edit_style(self._regex_color(field, errors)))
             edit.setToolTip(errors.get(field, ""))
         self.message_label.setText("\n".join(f"Invalid regex: {e}" for e in errors.values()))
         self.ok_button.setEnabled(not errors)
-        self.table_model.set_frame(self.preview())
+        self.table_model.layoutChanged.emit()  # colors of the first row
 
     def preview(self):
         draft = self.draft()
         if self.mode == Mode.ONE_TIME:
-            df = self.model.transactions()
-            df = df.loc[df[Col.transaction_id] == self.transaction_id].copy()
+            row = self.model.transaction(self.transaction_id)
+            df = row.to_frame().T if row is not None else self.model.transactions().iloc[0:0].copy()
             df[Col.tag] = draft.tag
             df[Col.recurring] = float("nan") if draft.recurring is None else float(draft.recurring)
             return df
         return self.model.preview_tagger(draft, self.original_name, self.transaction_id)
 
-    def selected_matches(self) -> tuple[bool, bool] | None:
+    def selected_matches(self, errors: dict[str, str] | None = None) -> tuple[bool, bool] | None:
         """Whether the regexes match the transaction the window was opened for."""
-        if self.transaction_id is None or self.errors():
+        if self.transaction_id is None or (errors if errors is not None else self.errors()):
             return None
         row = self.model.transaction(self.transaction_id)
         if row is None:
@@ -228,10 +242,9 @@ class TaggerWindow(Window):
     def _regex_color(self, field: str, errors: dict[str, str]):
         if field in errors:
             return RED
-        matches = self.selected_matches()
-        if matches is None:
+        if self._matches is None:
             return None
-        return GREEN if matches[0 if field == "regex_recipient" else 1] else RED
+        return GREEN if self._matches[0 if field == "regex_recipient" else 1] else RED
 
     def _background(self, row: int, key: str):
         if row != 0 or self.transaction_id is None:
@@ -241,8 +254,7 @@ class TaggerWindow(Window):
             return None
         if self.mode == Mode.ONE_TIME:
             return GREY
-        matches = self.selected_matches()
-        return GREY if matches is None else (GREEN if all(matches) else RED)
+        return GREY if self._matches is None else (GREEN if all(self._matches) else RED)
 
     # ------------------------------------------------------------------ saving
     def accept(self) -> bool:

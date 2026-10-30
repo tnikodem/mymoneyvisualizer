@@ -61,9 +61,11 @@ def test_tag_broken_text_by_double_click_and_see_it_in_summary(main, window, mod
 
     main.show_accounts()
     tab = main.accounts_window.tab("konto")
+    assert tab.table.displayed_frame().empty  # tabs are filled when they are shown
+    main.accounts_window.tabs.setCurrentWidget(tab)
     shown = tab.table.displayed_frame()
     row = shown.index[(shown[Col.recipient] == recipient) & shown[Col.description].str.startswith(description)][0]
-    tab.table.doubleClicked.emit(tab.table.proxy.index(int(row), 2))
+    tab.table.doubleClicked.emit(tab.table.model().index(int(row), 2))
 
     tagger_window = main.tagger_window
     assert tagger_window.isVisible()

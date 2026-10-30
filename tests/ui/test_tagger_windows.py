@@ -158,7 +158,7 @@ def test_tagger_overview(main, model, qtbot, dialogs):
 
     qtbot.mouseClick(window.add_button, Qt.MouseButton.LeftButton)
     assert main.tagger_window.isVisible() and main.tagger_window.original_name is None
-    window.table.doubleClicked.emit(window.table.proxy.index(0, 0))
+    window.table.doubleClicked.emit(window.table.model().index(0, 0))
     assert main.tagger_window.original_name == "groceries"
 
     window.table.selectRow(0)

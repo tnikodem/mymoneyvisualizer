@@ -71,5 +71,5 @@ def test_unique_tags_and_display():
     tags = ["b.x", "a", "b.y", "a"]
     assert unique_tags(tags) == ["a", "b.x", "b.y"]
     assert unique_base_tags(tags) == ["a", "b"]
-    assert display_tag("") == "unassigned"
+    assert display_tag("") == "(no tag)"
     assert display_tag("food") == "food"

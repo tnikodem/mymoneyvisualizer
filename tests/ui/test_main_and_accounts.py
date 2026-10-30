@@ -74,7 +74,7 @@ def test_import_button_and_double_click(main, monkeypatch, tmp_path):
     tab.import_data(path="")
     assert opened == [(str(tmp_path / "x.csv"), "giro")]
 
-    tab.table.doubleClicked.emit(tab.table.proxy.index(0, 2))
+    tab.table.doubleClicked.emit(tab.table.model().index(0, 2))
     assert main.tagger_window.isVisible()
     assert main.tagger_window.transaction_id == tab.table.row_at(0)[Col.transaction_id]
 

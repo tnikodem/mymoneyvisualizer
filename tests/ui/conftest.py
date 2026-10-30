@@ -3,6 +3,7 @@ from PyQt6.QtWidgets import QMessageBox
 
 from mymoneyvisualizer.app import AppModel
 from mymoneyvisualizer.domain.models import Tagger
+from mymoneyvisualizer.ui.common import Window
 from mymoneyvisualizer.ui.main_window import MainWindow
 
 from ..helpers import transactions
@@ -25,6 +26,15 @@ class Dialogs:
             return QMessageBox.StandardButton.Ok
 
         return show
+
+
+@pytest.fixture(autouse=True)
+def immediate_refresh(monkeypatch):
+    """Windows refresh at once instead of after a short delay, so tests can check right after a change.
+
+    ``test_lazy_refresh.py`` checks the delayed refresh itself.
+    """
+    monkeypatch.setattr(Window, "REFRESH_DELAY_MS", None)
 
 
 @pytest.fixture(autouse=True)

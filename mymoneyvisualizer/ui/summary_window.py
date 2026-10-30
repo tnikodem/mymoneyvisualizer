@@ -94,7 +94,7 @@ class SummaryWindow(Window):
         display.addStretch(1)
 
         self.table_model = DataFrameModel([], self, background=self._background, tooltip=self._tooltip)
-        self.table = DataFrameView(self.table_model, self, pinned=self._is_total_row)
+        self.table = DataFrameView(self.table_model, self, pinned=lambda frame: (frame[Col.tag] == TOTAL).to_numpy())
         central = QWidget(self)
         layout = QVBoxLayout(central)
         layout.addLayout(selection)

@@ -33,7 +33,7 @@ def test_category_lists(window):
     assert _items(window.lists["income"]) == ["income"]
     assert _items(window.lists["basic"]) == ["household", "car"]
     assert _items(window.lists["optional"]) == ["carsharing", ""]
-    assert window.lists["optional"].item(1).text() == "unassigned"
+    assert window.lists["optional"].item(1).text() == "(no tag)"
 
 
 def test_moving_a_tag_changes_its_category(window, model, qtbot):
@@ -87,7 +87,7 @@ def _report(**changes):
 def test_budget_html_running_period():
     text = budget_html(_report())
     assert "Expected budget" in text
-    assert "unassigned:" in text
+    assert "(no tag):" in text
     assert "Remaining per month:" in text
     assert "Trend end of period:" in text
     assert "1.140 €" in text  # balance
