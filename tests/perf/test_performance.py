@@ -53,16 +53,19 @@ def test_startup(data_dir):
 
 def test_editing_rules(model):
     some = model.transactions().iloc[5000]
+    existing = model.rules[100].id
     with Budget(1.5):  # 10 key presses in the rule window, new and existing rule
         for i in range(5):
-            model.preview_rule(Rule("draft", regex_recipient="REWE Markt 1"[: 4 + i]), None, some[Col.transaction_id])
-            model.preview_rule(Rule("t100", regex_description="SAGT DANKE"[: 3 + i]), "t100")
+            model.preview_rule(Rule(regex_recipient="REWE Markt 1"[: 4 + i]), None, some[Col.transaction_id])
+            model.preview_rule(Rule(regex_description="SAGT DANKE"[: 3 + i]), existing)
     with Budget(1.5):
-        model.save_rule(Rule("perf", category="perf.x", regex_recipient="Shell 12$"))
+        saved = model.save_rule(Rule(category="perf.x", regex_recipient="Shell 12$"))
+    with Budget(1.5):  # typed into the rules overview
+        model.update_rule(saved.id, spread_months=12)
     with Budget(1.5):
         model.save_manual_category(ManualCategory(some[Col.transaction_id], "perf.once", spread_months=12))
     with Budget(1.5):
-        model.delete_rules(["perf"])
+        model.delete_rules([saved.id])
 
 
 def test_analysis(model):

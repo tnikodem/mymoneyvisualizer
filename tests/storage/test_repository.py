@@ -32,7 +32,7 @@ def test_roundtrip(tmp_path):
     repo = Repository(tmp_path)
     state = State(
         accounts={"Giro Konto": transactions(("2024-01-02", "Müller", "Brot", -3.5)), "empty": transactions()},
-        rules=[Rule("t", category="küche", regex_recipient="Müller", spread_months=24, residual_percent=10)],
+        rules=[Rule(category="küche", regex_recipient="Müller", spread_months=24, residual_percent=10)],
         manual_categories={
             "id": ManualCategory("id", "hobby"),
             "sale": ManualCategory("sale", "car", spread_months=60, residual_percent=40, sale_of="id"),

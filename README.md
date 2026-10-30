@@ -52,9 +52,15 @@ Every transaction gets a category such as `household.food.grocery`: the main cat
 after the points. Double click a transaction to categorize it:
 
 * **all matching transactions (rule)**: a rule assigns its category to every transaction whose recipient and
-  description match its regular expressions. The proposal matches the recipient of the transaction; the preview
+  description contain its regular expressions. The proposal matches the recipient of the transaction; the preview
   shows all transactions the rule catches. Rules are applied in order, later ones win.
 * **only this transaction (manual category)**: wins over all rules.
+
+The cursor starts in the category: type it, choose a proposal with the arrow keys, **Enter** saves, **Escape**
+cancels. Rules have no names; **Rules** lists what each one does: `#` (the order), what recipient and description
+must contain, category, spread, residual value and the transactions it categorizes. Filter the list, e.g. by
+`insurance`, and change category, spread or residual value right in the table: select the cell and type. Double
+click a rule to edit it with all its transactions.
 
 A transfer between two of your accounts gets the name of the receiving account as category, e.g. `Tagesgeld`. Such
 internal transfers are no income or expense and can be hidden.

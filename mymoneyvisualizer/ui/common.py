@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Sequence
 
-from PyQt6.QtCore import QMargins, QObject, QPoint, QRect, QSize, QTimer, pyqtSignal
+from PyQt6.QtCore import QMargins, QObject, QPoint, QRect, QSize, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QColor, QShowEvent
-from PyQt6.QtWidgets import QHBoxLayout, QLabel, QMainWindow, QMessageBox, QWidget
+from PyQt6.QtWidgets import QCompleter, QHBoxLayout, QLabel, QMainWindow, QMessageBox, QWidget
 from pyqt6_multiselect_combobox import MultiSelectComboBox
 
 from mymoneyvisualizer.app import AppModel
@@ -35,6 +35,14 @@ PLOT_COLORS = [
 
 def line_edit_style(color: QColor | None) -> str:
     return "" if color is None else f"QLineEdit {{ background: {color.name()}; }}"
+
+
+def category_completer(model: AppModel, parent: QObject) -> QCompleter:
+    """Proposes the known categories and the account names (internal transfers) while a category is typed."""
+    completer = QCompleter(model.unique_categories() + model.account_names, parent)
+    completer.setFilterMode(Qt.MatchFlag.MatchContains)
+    completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+    return completer
 
 
 class ModelBridge(QObject):

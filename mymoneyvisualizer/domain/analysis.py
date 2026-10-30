@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 
 from mymoneyvisualizer.domain.categories import category_at_level, matches_category
+from mymoneyvisualizer.domain.categorization import readable_pattern
 from mymoneyvisualizer.domain.columns import Col
 from mymoneyvisualizer.domain.models import CONSUMPTION_GROUPS, GROUP_INCOME, GROUP_SAVINGS, Rule
 
@@ -220,14 +221,21 @@ def detail_transactions(
 
 
 def rule_overview(categorized: pd.DataFrame, rules: Iterable[Rule]) -> pd.DataFrame:
-    """Number of transactions and their sum per rule."""
+    """One row per rule in the order they are applied: what it matches, what it sets and what it categorizes.
+
+    ``position`` counts from 1, ``recipient`` and ``description`` are the regexes for reading, ``count`` and ``sum``
+    cover the transactions the rule categorizes (not those a later rule or a manual category takes).
+    """
     groups = categorized.groupby(Col.rule)[Col.value].agg(["count", "sum"])
     rows = []
-    for rule in rules:
-        count, total = groups.loc[rule.name] if rule.name in groups.index else (0, 0.0)
+    for position, rule in enumerate(rules, start=1):
+        count, total = groups.loc[rule.id] if rule.id in groups.index else (0, 0.0)
         rows.append(
             {
-                "name": rule.name,
+                "id": rule.id,
+                "position": position,
+                "recipient": readable_pattern(rule.regex_recipient),
+                "description": readable_pattern(rule.regex_description),
                 Col.category: rule.category,
                 Col.spread_months: rule.spread_months,
                 Col.residual_percent: rule.residual_percent,
@@ -235,5 +243,15 @@ def rule_overview(categorized: pd.DataFrame, rules: Iterable[Rule]) -> pd.DataFr
                 "sum": round(float(total), 2),
             }
         )
-    columns = ["name", Col.category, Col.spread_months, Col.residual_percent, "count", "sum"]
+    columns = [
+        "id",
+        "position",
+        "recipient",
+        "description",
+        Col.category,
+        Col.spread_months,
+        Col.residual_percent,
+        "count",
+        "sum",
+    ]
     return pd.DataFrame(rows, columns=columns)

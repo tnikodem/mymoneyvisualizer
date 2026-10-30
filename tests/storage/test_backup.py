@@ -13,7 +13,7 @@ from ..helpers import transactions
 def _state():
     return State(
         accounts={"giro": transactions(("2024-01-02", "a", "b", -1.0))},
-        rules=[Rule("t", category="x")],
+        rules=[Rule(category="x")],
         groups=[GroupAssignment("x", "wants")],
     )
 

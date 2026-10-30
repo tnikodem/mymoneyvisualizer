@@ -16,7 +16,7 @@ from mymoneyvisualizer.domain.columns import MANUAL_RULE, Col
 from mymoneyvisualizer.domain.models import ManualCategory, Rule
 from mymoneyvisualizer.importing.profile import ImportProfile
 
-from .helpers import transactions
+from .helpers import rule_of, transactions
 
 
 @pytest.fixture
@@ -46,9 +46,9 @@ def filled(model):
         ),
     )
     model.import_transactions("spar", transactions(("2024-01-05", "Ich", "Sparen Eingang", 200.0)))
-    model.save_rule(Rule("groceries", category="household.food", regex_recipient="REWE|EDEKA"))
-    model.save_rule(Rule("salary", category="income", regex_recipient="ACME"))
-    model.save_rule(Rule("saving", category="spar", regex_description="^Sparen$"))
+    model.save_rule(Rule(category="household.food", regex_recipient="REWE|EDEKA"))
+    model.save_rule(Rule(category="income", regex_recipient="ACME"))
+    model.save_rule(Rule(category="spar", regex_description="^Sparen$"))
     return model
 
 
@@ -97,10 +97,10 @@ def test_rename_account_keeps_transfer_categories(filled):
     target = filled.account_transactions("giro").iloc[-1][Col.transaction_id]
     filled.save_manual_category(ManualCategory(target, "spar"))
     filled.rename_account("spar", "Tagesgeld")
-    assert filled.rule("saving").category == "Tagesgeld"
+    assert [r.category for r in filled.rules] == ["household.food", "income", "Tagesgeld"]
     assert filled.manual_categories[target].category == "Tagesgeld"
     assert "Tagesgeld" not in set(filled.income_expenses("2024-01", "2024-02")[Col.category])
-    assert _reloaded(filled).rule("saving").category == "Tagesgeld"
+    assert _reloaded(filled).rules[2].category == "Tagesgeld"
 
 
 def test_import_and_categorization(filled):
@@ -119,36 +119,53 @@ def test_new_main_categories_get_a_group(filled, events):
         ("household", "needs"),
         ("income", "income"),
     ]
-    filled.save_rule(Rule("kiosk", category="hobby.news", regex_recipient="Kiosk"))
+    filled.save_rule(Rule(category="hobby.news", regex_recipient="Kiosk"))
     assert GROUPS in events[-1]
     assert "hobby" in [a.category for a in filled.groups]
 
 
-def test_save_rule_validates_and_renames(filled, events):
+def test_save_rule_validates_and_replaces(filled, events):
     with pytest.raises(InvalidRuleError) as error:
-        filled.save_rule(Rule("bad", regex_recipient="(["))
+        filled.save_rule(Rule(regex_recipient="(["))
     assert "regex_recipient" in error.value.errors
 
-    clash = filled.save_rule(Rule("salary", category="other"))
-    assert clash.name == "salary_1"
-    assert filled.save_rule(Rule(MANUAL_RULE)).name == f"{MANUAL_RULE}_1"
-    assert filled.save_rule(Rule("  ")).name == "new_rule"
+    new = Rule(category="household.other")
+    assert filled.save_rule(new).id == new.id
+    assert filled.rules[-1] == new
     assert events[-1] == frozenset({RULES, TRANSACTIONS})
+    copy = filled.save_rule(filled.rules[0])  # saved without original: a new rule
+    assert copy.id != filled.rules[0].id
+    assert len(filled.rules) == 5
 
-    renamed = filled.save_rule(Rule("pay", category="income.salary", regex_recipient="ACME"), original_name="salary")
-    assert renamed.name == "pay"
-    names = [t.name for t in filled.rules]
-    assert names.index("pay") == 1  # keeps its position = priority
-    assert "salary" not in names
-    assert _reloaded(filled).rule("pay").category == "income.salary"
+    salary = rule_of(filled, "income")
+    saved = filled.save_rule(Rule(category="income.salary", regex_recipient="ACME"), original_id=salary.id)
+    assert saved.id == salary.id
+    assert [r.category for r in filled.rules][1] == "income.salary"  # keeps its position = priority
+    assert "income" not in [r.category for r in filled.rules]
+    assert _reloaded(filled).rules[1].category == "income.salary"
+
+
+def test_update_rule(filled, events):
+    salary = rule_of(filled, "income")
+    updated = filled.update_rule(salary.id, spread_months=12, residual_percent=10)
+    assert (updated.id, updated.spread_months, updated.residual_percent) == (salary.id, 12, 10)
+    assert filled.rule(salary.id).regex_recipient == "ACME"
+    assert filled.transactions().set_index(Col.recipient).loc["ACME", Col.spread_months] == 12
+    count = len(events)
+    filled.update_rule(salary.id, spread_months=12)
+    assert len(events) == count  # nothing changed, nothing saved
+    assert filled.update_rule(salary.id, spread_months=0).residual_percent == 0
+    assert filled.update_rule("unknown", category="x") is None
 
 
 def test_returned_objects_are_copies(filled):
-    filled.rule("salary").category = "hacked"
+    salary = rule_of(filled, "income")
+    filled.rule(salary.id).category = "hacked"
     filled.rules[0].category = "hacked"
     filled.settings.excluded_categories.append("hacked")
     filled.groups[0].group = "wants"
-    assert filled.rule("salary").category == "income"
+    assert filled.rule(salary.id).category == "income"
+    assert filled.rules[0].category == "household.food"
     assert filled.settings.excluded_categories == []
     assert filled.groups[0].group == "needs"
 
@@ -157,8 +174,8 @@ def test_delete_rules(filled, events):
     count = len(events)
     filled.delete_rules(["unknown"])
     assert len(events) == count
-    filled.delete_rules(["salary", "saving"])
-    assert [t.name for t in filled.rules] == ["groceries"]
+    filled.delete_rules([rule_of(filled, "income").id, rule_of(filled, "spar").id])
+    assert [r.category for r in filled.rules] == ["household.food"]
 
 
 def test_manual_categories(filled):
@@ -189,24 +206,24 @@ def test_delete_account_removes_its_manual_categories(filled):
 
 def test_preview_rule(filled):
     kiosk = filled.account_transactions("giro").iloc[0][Col.transaction_id]
-    preview = filled.preview_rule(Rule("draft", category="shop", regex_description="Einkauf"), transaction_id=kiosk)
+    preview = filled.preview_rule(Rule(category="shop", regex_description="Einkauf"), transaction_id=kiosk)
     assert list(preview[Col.recipient]) == ["Kiosk", "EDEKA", "REWE"]
     assert list(preview[Col.category]) == ["", "shop", "shop"]
     # nothing was saved
-    assert filled.rule("draft") is None
+    assert "shop" not in [r.category for r in filled.rules]
 
 
 def test_preview_of_edited_rule_ignores_saved_version(filled):
-    edited = Rule("groceries", category="food", regex_recipient="EDEKA")
-    preview = filled.preview_rule(edited, original_name="groceries")
+    edited = Rule(category="food", regex_recipient="EDEKA")
+    preview = filled.preview_rule(edited, original_id=rule_of(filled, "household.food").id)
     assert list(preview[Col.recipient]) == ["EDEKA"]
-    assert filled.preview_rule(Rule("x", regex_recipient="([")).empty
+    assert filled.preview_rule(Rule(regex_recipient="([")).empty
 
 
 def test_preview_does_not_override_manual_categories(filled):
     target = filled.account_transactions("giro").iloc[-1][Col.transaction_id]  # REWE
     filled.save_manual_category(ManualCategory(target, "gift"))
-    preview = filled.preview_rule(Rule("draft", category="shop", regex_recipient="REWE"))
+    preview = filled.preview_rule(Rule(category="shop", regex_recipient="REWE"))
     assert preview.empty
 
 
@@ -267,7 +284,7 @@ def test_detail(filled):
 
 
 def test_budget_and_overview(filled):
-    filled.save_rule(Rule("saving in", category="giro", regex_description="Sparen Eingang"))  # internal transfer
+    filled.save_rule(Rule(category="giro", regex_description="Sparen Eingang"))  # internal transfer
     filled.set_budget_period(2024, 2024)
     series = filled.budget_series()
     assert "spar" not in series.monthly.columns
@@ -277,15 +294,13 @@ def test_budget_and_overview(filled):
     assert report.wants.categories == []
     assert report.savings_rate == pytest.approx((2000 - 72) / 2000)
     assert filled.categories_in_group("income") == ["income"]
-    overview = filled.rule_overview().set_index("name")
-    assert overview.loc["groceries", "count"] == 2
+    overview = filled.rule_overview().set_index(Col.category)
+    assert overview.loc["household.food", "count"] == 2
 
 
 def test_spread_rule_in_the_budget(filled):
-    filled.save_rule(
-        Rule("bio", category="household.bio", regex_description="Bio", spread_months=12, residual_percent=50)
-    )
-    assert filled.rule("bio").residual_percent == 50
+    filled.save_rule(Rule(category="household.bio", regex_description="Bio", spread_months=12, residual_percent=50))
+    assert rule_of(filled, "household.bio").residual_percent == 50
     row = filled.transactions().set_index(Col.recipient).loc["EDEKA"]
     assert (row[Col.spread_months], row[Col.residual_percent]) == (12, 50)
     monthly = filled.budget_series().monthly
@@ -311,7 +326,7 @@ def test_sale_of_a_purchase(filled):
 
 def test_uncategorized_count(filled):
     assert filled.uncategorized_count() == 2  # Kiosk and the incoming savings transfer
-    filled.save_rule(Rule("kiosk", category="hobby", regex_recipient="Kiosk"))
+    filled.save_rule(Rule(category="hobby", regex_recipient="Kiosk"))
     assert filled.uncategorized_count() == 1
 
 

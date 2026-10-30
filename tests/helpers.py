@@ -15,6 +15,11 @@ def transactions(*rows, account=None):
     return df
 
 
+def rule_of(model, category):
+    """The rule that sets ``category`` (rules have no names)."""
+    return next(rule for rule in model.rules if rule.category == category)
+
+
 def categorized(*rows, categories, account="giro", spread_months=None, residual_percent=None, sale_of=None):
     """Transactions with explicit categories and spreads (one per row), as produced by :func:`apply_rules`."""
     df = apply_rules(transactions(*rows, account=account), [])

@@ -163,11 +163,11 @@ class MainWindow(QMainWindow):
         """All transactions without category; a double click categorizes one."""
         self.open_detail(None, [UNCATEGORIZED])
 
-    def open_rule(self, name: str | None = None, transaction_id: str | None = None) -> None:
+    def open_rule(self, rule_id: str | None = None, transaction_id: str | None = None) -> None:
         if transaction_id is not None:
             self.rule_window.open_for_transaction(transaction_id)
-        elif name is not None:
-            self.rule_window.open_rule(name)
+        elif rule_id is not None:
+            self.rule_window.open_rule(rule_id)
         else:
             self.rule_window.open_new()
 

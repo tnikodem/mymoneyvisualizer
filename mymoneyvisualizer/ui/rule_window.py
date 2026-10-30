@@ -6,10 +6,10 @@ import enum
 
 import pandas as pd
 from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtGui import QKeyEvent
 from PyQt6.QtWidgets import (
     QButtonGroup,
     QComboBox,
-    QCompleter,
     QFormLayout,
     QHBoxLayout,
     QLabel,
@@ -25,7 +25,7 @@ from mymoneyvisualizer.app import RULES, TRANSACTIONS, InvalidRuleError
 from mymoneyvisualizer.domain.categorization import regex_error, regex_for, rule_matches
 from mymoneyvisualizer.domain.columns import MANUAL_RULE, Col
 from mymoneyvisualizer.domain.models import MAX_SPREAD_MONTHS, ManualCategory, Rule
-from mymoneyvisualizer.ui.common import GREEN, GREY, RED, Window, line_edit_style
+from mymoneyvisualizer.ui.common import GREEN, GREY, RED, Window, category_completer, line_edit_style
 from mymoneyvisualizer.ui.table_model import (
     CATEGORY,
     DATE,
@@ -49,19 +49,12 @@ PREVIEW_COLUMNS = [
     Column(Col.spread_months, "spread", MONTHS, 80),
     Column(Col.residual_percent, "residual", PERCENT, 60),
 ]
-#: longest proposed rule name taken from the recipient
-NAME_LENGTH = 40
 REGEX_HINT = "Regular expression searched in the text; | separates alternatives, empty matches everything."
 
 
 class Mode(enum.Enum):
     RULE = "rule"
     MANUAL = "manual"
-
-
-def proposed_name(recipient: str, description: str) -> str:
-    text = " ".join((recipient.strip() or description.strip()).split())
-    return text[:NAME_LENGTH].strip()
 
 
 class SpreadEdit(QWidget):
@@ -114,13 +107,15 @@ class SpreadEdit(QWidget):
 
 
 class RuleWindow(Window):
+    """Opens with the cursor in the category: type it, Enter saves (like OK), Escape cancels."""
+
     topics = frozenset({TRANSACTIONS, RULES})
 
     def __init__(self, model, bridge, parent: QWidget | None = None):
         super().__init__(model, bridge, parent)
         self.resize(1300, 800)
         self.mode = Mode.RULE
-        self.original_name: str | None = None
+        self.original_id: str | None = None
         self.transaction_id: str | None = None
         self._loading = False
         self._matches: tuple[bool, bool] | None = None
@@ -128,6 +123,7 @@ class RuleWindow(Window):
         self.ok_button = QPushButton("OK", self)
         self.ok_button.setDefault(True)
         self.cancel_button = QPushButton("Cancel", self)
+        self.cancel_button.setAutoDefault(True)  # Enter on the focused button cancels instead of saving
         self.rule_radio = QRadioButton("all matching transactions (rule)", self)
         self.manual_radio = QRadioButton("only this transaction", self)
         self.rule_radio.setChecked(True)
@@ -143,7 +139,6 @@ class RuleWindow(Window):
             "Selling something you spread over its useful life: its real loss of value (price minus sale proceeds)"
             " is spread over the months you owned it."
         )
-        self.name_edit = QLineEdit(self)
         self.recipient_edit = QLineEdit(self)
         self.description_edit = QLineEdit(self)
         for edit in (self.recipient_edit, self.description_edit):
@@ -170,9 +165,8 @@ class RuleWindow(Window):
         self.definition = QWidget(self)
         definition = QFormLayout(self.definition)
         definition.setContentsMargins(0, 0, 0, 0)
-        definition.addRow("Rule name:", self.name_edit)
-        definition.addRow("Recipient regex:", self.recipient_edit)
-        definition.addRow("Description regex:", self.description_edit)
+        definition.addRow("Recipient contains:", self.recipient_edit)
+        definition.addRow("Description contains:", self.description_edit)
 
         self.table_model = DataFrameModel(PREVIEW_COLUMNS, self, background=self._background)
         self.table = DataFrameView(self.table_model, self, sortable=False)
@@ -186,7 +180,7 @@ class RuleWindow(Window):
         layout.addWidget(self.table)
         self.setCentralWidget(central)
 
-        for edit in (self.category_edit, self.name_edit, self.recipient_edit, self.description_edit):
+        for edit in (self.category_edit, self.recipient_edit, self.description_edit):
             edit.textChanged.connect(self._edited)
         self.spread_edit.changed.connect(self._edited)
         self.sale_combo.currentIndexChanged.connect(self._sale_changed)
@@ -196,14 +190,14 @@ class RuleWindow(Window):
 
     # ------------------------------------------------------------------ opening
     def open_new(self) -> None:
-        self._open(Rule(self.model.free_rule_name()), original_name=None, transaction_id=None)
+        self._open(Rule(), original_id=None, transaction_id=None)
 
-    def open_rule(self, name: str) -> None:
-        rule = self.model.rule(name)
+    def open_rule(self, rule_id: str) -> None:
+        rule = self.model.rule(rule_id)
         if rule is None:
             self.open_new()
         else:
-            self._open(rule, original_name=name, transaction_id=None)
+            self._open(rule, original_id=rule_id, transaction_id=None)
 
     def open_for_transaction(self, transaction_id: str) -> None:
         """Edit the rule of a transaction or its manual category, or propose a rule for its recipient."""
@@ -214,34 +208,32 @@ class RuleWindow(Window):
         recipient, description = str(row[Col.recipient]), str(row[Col.description])
         # a new rule matches the recipient; the description often contains dates and references of one payment
         draft = Rule(
-            self.model.free_rule_name(proposed_name(recipient, description)),
             regex_recipient=regex_for(recipient),
             regex_description="" if recipient.strip() else regex_for(description),
         )
-        rule_name = row[Col.rule]
+        rule = self.model.rule(row[Col.rule])
         manual = self.model.manual_categories.get(transaction_id)
-        if rule_name == MANUAL_RULE and manual is not None:
+        if row[Col.rule] == MANUAL_RULE and manual is not None:
             draft.category = manual.category
             draft.spread_months, draft.residual_percent = manual.spread_months, manual.residual_percent
             self._open(draft, None, transaction_id, Mode.MANUAL, sale_of=manual.sale_of)
-        elif self.model.rule(rule_name) is not None:
-            self._open(self.model.rule(rule_name), rule_name, transaction_id)
+        elif rule is not None:
+            self._open(rule, rule.id, transaction_id)
         else:
             self._open(draft, None, transaction_id)
 
     def _open(
         self,
         rule: Rule,
-        original_name: str | None,
+        original_id: str | None,
         transaction_id: str | None,
         mode: Mode = Mode.RULE,
         sale_of: str = "",
     ) -> None:
-        self.original_name = original_name
+        self.original_id = original_id
         self.transaction_id = transaction_id
         self._loading = True
         try:
-            self.name_edit.setText(rule.name)
             self.category_edit.setText(rule.category)
             self.spread_edit.set_spread(rule.spread_months, rule.residual_percent)
             self.recipient_edit.setText(rule.regex_recipient)
@@ -249,13 +241,11 @@ class RuleWindow(Window):
             self._fill_sales(sale_of)
         finally:
             self._loading = False
-        completer = QCompleter(self.model.unique_categories() + self.model.account_names, self)
-        completer.setFilterMode(Qt.MatchFlag.MatchContains)
-        completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
-        self.category_edit.setCompleter(completer)
+        self.category_edit.setCompleter(category_completer(self.model, self))
         self.set_mode(mode)
         self.show()
         self.raise_()
+        self.category_edit.setFocus()
 
     def _fill_sales(self, selected: str) -> None:
         """Purchases the transaction can be the sale of; only an incoming payment can be a sale."""
@@ -283,14 +273,16 @@ class RuleWindow(Window):
         return self.sale_combo.currentData() or ""
 
     def draft(self) -> Rule:
-        return Rule(
-            name=self.name_edit.text().strip(),
+        draft = Rule(
             category=self.category_edit.text().strip(),
             regex_recipient=self.recipient_edit.text(),
             regex_description=self.description_edit.text(),
             spread_months=self.spread_edit.months(),
             residual_percent=self.spread_edit.residual_percent(),
         )
+        if self.original_id is not None:
+            draft.id = self.original_id
+        return draft
 
     def set_mode(self, mode: Mode) -> None:
         if mode == Mode.MANUAL and self.transaction_id is None:
@@ -342,7 +334,10 @@ class RuleWindow(Window):
 
     def update_state(self) -> None:
         """Title, regex colors, hints and the OK button; cheap enough for every key press."""
-        self.setWindowTitle("Category of one transaction" if self.mode == Mode.MANUAL else self.draft().name or "Rule")
+        if self.mode == Mode.MANUAL:
+            self.setWindowTitle("Category of one transaction")
+        else:
+            self.setWindowTitle("New rule" if self.original_id is None else "Rule")
         errors = self.errors()
         self._matches = self.selected_matches(errors)
         for field, edit in (("regex_recipient", self.recipient_edit), ("regex_description", self.description_edit)):
@@ -390,7 +385,7 @@ class RuleWindow(Window):
             df[Col.spread_months] = draft.spread_months
             df[Col.residual_percent] = draft.residual_percent
             return df
-        return self.model.preview_rule(self.draft(), self.original_name, self.transaction_id)
+        return self.model.preview_rule(self.draft(), self.original_id, self.transaction_id)
 
     def selected_matches(self, errors: dict[str, str] | None = None) -> tuple[bool, bool] | None:
         """Whether the regexes match the transaction the window was opened for."""
@@ -418,6 +413,16 @@ class RuleWindow(Window):
             return GREY
         return GREY if self._matches is None else (GREEN if all(self._matches) else RED)
 
+    def keyPressEvent(self, event: QKeyEvent) -> None:  # noqa: N802 (Qt API)
+        """Keys the fields leave alone. While the category completer shows proposals, it takes Enter itself."""
+        if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+            if self.ok_button.isEnabled():
+                self.accept()
+        elif event.key() == Qt.Key.Key_Escape:
+            self.close()
+        else:
+            super().keyPressEvent(event)
+
     # ------------------------------------------------------------------ saving
     def accept(self) -> bool:
         draft = self.draft()
@@ -436,7 +441,7 @@ class RuleWindow(Window):
                 self.model.remove_manual_category(self.transaction_id)
         else:
             try:
-                self.model.save_rule(draft, self.original_name)
+                self.model.save_rule(draft, self.original_id)
             except InvalidRuleError as e:
                 self.show_error("Invalid rule", str(e))
                 return False

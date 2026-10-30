@@ -30,6 +30,7 @@ from mymoneyvisualizer.domain.models import (
     Settings,
     clean_months,
     clean_percent,
+    new_rule_id,
     reorder_groups,
 )
 from mymoneyvisualizer.importing.profile import ImportProfile
@@ -47,7 +48,6 @@ SETTINGS = "settings"
 ALL_TOPICS = frozenset({ACCOUNTS, TRANSACTIONS, RULES, GROUPS, PROFILES, SETTINGS})
 
 DEFAULT_ACCOUNT_NAME = "new account"
-DEFAULT_RULE_NAME = "new_rule"
 
 
 class Event:
@@ -135,8 +135,8 @@ class AppModel:
     def rules(self) -> list[Rule]:
         return [replace(r) for r in self._rules]
 
-    def rule(self, name: str) -> Rule | None:
-        return next((replace(r) for r in self._rules if r.name == name), None)
+    def rule(self, rule_id: str) -> Rule | None:
+        return next((replace(r) for r in self._rules if r.id == rule_id), None)
 
     @property
     def manual_categories(self) -> dict[str, ManualCategory]:
@@ -254,21 +254,20 @@ class AppModel:
         return len(new)
 
     # ------------------------------------------------------------------ categorization
-    def free_rule_name(self, base: str = DEFAULT_RULE_NAME, ignore: str | None = None) -> str:
-        taken = {r.name for r in self._rules if r.name != ignore} | {MANUAL_RULE}
-        return _free_name(base or DEFAULT_RULE_NAME, taken)
-
-    def save_rule(self, rule: Rule, original_name: str | None = None) -> Rule:
-        """Insert a new rule or replace ``original_name``. Names are made unique."""
+    def save_rule(self, rule: Rule, original_id: str | None = None) -> Rule:
+        """Replace the rule ``original_id`` (it keeps its id and position) or append a new rule."""
         errors = rule_errors(rule)
         if errors:
             raise InvalidRuleError(errors)
-        names = [r.name for r in self._rules]
-        index = names.index(original_name) if original_name in names else None
+        ids = [r.id for r in self._rules]
+        index = ids.index(original_id) if original_id in ids else None
+        rule_id = rule.id if index is None else original_id
+        if index is None and rule_id in ids:  # a copy of a saved rule becomes a new rule
+            rule_id = new_rule_id()
         spread_months = clean_months(rule.spread_months)
         saved = replace(
             rule,
-            name=self.free_rule_name(rule.name.strip(), ignore=original_name),
+            id=rule_id,
             spread_months=spread_months,
             residual_percent=clean_percent(rule.residual_percent) if spread_months else 0,
         )
@@ -280,11 +279,19 @@ class AppModel:
         self._notify(RULES, TRANSACTIONS)
         return replace(saved)
 
-    def delete_rules(self, names: Iterable[str]) -> None:
-        names = set(names)
-        if not names & {r.name for r in self._rules}:
+    def update_rule(self, rule_id: str, **changes) -> Rule | None:
+        """Change single fields of a rule, e.g. its spread; ``None`` if the rule does not exist (any more)."""
+        rule = self.rule(rule_id)
+        if rule is None:
+            return None
+        changed = replace(rule, **changes)
+        return rule if changed == rule else self.save_rule(changed, rule_id)
+
+    def delete_rules(self, rule_ids: Iterable[str]) -> None:
+        rule_ids = set(rule_ids)
+        if not rule_ids & {r.id for r in self._rules}:
             return
-        self._rules = [r for r in self._rules if r.name not in names]
+        self._rules = [r for r in self._rules if r.id not in rule_ids]
         self.repository.save_rules(self._rules)
         self._notify(RULES, TRANSACTIONS)
 
@@ -335,22 +342,22 @@ class AppModel:
         )
         return df.loc[candidates].sort_values(Col.date, ascending=False, kind="stable")
 
-    def _categorized_without(self, name: str) -> pd.DataFrame:
-        """Categorization without the rule ``name`` (cached while it is edited in the rule window)."""
-        if self._without is None or self._without[0] != name:
-            self._without = (name, self._apply([r for r in self._rules if r.name != name]))
+    def _categorized_without(self, rule_id: str) -> pd.DataFrame:
+        """Categorization without the rule ``rule_id`` (cached while it is edited in the rule window)."""
+        if self._without is None or self._without[0] != rule_id:
+            self._without = (rule_id, self._apply([r for r in self._rules if r.id != rule_id]))
         return self._without[1]
 
     def preview_rule(
-        self, rule: Rule, original_name: str | None = None, transaction_id: str | None = None
+        self, rule: Rule, original_id: str | None = None, transaction_id: str | None = None
     ) -> pd.DataFrame:
         """Transactions ``rule`` would categorize (shown with its category), the transaction ``transaction_id`` first.
 
-        The saved version ``original_name`` is ignored, so the preview shows exactly what the edited rule does.
+        The saved version ``original_id`` is ignored, so the preview shows exactly what the edited rule does.
         Only the patterns of ``rule`` are evaluated, the rest comes from caches: fast enough per key press.
         """
-        names = {r.name for r in self._rules}
-        base = self._categorized_without(original_name) if original_name in names else self.transactions()
+        ids = {r.id for r in self._rules}
+        base = self._categorized_without(original_id) if original_id in ids else self.transactions()
         if rule_errors(rule):
             matched = np.zeros(len(base), dtype=bool)
         else:
@@ -364,7 +371,7 @@ class AppModel:
         rows = base.loc[shown].copy()
         hit = matched[shown]
         rows.loc[hit, Col.category] = rule.category
-        rows.loc[hit, Col.rule] = rule.name
+        rows.loc[hit, Col.rule] = rule.id
         rows.loc[hit, Col.spread_months] = clean_months(rule.spread_months)
         rows.loc[hit, Col.residual_percent] = clean_percent(rule.residual_percent) if rule.spread_months else 0
         first = selected[shown]

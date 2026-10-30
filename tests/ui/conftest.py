@@ -65,12 +65,12 @@ def model(tmp_path):
     model.import_transactions("giro", transactions(*rows))
     model.import_transactions("spar", transactions(("2023-06-20", "Ich", "Sparen Eingang", 200.0)))
     for rule in (
-        Rule("salary", category="income.salary", regex_recipient="ACME"),
-        Rule("rent", category="household.rent", regex_description="Miete"),
-        Rule("groceries", category="household.food", regex_recipient="REWE"),
-        Rule("fuel", category="car.fuel", regex_recipient="Shell"),
-        Rule("sharing", category="carsharing", regex_recipient="ShareNow"),
-        Rule("saving", category="spar", regex_description="^Sparen$"),
+        Rule(category="income.salary", regex_recipient="ACME"),
+        Rule(category="household.rent", regex_description="Miete"),
+        Rule(category="household.food", regex_recipient="REWE"),
+        Rule(category="car.fuel", regex_recipient="Shell"),
+        Rule(category="carsharing", regex_recipient="ShareNow"),
+        Rule(category="spar", regex_description="^Sparen$"),
     ):
         model.save_rule(rule)
     model.assign_groups({"income": ["income"], "needs": ["household", "car"], "wants": ["carsharing", ""]})

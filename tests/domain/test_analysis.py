@@ -202,18 +202,32 @@ def test_income_expenses_deviations_empty():
     assert list(baseline.columns) == ["2024-01", "2024-02"]
 
 
-def test_rule_overview_counts_unused_rules():
+def test_rule_overview_says_what_each_rule_does():
     df = _sample()
-    df[Col.rule] = ["groceries", "", "groceries", "", "", "", ""]
-    rules = [Rule("groceries", category="food", spread_months=12), Rule("unused", category="x")]
-    assert rule_overview(df, rules).to_dict("records") == [
+    groceries = Rule(category="food", regex_recipient=r"REWE|EDEKA\.de", spread_months=12)
+    unused = Rule(category="x", regex_recipient="^Shell", regex_description="Tanken")
+    df[Col.rule] = [groceries.id, "", groceries.id, "", "", "", ""]
+    assert rule_overview(df, [groceries, unused]).to_dict("records") == [
         {
-            "name": "groceries",
+            "id": groceries.id,
+            "position": 1,
+            "recipient": "REWE | EDEKA.de",
+            "description": "",
             "category": "food",
             "spread_months": 12,
             "residual_percent": 0,
             "count": 2,
             "sum": -80.0,
         },
-        {"name": "unused", "category": "x", "spread_months": 0, "residual_percent": 0, "count": 0, "sum": 0.0},
+        {
+            "id": unused.id,
+            "position": 2,
+            "recipient": "^Shell",
+            "description": "Tanken",
+            "category": "x",
+            "spread_months": 0,
+            "residual_percent": 0,
+            "count": 0,
+            "sum": 0.0,
+        },
     ]

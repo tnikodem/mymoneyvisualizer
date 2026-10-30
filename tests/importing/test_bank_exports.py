@@ -65,10 +65,9 @@ def test_double_click_rules_and_income_expenses(name, tmp_path):
     model.import_transactions("konto", transactions)
 
     categories = dict(zip(transactions[Col.transaction_id], (t["category"] for t in truth), strict=True))
-    for i, (transaction_id, category) in enumerate(categories.items()):
+    for transaction_id, category in categories.items():
         row = model.transaction(transaction_id)
         rule = Rule(
-            f"t{i}",
             category=category,
             regex_recipient=regex_for(row[Col.recipient]),
             regex_description=regex_for(row[Col.description]),

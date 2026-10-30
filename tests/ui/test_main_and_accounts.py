@@ -27,7 +27,7 @@ def test_status_shows_what_is_left_to_do(main, model, qtbot):
     assert detail.windowTitle() == "(uncategorized): all months"
     assert list(detail.table_model.frame[Col.recipient]) == ["Ich", "Kiosk"]
 
-    model.save_rule(Rule("rest", category="misc", regex_recipient="Kiosk|Ich"))
+    model.save_rule(Rule(category="misc", regex_recipient="Kiosk|Ich"))
     assert main.rules_status.text() == "7 rules; everything is categorized."
     assert not main.uncategorized_button.isEnabled()
     assert detail.table_model.frame.empty

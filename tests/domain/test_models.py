@@ -28,19 +28,26 @@ def test_clean_percent(value, expected):
 
 
 def test_rule_roundtrip_and_missing_values():
-    rule = Rule(name="t", category="car", regex_recipient="Autohaus", spread_months=72, residual_percent=40)
+    rule = Rule(category="car", regex_recipient="Autohaus", spread_months=72, residual_percent=40)
     assert Rule.from_dict(rule.to_dict()) == rule
-    assert Rule.from_dict({"name": "t", "category": None}) == Rule(name="t")
+    assert Rule.from_dict({"category": None}) == Rule()
+
+
+def test_rule_id_tells_rules_apart_but_is_not_stored_or_compared():
+    first, second = Rule(category="food"), Rule(category="food")
+    assert first.id != second.id
+    assert first == second
+    assert "id" not in first.to_dict()
+    assert Rule.from_dict(first.to_dict()).id != first.id
 
 
 def test_unspread_rule_has_no_spread_keys():
-    assert Rule("t", "food", "REWE").to_dict() == {
-        "name": "t",
+    assert Rule("food", "REWE").to_dict() == {
         "category": "food",
         "regex_recipient": "REWE",
         "regex_description": "",
     }
-    assert "residual_percent" not in Rule("t", spread_months=12).to_dict()
+    assert "residual_percent" not in Rule(spread_months=12).to_dict()
 
 
 def test_manual_category_roundtrip():

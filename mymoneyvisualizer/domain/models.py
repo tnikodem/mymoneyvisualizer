@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime
 import math
+import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
@@ -59,6 +60,10 @@ def _spread_dict(spread_months: int, residual_percent: int) -> dict[str, int]:
     return spread
 
 
+def new_rule_id() -> str:
+    return uuid.uuid4().hex
+
+
 @dataclass
 class Rule:
     """Assigns ``category`` to every transaction whose recipient and description match the regexes.
@@ -66,19 +71,21 @@ class Rule:
     ``spread_months`` > 0 spreads every matched payment over that many months, starting with the month of payment:
     the service period of a prepayment or the useful life of a purchase. ``residual_percent`` of the price is the
     expected residual value of a purchase; it is not consumed.
+
+    A rule has no name: its regexes say what it does. ``id`` tells rules apart while the program runs; it is not
+    stored and not compared.
     """
 
-    name: str
     category: str = ""
     regex_recipient: str = ""
     regex_description: str = ""
     spread_months: int = 0
     residual_percent: int = 0
+    id: str = field(default_factory=new_rule_id, compare=False)
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> Rule:
         return cls(
-            name=_str(data.get("name")),
             category=_str(data.get("category")),
             regex_recipient=_str(data.get("regex_recipient")),
             regex_description=_str(data.get("regex_description")),
@@ -88,7 +95,6 @@ class Rule:
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "name": self.name,
             "category": self.category,
             "regex_recipient": self.regex_recipient,
             "regex_description": self.regex_description,
