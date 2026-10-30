@@ -4,6 +4,7 @@ import pytest
 
 from mymoneyvisualizer.domain.analysis import (
     MONTHLY_AVERAGE,
+    SUMMARY,
     TOTAL,
     detail_transactions,
     filter_transactions,
@@ -68,32 +69,71 @@ def test_filter_transactions():
     assert set(filter_transactions(df, category_filter="car")[Col.category]) == {"car.fuel", "carsharing"}
 
 
+GROUPS = {"income": "income", "household": "needs", "car": "needs", "carsharing": "wants", "": "needs"}
+
+
+def _categories(table):
+    return table.loc[table[SUMMARY] == ""].set_index(Col.category)
+
+
+def _summaries(table):
+    return table.loc[table[SUMMARY] != ""].set_index(SUMMARY)
+
+
 def test_income_expenses_table_base_level():
-    table = income_expenses_table(_sample(), "2024-01", "2024-04", own_accounts=["spar"]).set_index(Col.category)
-    assert list(table.columns) == ["2024-01", "2024-02", "2024-03", "2024-04", TOTAL, MONTHLY_AVERAGE]
-    assert table.loc["household", "2024-01"] == -50.0
-    assert table.loc["household", "2024-02"] == 0.0
-    assert table.loc["household", TOTAL] == -80.0
-    assert table.loc["household", MONTHLY_AVERAGE] == -20.0
-    assert "spar" not in table.index
-    assert table.index[-1] == TOTAL
-    assert table.loc[TOTAL, TOTAL] == pytest.approx(2000 - 50 - 60 - 30 - 10 - 2)
+    table = income_expenses_table(_sample(), "2024-01", "2024-04", own_accounts=["spar"], groups=GROUPS)
+    assert list(table.columns) == [
+        Col.category,
+        "2024-01",
+        "2024-02",
+        "2024-03",
+        "2024-04",
+        TOTAL,
+        MONTHLY_AVERAGE,
+        SUMMARY,
+    ]
+    categories = _categories(table)
+    assert categories.loc["household", "2024-01"] == -50.0
+    assert categories.loc["household", "2024-02"] == 0.0
+    assert categories.loc["household", TOTAL] == -80.0
+    assert categories.loc["household", MONTHLY_AVERAGE] == -20.0
+    assert "spar" not in categories.index
     # sorted by total, largest expense first
-    assert list(table.index[:2]) == ["household", "car"]
+    assert list(categories.index[:2]) == ["household", "car"]
+
+
+def test_income_expenses_table_summary_rows():
+    table = income_expenses_table(_sample(), "2024-01", "2024-04", groups={**GROUPS, "spar": "savings"})
+    summaries = _summaries(table)
+    assert list(summaries.index) == ["income", "expenses", "savings", "net"]
+    assert list(summaries[Col.category]) == ["Income", "Expenses", "Savings", "Net"]
+    assert summaries.loc["income", TOTAL] == 2000.0
+    assert summaries.loc["expenses", TOTAL] == pytest.approx(-50 - 60 - 30 - 10 - 2)
+    assert summaries.loc["savings", "2024-03"] == -200.0
+    assert summaries.loc["net", TOTAL] == pytest.approx(2000 - 50 - 60 - 30 - 10 - 2 - 200)
+    assert table.index[-1] == len(table) - 1 and table[SUMMARY].iloc[-1] == "net"
+
+
+def test_income_expenses_table_without_groups_only_has_the_net_row():
+    """Categories without a group (e.g. internal transfers when shown) only count in the net row."""
+    table = income_expenses_table(_sample(), "2024-01", "2024-04")
+    summaries = _summaries(table)
+    assert list(summaries.index) == ["income", "expenses", "net"]
+    assert summaries.loc["income", TOTAL] == 0.0
+    assert summaries.loc["net", TOTAL] == pytest.approx(2000 - 50 - 60 - 30 - 10 - 200 - 2)
 
 
 def test_income_expenses_table_level_and_filter():
-    table = income_expenses_table(_sample(), "2024-01", "2024-04", level=1, category_filter="household").set_index(
-        Col.category
-    )
-    assert list(table.index) == ["household.food", TOTAL]
-    assert table.loc["household.food", TOTAL] == -80.0
+    table = income_expenses_table(_sample(), "2024-01", "2024-04", level=1, category_filter="household", groups=GROUPS)
+    assert list(_categories(table).index) == ["household.food"]
+    assert _categories(table).loc["household.food", TOTAL] == -80.0
+    assert _summaries(table).loc["expenses", TOTAL] == -80.0
 
 
 def test_income_expenses_table_only_requested_months():
-    table = income_expenses_table(_sample(), "2024-03", "2024-03").set_index(Col.category)
-    assert list(table.columns) == ["2024-03", TOTAL, MONTHLY_AVERAGE]
-    assert "car" not in table.index  # car.fuel only happened in January
+    table = income_expenses_table(_sample(), "2024-03", "2024-03")
+    assert list(table.columns) == [Col.category, "2024-03", TOTAL, MONTHLY_AVERAGE, SUMMARY]
+    assert "car" not in _categories(table).index  # car.fuel only happened in January
 
 
 def test_income_expenses_table_empty():
@@ -103,14 +143,21 @@ def test_income_expenses_table_empty():
 
 def test_detail_transactions_for_category_and_month():
     df = _sample()
-    detail = detail_transactions(df, "2024-03", "household")
+    detail = detail_transactions(df, "2024-03", ["household"])
     assert list(detail[Col.category]) == ["household.food.bio"]
-    assert detail_transactions(df, "2024-01", "car")[Col.category].tolist() == ["car.fuel"]
-    assert detail_transactions(df, "2024-03", "car").empty  # carsharing is not car
-    assert detail_transactions(df, "2024-04", "")[Col.recipient].tolist() == ["Kiosk"]
+    assert detail_transactions(df, "2024-01", ["car"])[Col.category].tolist() == ["car.fuel"]
+    assert detail_transactions(df, "2024-03", ["car"]).empty  # carsharing is not car
+    assert detail_transactions(df, "2024-04", [""])[Col.recipient].tolist() == ["Kiosk"]
 
 
-def test_detail_transactions_total_row_uses_same_filters():
+def test_detail_transactions_of_several_categories_and_all_months():
+    df = _sample()
+    detail = detail_transactions(df, None, ["car", "carsharing"])
+    assert list(detail[Col.recipient]) == ["Shell", "ShareNow"]
+    assert detail_transactions(df, None, [""])[Col.recipient].tolist() == ["Kiosk"]
+
+
+def test_detail_transactions_of_all_categories_use_same_filters():
     detail = detail_transactions(_sample(), "2024-03", None, own_accounts=["spar"])
     assert list(detail[Col.recipient]) == ["REWE", "ShareNow", "ACME"]
 
@@ -158,8 +205,15 @@ def test_income_expenses_deviations_empty():
 def test_rule_overview_counts_unused_rules():
     df = _sample()
     df[Col.rule] = ["groceries", "", "groceries", "", "", "", ""]
-    overview = rule_overview(df, [Rule("groceries", category="food", recurring=2), Rule("unused", category="x")])
-    assert overview.to_dict("records") == [
-        {"name": "groceries", "category": "food", "recurring": 2.0, "count": 2, "sum": -80.0},
-        {"name": "unused", "category": "x", "recurring": pytest.approx(np.nan, nan_ok=True), "count": 0, "sum": 0.0},
+    rules = [Rule("groceries", category="food", spread_months=12), Rule("unused", category="x")]
+    assert rule_overview(df, rules).to_dict("records") == [
+        {
+            "name": "groceries",
+            "category": "food",
+            "spread_months": 12,
+            "residual_percent": 0,
+            "count": 2,
+            "sum": -80.0,
+        },
+        {"name": "unused", "category": "x", "spread_months": 0, "residual_percent": 0, "count": 0, "sum": 0.0},
     ]

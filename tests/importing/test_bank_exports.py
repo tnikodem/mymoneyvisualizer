@@ -12,7 +12,7 @@ import pytest
 import yaml
 
 from mymoneyvisualizer.app import AppModel
-from mymoneyvisualizer.domain.analysis import TOTAL, income_expenses_table, month_key
+from mymoneyvisualizer.domain.analysis import NET, SUMMARY, TOTAL, income_expenses_table, month_key
 from mymoneyvisualizer.domain.categorization import regex_for, rule_matches
 from mymoneyvisualizer.domain.columns import Col
 from mymoneyvisualizer.domain.models import Rule
@@ -83,11 +83,13 @@ def test_double_click_rules_and_income_expenses(name, tmp_path):
     for t in truth:
         expected_sums[t["category"]] += t["value"]
     first, last = min(t["date"] for t in truth), max(t["date"] for t in truth)
-    table = income_expenses_table(model.transactions(), month_key(first), month_key(last)).set_index(Col.category)
-    assert set(table.index) - {TOTAL} == set(expected_sums)
+    table = income_expenses_table(model.transactions(), month_key(first), month_key(last))
+    categories = table.loc[table[SUMMARY] == ""].set_index(Col.category)
+    assert set(categories.index) == set(expected_sums)
     for category, total in expected_sums.items():
-        assert table.at[category, TOTAL] == pytest.approx(total, abs=0.005), category
-    assert table.at[TOTAL, TOTAL] == pytest.approx(sum(t["value"] for t in truth), abs=0.005)
+        assert categories.at[category, TOTAL] == pytest.approx(total, abs=0.005), category
+    net = table.loc[table[SUMMARY] == NET, TOTAL].item()
+    assert net == pytest.approx(sum(t["value"] for t in truth), abs=0.005)
 
 
 def test_all_files_are_covered():

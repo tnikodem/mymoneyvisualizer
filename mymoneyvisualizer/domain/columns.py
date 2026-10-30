@@ -17,12 +17,15 @@ class Col:
     value = "value"
     category = "category"
     rule = "rule"
-    recurring = "recurring"
+    spread_months = "spread_months"
+    residual_percent = "residual_percent"
+    sale_of = "sale_of"
 
 
 #: Columns that are imported from the bank and persisted. Categories are always derived.
 RAW_COLUMNS = (Col.transaction_id, Col.date, Col.recipient, Col.description, Col.value)
-CATEGORY_COLUMNS = (Col.category, Col.rule, Col.recurring)
+#: Columns derived from the rules and the manual categories.
+CATEGORY_COLUMNS = (Col.category, Col.rule, Col.spread_months, Col.residual_percent, Col.sale_of)
 
 #: Category of a transaction that no rule matched.
 UNCATEGORIZED = ""

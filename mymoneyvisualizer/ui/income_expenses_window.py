@@ -1,7 +1,9 @@
-"""Income & expenses: monthly sums per category, unusual months highlighted, and the transactions behind a cell."""
+"""Income & expenses as paid (cash basis): monthly sums per category, unusual months highlighted, the transactions
+behind a cell."""
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -9,7 +11,16 @@ import pandas as pd
 from PyQt6.QtWidgets import QCheckBox, QComboBox, QHBoxLayout, QLabel, QLineEdit, QVBoxLayout, QWidget
 
 from mymoneyvisualizer.app import ACCOUNTS, RULES, SETTINGS, TRANSACTIONS
-from mymoneyvisualizer.domain.analysis import MONTHLY_AVERAGE, TOTAL, month_key, ordered_month_range
+from mymoneyvisualizer.domain.analysis import (
+    MONTHLY_AVERAGE,
+    NET,
+    SUMMARY,
+    SUMMARY_LABELS,
+    TOTAL,
+    month_key,
+    ordered_month_range,
+    summary_groups,
+)
 from mymoneyvisualizer.domain.categories import display_category
 from mymoneyvisualizer.domain.columns import Col
 from mymoneyvisualizer.ui.common import LESS_EXPENSE, MORE_EXPENSE, TOTAL_BACKGROUND, CategorySelect, Window
@@ -18,6 +29,7 @@ from mymoneyvisualizer.ui.table_model import (
     DATE,
     MONEY,
     MONEY0,
+    MONTHS,
     Column,
     DataFrameModel,
     DataFrameView,
@@ -28,6 +40,7 @@ if TYPE_CHECKING:
     from mymoneyvisualizer.ui.main_window import MainWindow
 
 CATEGORY_LEVELS = ("Main category", "Subcategory", "Level 3", "Level 4")
+TOTALS = (TOTAL, MONTHLY_AVERAGE)
 MONTHS_SHOWN = 12 * 12
 DETAIL_COLUMNS = [
     Column(Col.transaction_id, "id", hidden=True),
@@ -37,6 +50,7 @@ DETAIL_COLUMNS = [
     Column(Col.description, "description", width=560),
     Column(Col.value, "value", MONEY, 90),
     Column(Col.category, "category", CATEGORY, 160),
+    Column(Col.spread_months, "spread", MONTHS, 80),
 ]
 
 
@@ -94,9 +108,7 @@ class IncomeExpensesWindow(Window):
         display.addStretch(1)
 
         self.table_model = DataFrameModel([], self, background=self._background, tooltip=self._tooltip)
-        self.table = DataFrameView(
-            self.table_model, self, pinned=lambda frame: (frame[Col.category] == TOTAL).to_numpy()
-        )
+        self.table = DataFrameView(self.table_model, self, pinned=lambda frame: (frame[SUMMARY] != "").to_numpy())
         central = QWidget(self)
         layout = QVBoxLayout(central)
         layout.addLayout(selection)
@@ -155,19 +167,23 @@ class IncomeExpensesWindow(Window):
             if table is None
             else [
                 Column(Col.category, "category", CATEGORY, 180),
-                *[Column(c, c, MONEY0, 80) for c in table.columns if c not in (Col.category, TOTAL, MONTHLY_AVERAGE)],
+                *[Column(c, c, MONEY0, 80) for c in table.columns if c not in (Col.category, SUMMARY, *TOTALS)],
                 Column(TOTAL, TOTAL, MONEY0, 90),
                 Column(MONTHLY_AVERAGE, MONTHLY_AVERAGE, MONEY0, 110),
+                Column(SUMMARY, SUMMARY, hidden=True),
             ]
         )
         self.table_model.set_frame(table, columns)
 
     # ------------------------------------------------------------------ cell decoration
-    def _is_total_row(self, row: int) -> bool:
+    def _summary(self, row: int) -> str:
+        """Kind of summary row, ``""`` for a category."""
         frame = self.table_model.frame
-        return not frame.empty and frame[Col.category].iat[row] == TOTAL
+        return "" if frame.empty else str(frame[SUMMARY].iat[row])
 
     def _deviation(self, row: int, key: str) -> float | None:
+        if self._summary(row):
+            return None
         category = self.table_model.frame[Col.category].iat[row]
         if category not in self.deviation.index or key not in self.deviation.columns:
             return None
@@ -175,7 +191,7 @@ class IncomeExpensesWindow(Window):
         return None if np.isnan(value) else float(value)
 
     def _background(self, row: int, key: str):
-        if self._is_total_row(row) or key in (TOTAL, MONTHLY_AVERAGE):
+        if self._summary(row) or key in TOTALS:
             return TOTAL_BACKGROUND
         deviation = self._deviation(row, key)
         if deviation is None:
@@ -195,22 +211,33 @@ class IncomeExpensesWindow(Window):
 
     # ------------------------------------------------------------------ detail
     def open_detail(self, index) -> None:
+        """Transactions behind a cell; for a summary row those of all its categories."""
         key = self.table_model.columns[index.column()].key
-        if key in (Col.category, TOTAL, MONTHLY_AVERAGE):
+        if key in (Col.category, SUMMARY, *TOTALS):
             return
-        category = self.table.row_at(index.row())[Col.category]
-        self.navigator.open_detail(key, None if category == TOTAL else category, self.filter_edit.text())
+        row = self.table.row_at(index.row())
+        summary = row[SUMMARY]
+        if not summary:
+            self.navigator.open_detail(key, [row[Col.category]], self.filter_edit.text())
+            return
+        groups = summary_groups(summary)
+        categories = None if groups is None else [c for g in groups for c in self.model.categories_in_group(g)]
+        title = "all categories" if summary == NET else SUMMARY_LABELS[summary].lower()
+        self.navigator.open_detail(key, categories, self.filter_edit.text(), title)
 
 
 class DetailWindow(Window):
+    """Transactions of some categories in one month or in all months; a double click categorizes one."""
+
     topics = frozenset({TRANSACTIONS, RULES, SETTINGS})
 
     def __init__(self, model, bridge, navigator: MainWindow):
         super().__init__(model, bridge, navigator)
         self.navigator = navigator
         self.resize(1400, 800)
+        self.opened = False
         self.month: str | None = None
-        self.category: str | None = None
+        self.categories: list[str] | None = None
         self.category_filter = ""
         self.label = QLabel(self)
         self.table_model = DataFrameModel(DETAIL_COLUMNS, self)
@@ -222,20 +249,29 @@ class DetailWindow(Window):
         self.setCentralWidget(central)
         self.table.doubleClicked.connect(self.open_rule)
 
-    def open_detail(self, month: str, category: str | None, category_filter: str = "") -> None:
-        self.month, self.category, self.category_filter = month, category, category_filter
-        what = "all categories" if category is None else display_category(category)
-        self.setWindowTitle(f"{what} in {month}")
-        self.label.setText(f"All transactions in {month} for {what}:")
+    def open_detail(
+        self, month: str | None, categories: Sequence[str] | None, category_filter: str = "", title: str = ""
+    ) -> None:
+        """Show the transactions of ``categories`` (``None``: all) in ``month`` (``None``: all months)."""
+        self.opened = True
+        self.month, self.categories, self.category_filter = (
+            month,
+            None if categories is None else list(categories),
+            category_filter,
+        )
+        what = title or ("all categories" if categories is None else ", ".join(display_category(c) for c in categories))
+        when = "all months" if month is None else month
+        self.setWindowTitle(f"{what}: {when}")
+        self.label.setText(f"Transactions of {what} in {when}. Double click one to categorize it.")
         self.refresh()
         self.show()
         self.raise_()
 
     def refresh(self) -> None:
         super().refresh()
-        if self.month is not None:
+        if self.opened:
             self.table_model.set_frame(
-                self.model.detail(self.month, self.category, category_filter=self.category_filter)
+                self.model.detail(self.month, self.categories, category_filter=self.category_filter)
             )
 
     def open_rule(self, index) -> None:

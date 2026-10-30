@@ -156,8 +156,10 @@ def build_state(
     state.rules = rule_list
 
     ids = combined[Col.transaction_id].to_numpy()
-    for transaction_id in np.random.default_rng(seed).choice(ids, size=manual, replace=False):
-        state.manual_categories[str(transaction_id)] = ManualCategory(str(transaction_id), "leisure.gift")
+    for i, transaction_id in enumerate(np.random.default_rng(seed).choice(ids, size=manual, replace=False)):
+        # every tenth one is a durable purchase, spread over five years with a residual value
+        spread = (60, 30) if i % 10 == 0 else (0, 0)
+        state.manual_categories[str(transaction_id)] = ManualCategory(str(transaction_id), "leisure.gift", *spread)
     bases = sorted({t.category.split(".")[0] for t in rule_list} | {"leisure"})
     state.groups = [
         GroupAssignment(

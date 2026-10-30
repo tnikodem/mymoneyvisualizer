@@ -8,45 +8,47 @@ from mymoneyvisualizer.domain.models import (
     ManualCategory,
     Rule,
     Settings,
-    clean_recurring,
-    recurring_to_float,
+    clean_months,
+    clean_percent,
     reorder_groups,
 )
 
 
 @pytest.mark.parametrize(
     ("value", "expected"),
-    [
-        (None, None),
-        (math.nan, None),
-        ("", None),
-        ("x", None),
-        (0, None),
-        (-2, None),
-        (True, None),
-        (1, 1),
-        (2.0, 2),
-        ("3", 3),
-    ],
+    [(None, 0), (math.nan, 0), ("", 0), ("x", 0), (-2, 0), (True, 1), (12, 12), (2.7, 2), ("36", 36), (10_000, 600)],
 )
-def test_clean_recurring(value, expected):
-    assert clean_recurring(value) == expected
+def test_clean_months(value, expected):
+    assert clean_months(value) == expected
 
 
-def test_recurring_to_float():
-    assert math.isnan(recurring_to_float(None))
-    assert recurring_to_float(2) == 2.0
+@pytest.mark.parametrize(("value", "expected"), [(None, 0), ("x", 0), (-5, 0), (40, 40), ("12.5", 12), (100, 99)])
+def test_clean_percent(value, expected):
+    assert clean_percent(value) == expected
 
 
 def test_rule_roundtrip_and_missing_values():
-    rule = Rule(name="t", category="food", regex_recipient="REWE", regex_description="", recurring=2)
+    rule = Rule(name="t", category="car", regex_recipient="Autohaus", spread_months=72, residual_percent=40)
     assert Rule.from_dict(rule.to_dict()) == rule
-    assert Rule.from_dict({"name": "t", "category": None, "recurring": None}) == Rule(name="t")
+    assert Rule.from_dict({"name": "t", "category": None}) == Rule(name="t")
+
+
+def test_unspread_rule_has_no_spread_keys():
+    assert Rule("t", "food", "REWE").to_dict() == {
+        "name": "t",
+        "category": "food",
+        "regex_recipient": "REWE",
+        "regex_description": "",
+    }
+    assert "residual_percent" not in Rule("t", spread_months=12).to_dict()
 
 
 def test_manual_category_roundtrip():
-    category = ManualCategory("id-1", "hobby", 3)
-    assert ManualCategory.from_dict(category.to_dict()) == category
+    sale = ManualCategory("id-2", "car", sale_of="id-1")
+    furniture = ManualCategory("id-3", "home.furniture", spread_months=120)
+    for manual in (sale, furniture, ManualCategory("id-4", "hobby")):
+        assert ManualCategory.from_dict(manual.to_dict()) == manual
+    assert sale.to_dict() == {"transaction_id": "id-2", "category": "car", "sale_of": "id-1"}
 
 
 def test_group_assignment_unknown_category():
@@ -58,18 +60,24 @@ def test_group_assignment_unknown_category():
 def test_settings_defaults_use_current_year():
     settings = Settings()
     assert settings.budget_start == settings.budget_end == datetime.date.today().year
-    assert settings.budget_shares == {"needs": 0.3, "wants": 0.5}
+    assert settings.budget_shares == {"needs": 0.5, "wants": 0.3}
+    assert settings.savings_share == pytest.approx(0.2)
     assert settings.hide_internal_transfers is True
+
+
+def test_savings_share_is_the_rest():
+    assert Settings(budget_shares={"needs": 0.6, "wants": 0.3}).savings_share == pytest.approx(0.1)
+    assert Settings(budget_shares={"needs": 0.8, "wants": 0.4}).savings_share == 0.0
 
 
 def test_settings_instances_do_not_share_state():
     """Regression: loading a configuration overwrote the module level DEFAULT_SETTINGS dict."""
-    first = Settings.from_dict({"excluded_categories": ["a"], "budget": {"factors": {"needs": 0.9}}})
+    first = Settings.from_dict({"excluded_categories": ["a"], "budget": {"shares": {"needs": 0.9}}})
     first.excluded_categories.append("b")
     first.budget_shares["wants"] = 0.1
     second = Settings()
     assert second.excluded_categories == []
-    assert second.budget_shares == {"needs": 0.3, "wants": 0.5}
+    assert second.budget_shares == {"needs": 0.5, "wants": 0.3}
 
 
 def test_settings_roundtrip():
@@ -85,8 +93,8 @@ def test_settings_roundtrip():
         {},
         {"budget": "garbage"},
         {"budget": {"start": 2020}},
-        {"budget": {"factors": {"needs": 7}}},
-        {"budget": {"factors": "garbage"}},
+        {"budget": {"shares": {"needs": 7}}},
+        {"budget": {"shares": "garbage"}},
         {"excluded_categories": "not-a-list"},
     ],
 )

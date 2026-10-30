@@ -1,9 +1,7 @@
 import logging
 
-import numpy as np
-
 from mymoneyvisualizer.domain.categorization import apply_rules, regex_error, rule_errors, rule_mask, rule_matches
-from mymoneyvisualizer.domain.columns import MANUAL_RULE, Col
+from mymoneyvisualizer.domain.columns import CATEGORY_COLUMNS, MANUAL_RULE, Col
 from mymoneyvisualizer.domain.models import ManualCategory, Rule
 
 from ..helpers import transactions
@@ -56,14 +54,14 @@ def test_rule_matches_single_transaction():
 def test_apply_rules_later_rule_wins_and_keeps_input():
     df = _df()
     rules = [
-        Rule("groceries", category="household.food", regex_recipient="REWE|EDEKA", recurring=None),
-        Rule("bio", category="household.food.bio", regex_description="Bio", recurring=2),
+        Rule("groceries", category="household.food", regex_recipient="REWE|EDEKA"),
+        Rule("bio", category="household.food.bio", regex_description="Bio", spread_months=12),
     ]
     out = apply_rules(df, rules)
     assert list(out[Col.category]) == ["household.food", "household.food.bio", "", ""]
     assert list(out[Col.rule]) == ["groceries", "bio", "", ""]
-    assert np.isnan(out[Col.recurring].iloc[0])
-    assert out[Col.recurring].iloc[1] == 2.0
+    assert list(out[Col.spread_months]) == [0, 12, 0, 0]
+    assert list(out[Col.sale_of]) == ["", "", "", ""]
     assert Col.category not in df.columns
 
 
@@ -73,14 +71,17 @@ def test_manual_categories_win_over_rules():
     out = apply_rules(
         df,
         [Rule("groceries", category="food", regex_recipient="REWE")],
-        {target: ManualCategory(target, "gift", 3), "unknown-id": ManualCategory("unknown-id", "x")},
+        {
+            target: ManualCategory(target, "gift", spread_months=60, residual_percent=40, sale_of="other"),
+            "unknown-id": ManualCategory("unknown-id", "x"),
+        },
     )
     assert out[Col.category].iloc[0] == "gift"
     assert out[Col.rule].iloc[0] == MANUAL_RULE
-    assert out[Col.recurring].iloc[0] == 3.0
+    assert out[[Col.spread_months, Col.residual_percent, Col.sale_of]].iloc[0].tolist() == [60, 40, "other"]
 
 
 def test_apply_rules_on_empty_table():
     out = apply_rules(transactions(), [Rule("t", category="x")])
     assert out.empty
-    assert {Col.category, Col.rule, Col.recurring} <= set(out.columns)
+    assert set(CATEGORY_COLUMNS) <= set(out.columns)

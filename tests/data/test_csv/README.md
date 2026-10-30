@@ -7,8 +7,8 @@ the export formats, not copied from real downloads; details of real exports may 
 `expected.yaml` holds the ground truth for every file: the rows the importer must produce (date, recipient,
 description, value, including text that is broken on purpose), the number of skipped rows and a category per
 transaction. It comes from the generator of these files, never from the importer.
-`tests/importing/test_bank_exports.py` imports every file with automatic detection, creates a tagger per
-transaction as a double click would and checks the summary per category.
+`tests/importing/test_bank_exports.py` imports every file with automatic detection, creates a rule per
+transaction from its texts and checks the income & expenses table per category.
 
 | file | layout | special |
 |---|---|---|

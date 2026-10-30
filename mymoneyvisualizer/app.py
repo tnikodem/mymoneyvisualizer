@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import copy
 import logging
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import replace
 from pathlib import Path
 
@@ -12,17 +12,24 @@ import numpy as np
 import pandas as pd
 
 from mymoneyvisualizer.domain import analysis, budget
-from mymoneyvisualizer.domain.categories import unique_categories, unique_main_categories
+from mymoneyvisualizer.domain.categories import category_at_level, unique_categories, unique_main_categories
 from mymoneyvisualizer.domain.categorization import RuleMatcher, apply_rules, rule_errors
-from mymoneyvisualizer.domain.columns import MANUAL_RULE, Col, empty_transactions, normalize_transactions
+from mymoneyvisualizer.domain.columns import (
+    MANUAL_RULE,
+    UNCATEGORIZED,
+    Col,
+    empty_transactions,
+    normalize_transactions,
+)
 from mymoneyvisualizer.domain.models import (
+    GROUP_INCOME,
     GROUP_NEEDS,
     GroupAssignment,
     ManualCategory,
     Rule,
     Settings,
-    clean_recurring,
-    recurring_to_float,
+    clean_months,
+    clean_percent,
     reorder_groups,
 )
 from mymoneyvisualizer.importing.profile import ImportProfile
@@ -258,10 +265,12 @@ class AppModel:
             raise InvalidRuleError(errors)
         names = [r.name for r in self._rules]
         index = names.index(original_name) if original_name in names else None
+        spread_months = clean_months(rule.spread_months)
         saved = replace(
             rule,
             name=self.free_rule_name(rule.name.strip(), ignore=original_name),
-            recurring=clean_recurring(rule.recurring),
+            spread_months=spread_months,
+            residual_percent=clean_percent(rule.residual_percent) if spread_months else 0,
         )
         if index is None:
             self._rules.append(saved)
@@ -279,8 +288,22 @@ class AppModel:
         self.repository.save_rules(self._rules)
         self._notify(RULES, TRANSACTIONS)
 
-    def set_manual_category(self, transaction_id: str, category: str, recurring: int | None = None) -> None:
-        self._manual_categories[transaction_id] = ManualCategory(transaction_id, category, clean_recurring(recurring))
+    def save_manual_category(self, manual: ManualCategory) -> None:
+        """Categorize a single transaction; it wins over the rules.
+
+        The sale of a purchase gets the category of the purchase unless it has one of its own.
+        """
+        category = manual.category.strip()
+        if manual.sale_of and not category:
+            purchase = self.transaction(manual.sale_of)
+            category = "" if purchase is None else str(purchase[Col.category])
+        spread_months = clean_months(manual.spread_months)
+        self._manual_categories[manual.transaction_id] = replace(
+            manual,
+            category=category,
+            spread_months=spread_months,
+            residual_percent=clean_percent(manual.residual_percent) if spread_months else 0,
+        )
         self.repository.save_manual_categories(self._manual_categories.values())
         self._notify(TRANSACTIONS)
 
@@ -288,6 +311,29 @@ class AppModel:
         if self._manual_categories.pop(transaction_id, None) is not None:
             self.repository.save_manual_categories(self._manual_categories.values())
             self._notify(TRANSACTIONS)
+
+    def uncategorized_count(self) -> int:
+        return int((self.transactions()[Col.category] == UNCATEGORIZED).sum())
+
+    def sale_candidates(self, transaction_id: str) -> pd.DataFrame:
+        """Spread purchases the transaction can be the sale of: not later and not sold by another transaction.
+
+        Newest first.
+        """
+        df = self.transactions()
+        sale = self.transaction(transaction_id)
+        if sale is None:
+            return df.iloc[0:0]
+        others = df[Col.transaction_id] != transaction_id
+        sold = set(df.loc[others & (df[Col.sale_of] != ""), Col.sale_of])
+        candidates = (
+            others
+            & (df[Col.spread_months] > 0)
+            & (df[Col.value] < 0)
+            & (df[Col.date] <= sale[Col.date])
+            & ~df[Col.transaction_id].isin(sold)
+        )
+        return df.loc[candidates].sort_values(Col.date, ascending=False, kind="stable")
 
     def _categorized_without(self, name: str) -> pd.DataFrame:
         """Categorization without the rule ``name`` (cached while it is edited in the rule window)."""
@@ -319,7 +365,8 @@ class AppModel:
         hit = matched[shown]
         rows.loc[hit, Col.category] = rule.category
         rows.loc[hit, Col.rule] = rule.name
-        rows.loc[hit, Col.recurring] = recurring_to_float(clean_recurring(rule.recurring))
+        rows.loc[hit, Col.spread_months] = clean_months(rule.spread_months)
+        rows.loc[hit, Col.residual_percent] = clean_percent(rule.residual_percent) if rule.spread_months else 0
         first = selected[shown]
         rest = rows.loc[~first].sort_values(Col.date, ascending=False, kind="stable")
         return pd.concat([rows.loc[first], rest]).reset_index(drop=True)
@@ -357,14 +404,26 @@ class AppModel:
         self._notify(GROUPS)
 
     def _ensure_groups(self) -> bool:
-        """Every main category (except internal transfers) gets a budget group; new ones start as needs."""
+        """Every main category (except internal transfers) gets a budget group.
+
+        A new main category into which more money comes than goes out is income, any other one needs. Transactions
+        without category are needs: unknown spending is treated as necessary until it is categorized.
+        """
         known = {a.category for a in self._groups}
-        missing = [t for t in self.unique_main_categories() if t not in known and t not in self._accounts]
+        df = self.transactions()
+        totals = df[Col.value].groupby(category_at_level(df[Col.category], 0)).sum()
+        missing = [c for c in totals.index if c not in known and c not in self._accounts]
         if not missing:
             return False
-        self._groups += [GroupAssignment(category, GROUP_NEEDS) for category in missing]
+        self._groups += [
+            GroupAssignment(c, GROUP_INCOME if totals[c] > 0 and c != UNCATEGORIZED else GROUP_NEEDS) for c in missing
+        ]
         self.repository.save_groups(self._groups)
         return True
+
+    def categories_in_group(self, group: str) -> list[str]:
+        """Main categories of a budget group."""
+        return [a.category for a in self._groups if a.group == group]
 
     # ------------------------------------------------------------------ analysis
     def _own_accounts(self, hide: bool = True) -> list[str]:
@@ -379,6 +438,7 @@ class AppModel:
             category_filter=category_filter,
             excluded_categories=self._settings.excluded_categories,
             own_accounts=self._own_accounts(self._settings.hide_internal_transfers),
+            groups={a.category: a.group for a in self._groups},
         )
 
     def income_expenses_deviations(self, start, end, *, level: int = 0, category_filter: str = ""):
@@ -392,11 +452,12 @@ class AppModel:
             own_accounts=self._own_accounts(self._settings.hide_internal_transfers),
         )
 
-    def detail(self, month, category: str | None, *, category_filter: str = "") -> pd.DataFrame:
+    def detail(self, month, categories: Sequence[str] | None, *, category_filter: str = "") -> pd.DataFrame:
+        """Transactions of ``categories`` (``None``: all) in ``month`` (``None``: all months)."""
         return analysis.detail_transactions(
             self.transactions(),
             month,
-            category,
+            categories,
             excluded_categories=self._settings.excluded_categories,
             own_accounts=self._own_accounts(self._settings.hide_internal_transfers),
             category_filter=category_filter,
@@ -408,20 +469,18 @@ class AppModel:
     def budget_series(self) -> budget.BudgetSeries:
         return budget.budget_series(
             self.transactions(),
-            budget_end_year=self._settings.budget_end,
             own_accounts=self._own_accounts(),
             excluded_categories=self._settings.excluded_categories,
         )
 
-    def budget_report(self, group: str, series: budget.BudgetSeries | None = None) -> budget.BudgetReport | None:
+    def budget_report(self, series: budget.BudgetSeries | None = None) -> budget.BudgetReport | None:
         settings = self._settings
         return budget.budget_report(
             series if series is not None else self.budget_series(),
             self._groups,
-            group,
             settings.budget_start,
             settings.budget_end,
-            settings.budget_shares[group],
+            settings.budget_shares,
         )
 
     # ------------------------------------------------------------------ backup

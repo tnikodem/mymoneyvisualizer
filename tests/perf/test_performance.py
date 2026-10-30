@@ -11,7 +11,7 @@ from PyQt6.QtCore import Qt
 
 from mymoneyvisualizer.app import AppModel
 from mymoneyvisualizer.domain.columns import Col
-from mymoneyvisualizer.domain.models import Rule
+from mymoneyvisualizer.domain.models import ManualCategory, Rule
 from mymoneyvisualizer.storage.repository import Repository
 
 from .dataset import build_state
@@ -60,7 +60,7 @@ def test_editing_rules(model):
     with Budget(1.5):
         model.save_rule(Rule("perf", category="perf.x", regex_recipient="Shell 12$"))
     with Budget(1.5):
-        model.set_manual_category(some[Col.transaction_id], "perf.once")
+        model.save_manual_category(ManualCategory(some[Col.transaction_id], "perf.once", spread_months=12))
     with Budget(1.5):
         model.delete_rules(["perf"])
 
@@ -70,7 +70,7 @@ def test_analysis(model):
         model.income_expenses("2025-11", "2026-10", level=1)
         model.income_expenses_deviations("2025-11", "2026-10", level=1)
         series = model.budget_series()
-        model.budget_report("needs", series)
+        model.budget_report(series)
         model.rule_overview()
         model.detail("2026-03", "household")
         for name in model.account_names:

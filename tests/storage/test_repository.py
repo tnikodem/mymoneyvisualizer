@@ -32,8 +32,11 @@ def test_roundtrip(tmp_path):
     repo = Repository(tmp_path)
     state = State(
         accounts={"Giro Konto": transactions(("2024-01-02", "Müller", "Brot", -3.5)), "empty": transactions()},
-        rules=[Rule("t", category="küche", regex_recipient="Müller", recurring=2)],
-        manual_categories={"id": ManualCategory("id", "hobby", None)},
+        rules=[Rule("t", category="küche", regex_recipient="Müller", spread_months=24, residual_percent=10)],
+        manual_categories={
+            "id": ManualCategory("id", "hobby"),
+            "sale": ManualCategory("sale", "car", spread_months=60, residual_percent=40, sale_of="id"),
+        },
         groups=[GroupAssignment("küche", "wants"), GroupAssignment("", "needs")],
         profiles=[ImportProfile(name="dkb", skiprows=4)],
         settings=Settings(excluded_categories=["x"], budget_start=2020, budget_end=2021),

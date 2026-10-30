@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 
 from mymoneyvisualizer.domain.columns import MANUAL_RULE, UNCATEGORIZED, Col
-from mymoneyvisualizer.domain.models import ManualCategory, Rule, recurring_to_float
+from mymoneyvisualizer.domain.models import ManualCategory, Rule
 
 logger = logging.getLogger(__name__)
 
@@ -214,7 +214,7 @@ def apply_rules(
     manual_categories: Mapping[str, ManualCategory] | None = None,
     matcher: RuleMatcher | None = None,
 ) -> pd.DataFrame:
-    """Return a copy of ``transactions`` with ``category``, ``rule`` and ``recurring`` columns.
+    """Return a copy of ``transactions`` with the :data:`~mymoneyvisualizer.domain.columns.CATEGORY_COLUMNS`.
 
     Rules are applied in order; a later rule overwrites an earlier one. Manual categories win over all rules.
     Pass a :class:`RuleMatcher` built from the same ``transactions`` to reuse its cached regex results.
@@ -227,23 +227,28 @@ def apply_rules(
     winner = np.full(len(transactions), -1, dtype=np.int64)
     for i, rule in enumerate(rules):
         winner[matcher.mask(rule)] = i
-    # index -1 (no rule) picks the last element: uncategorized
+    # index -1 (no rule) picks the last element: uncategorized, not spread
     categories = np.array([r.category for r in rules] + [UNCATEGORIZED], dtype=object)
     names = np.array([r.name for r in rules] + [""], dtype=object)
-    recurring = np.array([recurring_to_float(r.recurring) for r in rules] + [np.nan], dtype=float)
+    months = np.array([r.spread_months for r in rules] + [0], dtype=np.int64)
+    residual = np.array([r.residual_percent for r in rules] + [0], dtype=np.int64)
 
     df = transactions.copy()
     df[Col.category] = categories[winner]
     df[Col.rule] = names[winner]
-    df[Col.recurring] = recurring[winner]
+    df[Col.spread_months] = months[winner]
+    df[Col.residual_percent] = residual[winner]
+    df[Col.sale_of] = ""
     if manual_categories:
         overrides = df[Col.transaction_id].map(manual_categories)
         mask = overrides.notna().to_numpy()
         if mask.any():
-            chosen = overrides[mask]
+            chosen = list(overrides[mask])
             df.loc[mask, Col.category] = [m.category for m in chosen]
             df.loc[mask, Col.rule] = MANUAL_RULE
-            df.loc[mask, Col.recurring] = [recurring_to_float(m.recurring) for m in chosen]
-    for column in (Col.category, Col.rule):
+            df.loc[mask, Col.spread_months] = [m.spread_months for m in chosen]
+            df.loc[mask, Col.residual_percent] = [m.residual_percent for m in chosen]
+            df.loc[mask, Col.sale_of] = [m.sale_of for m in chosen]
+    for column in (Col.category, Col.rule, Col.sale_of):
         df[column] = df[column].astype(str)
     return df

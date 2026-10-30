@@ -3,8 +3,11 @@ from PyQt6.QtWidgets import QMessageBox
 
 from mymoneyvisualizer.domain.categorization import regex_for
 from mymoneyvisualizer.domain.columns import MANUAL_RULE, Col
+from mymoneyvisualizer.domain.models import ManualCategory
 from mymoneyvisualizer.ui.common import GREEN, GREY, RED
-from mymoneyvisualizer.ui.rule_window import Mode
+from mymoneyvisualizer.ui.rule_window import Mode, proposed_name
+
+from ..helpers import transactions
 
 
 def _transaction(model, recipient):
@@ -24,7 +27,7 @@ def test_create_new_rule(main, model, qtbot):
     window = main.rule_window
     main.open_rule()
     assert window.name_edit.text() == "new_rule"
-    assert not window.mode_button.isEnabled()  # no transaction, no manual category
+    assert not window.manual_radio.isEnabled()  # no transaction, no manual category
     qtbot.keyClicks(window.recipient_edit, "Kiosk")
     qtbot.keyClicks(window.category_edit, "hobby.news")
     assert list(window.table_model.frame[Col.category]) == ["hobby.news"]
@@ -55,10 +58,11 @@ def test_edit_and_rename_existing_rule(main, model):
     main.open_rule(name="fuel")
     assert window.original_name == "fuel"
     window.name_edit.setText("petrol")
-    window.recurring_edit.setText("2")
+    window.spread_edit.set_spread(24, 30)
+    assert window.spread_edit.unit_combo.currentText() == "years"
     assert window.accept()
     assert model.rule("fuel") is None
-    assert model.rule("petrol").recurring == 2
+    assert (model.rule("petrol").spread_months, model.rule("petrol").residual_percent) == (24, 30)
     assert [t.name for t in model.rules].index("petrol") == 3
 
 
@@ -89,31 +93,42 @@ def test_open_for_transaction_of_existing_rule(main, model):
     assert _background(window) == GREEN  # regression: the old window used re.match and showed red
 
 
-def test_open_for_uncategorized_transaction_proposes_rule(main, model):
+def test_open_for_uncategorized_transaction_proposes_rule_for_the_recipient(main, model):
+    """The description often holds dates and references of one payment, so the rule matches the recipient."""
     window = main.rule_window
     kiosk = _transaction(model, "Kiosk")
     main.open_rule(transaction_id=kiosk[Col.transaction_id])
     assert window.original_name is None
+    assert window.name_edit.text() == "Kiosk"
     assert window.recipient_edit.text() == "Kiosk"
-    assert window.description_edit.text() == "Zeitung"
-    assert window.mode_button.isEnabled()
+    assert window.description_edit.text() == ""
+    assert window.manual_radio.isEnabled()
+    assert window.rule_radio.isChecked()
+
+
+def test_proposed_name():
+    assert proposed_name("  REWE   Markt GmbH ", "x") == "REWE Markt GmbH"
+    assert proposed_name("", "Kontoführung 09/2026") == "Kontoführung 09/2026"
+    assert len(proposed_name("x" * 100, "")) == 40
 
 
 def test_manual_category(main, model, qtbot):
     window = main.rule_window
     kiosk = _transaction(model, "Kiosk")[Col.transaction_id]
     main.open_rule(transaction_id=kiosk)
-    qtbot.mouseClick(window.mode_button, Qt.MouseButton.LeftButton)
+    window.manual_radio.setChecked(True)
     assert window.mode == Mode.MANUAL
     assert window.definition.isHidden()
+    assert window.sale_combo.isHidden()  # an outgoing payment is no sale
     window.category_edit.setText("gift")
-    window.recurring_edit.setText("3")
+    window.spread_edit.set_spread(3, 0)
     assert len(window.table_model.frame) == 1
     assert window.table_model.frame[Col.category].iloc[0] == "gift"
+    assert window.spread_hint.text() == "-2,50 € → -0,83 € per month."
     assert _background(window) == GREY
     qtbot.mouseClick(window.ok_button, Qt.MouseButton.LeftButton)
     row = model.transaction(kiosk)
-    assert (row[Col.category], row[Col.rule], row[Col.recurring]) == ("gift", MANUAL_RULE, 3.0)
+    assert (row[Col.category], row[Col.rule], row[Col.spread_months]) == ("gift", MANUAL_RULE, 3)
 
     # reopening shows the manual category; an empty category removes it
     main.open_rule(transaction_id=kiosk)
@@ -122,8 +137,58 @@ def test_manual_category(main, model, qtbot):
     window.category_edit.clear()
     window.accept()
     assert model.transaction(kiosk)[Col.rule] == ""
-    window.toggle_mode()
+    window.rule_radio.setChecked(True)
     assert window.mode == Mode.RULE
+
+
+def test_spread_hint(main, model):
+    window = main.rule_window
+    main.open_rule(transaction_id=_transaction(model, "Kiosk")[Col.transaction_id])
+    assert window.spread_hint.text() == "Counted in the month of payment."
+    window.spread_edit.set_spread(2, 40)
+    assert window.spread_hint.text() == "-2,50 € → -0,75 € per month; residual value 1 € stays an asset."
+    main.open_rule()
+    window.spread_edit.set_spread(60, 0)
+    assert window.spread_hint.text() == "Spread evenly over 5 years from the month of payment."
+
+
+def test_a_rule_replaces_the_manual_category_of_its_transaction(main, model):
+    window = main.rule_window
+    kiosk = _transaction(model, "Kiosk")[Col.transaction_id]
+    model.save_manual_category(ManualCategory(kiosk, "gift"))
+    main.open_rule(transaction_id=kiosk)
+    assert window.mode == Mode.MANUAL
+    window.rule_radio.setChecked(True)
+    window.category_edit.setText("hobby.news")
+    assert window.accept()
+    row = model.transaction(kiosk)
+    assert (row[Col.category], row[Col.rule]) == ("hobby.news", "Kiosk")
+
+
+def test_sale_of_a_spread_purchase(main, model):
+    """A bike bought for 450 € and sold for 300 €: 150 € loss of value over the months it was owned."""
+    window = main.rule_window
+    bike = model.transactions().loc[lambda df: df[Col.value] == -450.0, Col.transaction_id].item()
+    model.save_manual_category(ManualCategory(bike, "hobby.bike", spread_months=60, residual_percent=40))
+    model.import_transactions("giro", transactions(("2024-06-01", "Max Mustermann", "Verkauf Fahrrad", 300.0)))
+    sale = _transaction(model, "Max Mustermann")[Col.transaction_id]
+
+    main.open_rule(transaction_id=sale)
+    window.manual_radio.setChecked(True)
+    assert not window.sale_combo.isHidden()
+    assert window.sale_combo.count() == 2
+    assert window.sale_combo.itemData(1) == bike
+    window.sale_combo.setCurrentIndex(1)
+    assert window.category_edit.text() == "hobby.bike"
+    assert not window.spread_edit.isEnabled()
+    assert window.spread_hint.text() == (
+        "Price and sale proceeds: -150,00 € over the 6 months you owned it → -25,00 € per month."
+    )
+    assert window.accept()
+    assert model.manual_categories[sale].sale_of == bike
+
+    main.open_rule(transaction_id=sale)
+    assert window.sale_combo.currentData() == bike
 
 
 def test_unknown_names_and_ids_open_new_rule(main):
@@ -153,7 +218,7 @@ def test_rule_overview(main, model, qtbot, dialogs):
     assert frame.loc["groceries", "count"] == 13
     assert frame.loc["salary", "sum"] == 36000.0
 
-    window.table.sortByColumn(3, Qt.SortOrder.DescendingOrder)
+    window.table.sortByColumn(4, Qt.SortOrder.DescendingOrder)  # count
     assert window.table.displayed_frame()["name"].iloc[0] == "groceries"
 
     qtbot.mouseClick(window.add_button, Qt.MouseButton.LeftButton)

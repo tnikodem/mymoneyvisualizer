@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Collection, Iterable
+from collections.abc import Collection, Iterable, Mapping, Sequence
 from typing import Literal
 
 import numpy as np
@@ -10,10 +10,15 @@ import pandas as pd
 
 from mymoneyvisualizer.domain.categories import category_at_level, matches_category
 from mymoneyvisualizer.domain.columns import Col
-from mymoneyvisualizer.domain.models import Rule
+from mymoneyvisualizer.domain.models import CONSUMPTION_GROUPS, GROUP_INCOME, GROUP_SAVINGS, Rule
 
 TOTAL = "total"
 MONTHLY_AVERAGE = "monthly average"
+
+#: Column of the income & expenses table that marks the summary rows below the categories ("" for categories).
+SUMMARY = "summary"
+INCOME, EXPENSES, SAVINGS, NET = "income", "expenses", "savings", "net"
+SUMMARY_LABELS = {INCOME: "Income", EXPENSES: "Expenses", SAVINGS: "Savings", NET: "Net"}
 
 MonthLike = str | pd.Period | pd.Timestamp
 
@@ -63,6 +68,11 @@ def filter_transactions(
     return df.loc[mask]
 
 
+def summary_groups(kind: str) -> tuple[str, ...] | None:
+    """Budget groups added up in a summary row; ``None`` for the net row, which adds up everything."""
+    return {INCOME: (GROUP_INCOME,), EXPENSES: CONSUMPTION_GROUPS, SAVINGS: (GROUP_SAVINGS,)}.get(kind)
+
+
 def in_months(df: pd.DataFrame, start: MonthLike, end: MonthLike) -> pd.DataFrame:
     months = df[Col.date].dt.to_period("M")
     return df.loc[(months >= to_month(start)) & (months <= to_month(end))]
@@ -84,10 +94,14 @@ def income_expenses_table(
     category_filter: str = "",
     excluded_categories: Collection[str] = (),
     own_accounts: Collection[str] = (),
+    groups: Mapping[str, str] | None = None,
 ) -> pd.DataFrame | None:
-    """Monthly sums per category plus ``total`` and ``monthly average`` columns and a final ``total`` row.
+    """Monthly sums per category plus ``total`` and ``monthly average`` columns, as paid (cash basis).
 
-    Rows are sorted by total (largest expense first). Returns ``None`` if there is nothing to show.
+    Categories are sorted by total (largest expense first). Below them follow summary rows, marked in the column
+    :data:`SUMMARY`: income, expenses (needs and wants), savings (only if there are savings categories) and the net
+    change of the accounts. ``groups`` maps main categories to their budget group; categories without a group, e.g.
+    internal transfers, only count in the net row. Returns ``None`` if there is nothing to show.
     """
     data = filter_transactions(
         df, excluded_categories=excluded_categories, own_accounts=own_accounts, category_filter=category_filter
@@ -100,10 +114,19 @@ def income_expenses_table(
     table[TOTAL] = table[months].sum(axis=1)
     table[MONTHLY_AVERAGE] = table[TOTAL] / len(months)
     table = table.sort_values(TOTAL, kind="stable").reset_index()
+    table[SUMMARY] = ""
 
-    total_row = table.drop(columns=Col.category).sum().to_frame().T
-    total_row.insert(0, Col.category, TOTAL)
-    return pd.concat([table, total_row], ignore_index=True)
+    values = [*months, TOTAL, MONTHLY_AVERAGE]
+    group = category_at_level(table[Col.category], 0).map(groups or {})
+    rows = []
+    for kind in (INCOME, EXPENSES, SAVINGS, NET):
+        members = summary_groups(kind)
+        selected = pd.Series(True, index=table.index) if members is None else group.isin(members)
+        if kind == SAVINGS and not selected.any():
+            continue
+        row = table.loc[selected, values].sum()
+        rows.append({Col.category: SUMMARY_LABELS[kind], **row.to_dict(), SUMMARY: kind})
+    return pd.concat([table, pd.DataFrame(rows)], ignore_index=True)
 
 
 def income_expenses_deviations(
@@ -172,20 +195,27 @@ def monthly_deviations(
 
 def detail_transactions(
     df: pd.DataFrame,
-    month: MonthLike,
-    category: str | None = None,
+    month: MonthLike | None,
+    categories: Sequence[str] | None = None,
     *,
     excluded_categories: Collection[str] = (),
     own_accounts: Collection[str] = (),
     category_filter: str = "",
 ) -> pd.DataFrame:
-    """Transactions behind one cell of the income & expenses table. ``category=None`` means the total row."""
+    """Transactions of ``categories`` (with their subcategories) in ``month``, oldest first.
+
+    ``categories=None`` means all categories, ``month=None`` all months.
+    """
     data = filter_transactions(
         df, excluded_categories=excluded_categories, own_accounts=own_accounts, category_filter=category_filter
     )
-    data = in_months(data, month, month)
-    if category is not None:
-        data = data.loc[matches_category(data[Col.category], category)]
+    if month is not None:
+        data = in_months(data, month, month)
+    if categories is not None:
+        mask = pd.Series(False, index=data.index)
+        for category in categories:
+            mask |= matches_category(data[Col.category], category)
+        data = data.loc[mask]
     return data.sort_values(Col.date, kind="stable").reset_index(drop=True)
 
 
@@ -198,10 +228,12 @@ def rule_overview(categorized: pd.DataFrame, rules: Iterable[Rule]) -> pd.DataFr
         rows.append(
             {
                 "name": rule.name,
-                "category": rule.category,
-                "recurring": np.nan if rule.recurring is None else float(rule.recurring),
+                Col.category: rule.category,
+                Col.spread_months: rule.spread_months,
+                Col.residual_percent: rule.residual_percent,
                 "count": int(count),
                 "sum": round(float(total), 2),
             }
         )
-    return pd.DataFrame(rows, columns=["name", "category", "recurring", "count", "sum"])
+    columns = ["name", Col.category, Col.spread_months, Col.residual_percent, "count", "sum"]
+    return pd.DataFrame(rows, columns=columns)

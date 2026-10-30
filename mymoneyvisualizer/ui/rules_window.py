@@ -7,17 +7,28 @@ from typing import TYPE_CHECKING
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
 from mymoneyvisualizer.app import RULES, TRANSACTIONS
+from mymoneyvisualizer.domain.columns import Col
 from mymoneyvisualizer.ui.common import Window
-from mymoneyvisualizer.ui.table_model import CATEGORY, MONEY, NUMBER, Column, DataFrameModel, DataFrameView
+from mymoneyvisualizer.ui.table_model import (
+    CATEGORY,
+    MONEY,
+    MONTHS,
+    NUMBER,
+    PERCENT,
+    Column,
+    DataFrameModel,
+    DataFrameView,
+)
 
 if TYPE_CHECKING:
     from mymoneyvisualizer.ui.main_window import MainWindow
 
 OVERVIEW_COLUMNS = [
     Column("name", "name", width=220),
-    Column("category", "category", CATEGORY, 220),
-    Column("recurring", "recurring", NUMBER, 80),
-    Column("count", "count", NUMBER, 80),
+    Column(Col.category, "category", CATEGORY, 200),
+    Column(Col.spread_months, "spread", MONTHS, 80),
+    Column(Col.residual_percent, "residual", PERCENT, 60),
+    Column("count", "count", NUMBER, 70),
     Column("sum", "sum", MONEY, 110),
 ]
 
@@ -29,7 +40,7 @@ class RulesWindow(Window):
         super().__init__(model, bridge, navigator)
         self.navigator = navigator
         self.setWindowTitle("Rules")
-        self.resize(800, 800)
+        self.resize(900, 800)
 
         self.ok_button = QPushButton("OK", self)
         self.add_button = QPushButton("Add Rule", self)

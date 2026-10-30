@@ -3,7 +3,6 @@
 import random
 import re
 
-import numpy as np
 import pandas as pd
 import pytest
 
@@ -13,10 +12,9 @@ from mymoneyvisualizer.domain.categorization import (
     anchored_literals,
     apply_rules,
     literal_alternatives,
-    recurring_to_float,
     rule_mask,
 )
-from mymoneyvisualizer.domain.columns import Col
+from mymoneyvisualizer.domain.columns import CATEGORY_COLUMNS, MANUAL_RULE, Col
 from mymoneyvisualizer.domain.models import ManualCategory, Rule
 
 from ..helpers import transactions
@@ -25,16 +23,16 @@ from ..helpers import transactions
 def reference_categorization(df, rules, manual_categories=None):
     """The straightforward algorithm: every rule on every row, in order, then manual categories."""
     out = df.copy()
-    out[Col.category], out[Col.rule], out[Col.recurring] = "", "", np.nan
+    out[Col.category], out[Col.rule], out[Col.sale_of] = "", "", ""
+    out[Col.spread_months] = out[Col.residual_percent] = 0
     for rule in rules:
         mask = rule_mask(out, rule)
-        out.loc[mask, Col.category] = rule.category
-        out.loc[mask, Col.rule] = rule.name
-        out.loc[mask, Col.recurring] = recurring_to_float(rule.recurring)
-    for transaction_id, category in (manual_categories or {}).items():
+        out.loc[mask, [Col.category, Col.rule]] = [rule.category, rule.name]
+        out.loc[mask, [Col.spread_months, Col.residual_percent]] = [rule.spread_months, rule.residual_percent]
+    for transaction_id, manual in (manual_categories or {}).items():
         mask = out[Col.transaction_id] == transaction_id
-        out.loc[mask, [Col.category, Col.rule]] = [category.category, "(manual)"]
-        out.loc[mask, Col.recurring] = recurring_to_float(category.recurring)
+        out.loc[mask, [Col.category, Col.rule, Col.sale_of]] = [manual.category, MANUAL_RULE, manual.sale_of]
+        out.loc[mask, [Col.spread_months, Col.residual_percent]] = [manual.spread_months, manual.residual_percent]
     return out
 
 
@@ -164,15 +162,14 @@ def test_engine_equals_reference_on_large_data():
     df = pd.concat(state.accounts.values(), ignore_index=True)
     fast = apply_rules(df, state.rules, state.manual_categories)
     slow = reference_categorization(df, state.rules, state.manual_categories)
-    for column in (Col.category, Col.rule):
-        assert list(fast[column]) == list(slow[column])
-    np.testing.assert_array_equal(fast[Col.recurring].to_numpy(), slow[Col.recurring].to_numpy())
+    for column in CATEGORY_COLUMNS:
+        assert list(fast[column]) == list(slow[column]), column
 
 
 def test_engine_equals_reference_with_tricky_rules():
     df = transactions(*[(f"2024-01-{i % 28 + 1:02d}", text, text[::-1], -1.0) for i, text in enumerate(TEXTS)])
     rules = [
-        Rule(f"t{i}", category=f"category{i}", regex_recipient=p, regex_description=q, recurring=i % 3 or None)
+        Rule(f"t{i}", category=f"category{i}", regex_recipient=p, regex_description=q, spread_months=12 * (i % 3))
         for i, (p, q) in enumerate(
             [
                 ("REWE", ""),
@@ -187,11 +184,12 @@ def test_engine_equals_reference_with_tricky_rules():
             ]
         )
     ]
-    manual = {df[Col.transaction_id].iloc[3]: ManualCategory(df[Col.transaction_id].iloc[3], "once", 2)}
+    once = df[Col.transaction_id].iloc[3]
+    manual = {once: ManualCategory(once, "once", spread_months=24, residual_percent=10)}
     fast = apply_rules(df, rules, manual)
     slow = reference_categorization(df, rules, manual)
-    assert list(fast[Col.category]) == list(slow[Col.category])
-    assert list(fast[Col.rule]) == list(slow[Col.rule])
+    for column in CATEGORY_COLUMNS:
+        assert list(fast[column]) == list(slow[column]), column
 
 
 def test_result_is_identical_after_restart(tmp_path):
@@ -209,13 +207,13 @@ def test_result_is_identical_after_restart(tmp_path):
     model.save_rule(Rule(first.name, category="y.changed", regex_description="SAGT DANKE"), original_name=first.name)
     model.delete_rules([model.rules[20].name])
     some_id = model.transactions()[Col.transaction_id].iloc[100]
-    model.set_manual_category(some_id, "z.once", 3)
+    model.save_manual_category(ManualCategory(some_id, "z.once", spread_months=36))
     model.remove_manual_category(next(iter(model.manual_categories)))
     model.preview_rule(Rule("draft", regex_recipient="Shell"), first.name, some_id)
     model.import_transactions("Girokonto", transactions(("2026-10-01", "REWE Markt 1", "Einkauf", -5.0)))
 
     restarted = AppModel.open(tmp_path / "data")
-    columns = [Col.transaction_id, Col.account, Col.category, Col.rule, Col.recurring]
+    columns = [Col.transaction_id, Col.account, *CATEGORY_COLUMNS]
     pd.testing.assert_frame_equal(model.transactions()[columns], restarted.transactions()[columns])
     fresh = apply_rules(restarted._combined_raw(), restarted.rules, restarted.manual_categories)
     pd.testing.assert_frame_equal(restarted.transactions()[columns], fresh[columns])

@@ -8,45 +8,72 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
+#: Budget groups of the 50/30/20 rule. Needs and wants are consumption, savings is what is put aside.
 GROUP_INCOME = "income"
 GROUP_NEEDS = "needs"
 GROUP_WANTS = "wants"
-GROUPS = (GROUP_INCOME, GROUP_NEEDS, GROUP_WANTS)
-EXPENSE_GROUPS = (GROUP_NEEDS, GROUP_WANTS)
+GROUP_SAVINGS = "savings"
+GROUPS = (GROUP_INCOME, GROUP_NEEDS, GROUP_WANTS, GROUP_SAVINGS)
+CONSUMPTION_GROUPS = (GROUP_NEEDS, GROUP_WANTS)
 
-DEFAULT_BUDGET_SHARES = {GROUP_NEEDS: 0.3, GROUP_WANTS: 0.5}
+#: Shares of the net income for needs and wants; the rest is the savings target.
+DEFAULT_BUDGET_SHARES = {GROUP_NEEDS: 0.5, GROUP_WANTS: 0.3}
+
+#: Longest spread: 50 years.
+MAX_SPREAD_MONTHS = 600
 
 
-def clean_recurring(value: Any) -> int | None:
-    """Recurrence period in years, or ``None`` if the transaction is not recurring."""
-    if value is None or isinstance(value, bool):
-        return None
+def clean_months(value: Any) -> int:
+    """Number of months a payment is spread over; 0 means it counts in the month of payment."""
     try:
         number = float(value)
     except (TypeError, ValueError):
-        return None
-    if not math.isfinite(number) or number < 1:
-        return None
-    return int(number)
+        return 0
+    if not math.isfinite(number):
+        return 0
+    return int(min(max(number, 0), MAX_SPREAD_MONTHS))
 
 
-def recurring_to_float(value: int | None) -> float:
-    return math.nan if value is None else float(value)
+def clean_percent(value: Any) -> int:
+    """Expected residual value in whole percent of the price (0-99)."""
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return 0
+    if not math.isfinite(number):
+        return 0
+    return int(min(max(number, 0), 99))
 
 
 def _str(value: Any) -> str:
     return "" if value is None else str(value)
 
 
+def _spread_dict(spread_months: int, residual_percent: int) -> dict[str, int]:
+    """Spread fields for YAML, left out when the payment is not spread."""
+    if not spread_months:
+        return {}
+    spread = {"spread_months": spread_months}
+    if residual_percent:
+        spread["residual_percent"] = residual_percent
+    return spread
+
+
 @dataclass
 class Rule:
-    """Rule that assigns ``category`` to every transaction whose recipient and description match the regexes."""
+    """Assigns ``category`` to every transaction whose recipient and description match the regexes.
+
+    ``spread_months`` > 0 spreads every matched payment over that many months, starting with the month of payment:
+    the service period of a prepayment or the useful life of a purchase. ``residual_percent`` of the price is the
+    expected residual value of a purchase; it is not consumed.
+    """
 
     name: str
     category: str = ""
     regex_recipient: str = ""
     regex_description: str = ""
-    recurring: int | None = None
+    spread_months: int = 0
+    residual_percent: int = 0
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> Rule:
@@ -55,7 +82,8 @@ class Rule:
             category=_str(data.get("category")),
             regex_recipient=_str(data.get("regex_recipient")),
             regex_description=_str(data.get("regex_description")),
-            recurring=clean_recurring(data.get("recurring")),
+            spread_months=clean_months(data.get("spread_months")),
+            residual_percent=clean_percent(data.get("residual_percent")),
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -64,28 +92,40 @@ class Rule:
             "category": self.category,
             "regex_recipient": self.regex_recipient,
             "regex_description": self.regex_description,
-            "recurring": self.recurring,
+            **_spread_dict(self.spread_months, self.residual_percent),
         }
 
 
 @dataclass
 class ManualCategory:
-    """Category of a single transaction; wins over all rules."""
+    """Category and spread of a single transaction; wins over all rules.
+
+    ``sale_of`` links the sale of a spread purchase (e.g. a used car) to the purchase: the real loss of value,
+    price minus sale proceeds, is then spread over the months from the purchase to the sale.
+    """
 
     transaction_id: str
     category: str
-    recurring: int | None = None
+    spread_months: int = 0
+    residual_percent: int = 0
+    sale_of: str = ""
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> ManualCategory:
         return cls(
             transaction_id=_str(data.get("transaction_id")),
             category=_str(data.get("category")),
-            recurring=clean_recurring(data.get("recurring")),
+            spread_months=clean_months(data.get("spread_months")),
+            residual_percent=clean_percent(data.get("residual_percent")),
+            sale_of=_str(data.get("sale_of")),
         )
 
     def to_dict(self) -> dict[str, Any]:
-        return {"transaction_id": self.transaction_id, "category": self.category, "recurring": self.recurring}
+        data = {"transaction_id": self.transaction_id, "category": self.category}
+        data.update(_spread_dict(self.spread_months, self.residual_percent))
+        if self.sale_of:
+            data["sale_of"] = self.sale_of
+        return data
 
 
 @dataclass
@@ -111,10 +151,16 @@ def _current_year() -> int:
 @dataclass
 class Settings:
     excluded_categories: list[str] = field(default_factory=list)
+    hide_internal_transfers: bool = True
     budget_start: int = field(default_factory=_current_year)
     budget_end: int = field(default_factory=_current_year)
+    #: target shares of the net income for needs and wants
     budget_shares: dict[str, float] = field(default_factory=lambda: dict(DEFAULT_BUDGET_SHARES))
-    hide_internal_transfers: bool = True
+
+    @property
+    def savings_share(self) -> float:
+        """The savings target is what the needs and wants leave of the income."""
+        return max(0.0, 1.0 - sum(self.budget_shares.values()))
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any] | None) -> Settings:
@@ -123,7 +169,7 @@ class Settings:
             return settings
         excluded = data.get("excluded_categories")
         if isinstance(excluded, Sequence) and not isinstance(excluded, str):
-            settings.excluded_categories = [str(t) for t in excluded]
+            settings.excluded_categories = [str(c) for c in excluded]
         if "hide_internal_transfers" in data:
             settings.hide_internal_transfers = bool(data["hide_internal_transfers"])
 
@@ -134,7 +180,7 @@ class Settings:
             settings.budget_start, settings.budget_end = min(start, end), max(start, end)
         shares = budget.get("shares")
         shares = shares if isinstance(shares, Mapping) else {}
-        for group in EXPENSE_GROUPS:
+        for group in CONSUMPTION_GROUPS:
             share = shares.get(group)
             if isinstance(share, int | float) and 0 <= share <= 1:
                 settings.budget_shares[group] = float(share)
