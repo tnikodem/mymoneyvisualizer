@@ -1,0 +1,33 @@
+{
+  "basic": {
+    "expected_total_budget": 21672.0,
+    "consumed": {
+      "": 82.12666666666667,
+      "car": 3822.6483333333335,
+      "household": 27414.881666666668
+    },
+    "category_order": [
+      "income",
+      "household",
+      "car",
+      "carsharing",
+      "hobby",
+      ""
+    ]
+  },
+  "optional": {
+    "expected_total_budget": 36120.0,
+    "consumed": {
+      "hobby": 4835.0625,
+      "carsharing": 423.7625
+    },
+    "category_order": [
+      "income",
+      "household",
+      "car",
+      "carsharing",
+      "hobby",
+      ""
+    ]
+  }
+}

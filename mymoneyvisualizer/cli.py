@@ -1,37 +1,52 @@
-# -*- coding: utf-8 -*-
-"""
-    mymoneyvisualizer.cli
-    ~~~~~~~~~
-    A simple tool to visualize your incomes and expenses.
-"""
+"""Command line entry point ``mmv``."""
 
-import sys
+from __future__ import annotations
+
+import argparse
 import logging
+import sys
+from collections.abc import Sequence
 
-from PyQt6.QtWidgets import QApplication
-
-from mymoneyvisualizer.configuration import Configuration
-
-from mymoneyvisualizer.windows.window_main import WindowMain
+from mymoneyvisualizer import __version__
+from mymoneyvisualizer.storage.paths import ENV_VAR, resolve_data_dir
 
 logger = logging.getLogger(__name__)
 
 
-def main():
-    # configure logging
-    logging_level = logging.ERROR
-    if len(sys.argv) > 1 and sys.argv[1] == "--debug":  # TODO use click(?) if more convenient cli preferrable
-            logging_level = logging.DEBUG
-    logging.basicConfig(level=logging_level,
-                        format="%(asctime)s %(levelname)-7s %(module)s: %(message)s",
-                        datefmt="%y-%m-%d %H:%M:%S")
-
-    logger.info("Starting MyMoneyVisualizer")
-    config = Configuration(dir_path="./config")
-    app = QApplication(sys.argv)
-    ex = WindowMain(config=config)
-    sys.exit(app.exec())
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(prog="mmv", description="Where did all my money go? Visualize your finances.")
+    parser.add_argument("--data-dir", help=f"directory with your data (default: ${ENV_VAR} or the user data dir)")
+    parser.add_argument("--debug", action="store_true", help="print debug logs")
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
+    return parser.parse_args(argv)
 
 
-if __name__ == '__main__':
-    main()
+def main(argv: Sequence[str] | None = None) -> int:
+    args = parse_args(argv)
+    logging.basicConfig(
+        level=logging.DEBUG if args.debug else logging.WARNING,
+        format="%(asctime)s %(levelname)-7s %(name)s: %(message)s",
+        datefmt="%y-%m-%d %H:%M:%S",
+    )
+    # Qt is imported here so that ``mmv --help`` works without a display
+    from PyQt6.QtWidgets import QApplication, QMessageBox
+
+    from mymoneyvisualizer.app import AppModel
+    from mymoneyvisualizer.storage.files import StorageError
+    from mymoneyvisualizer.ui.main_window import MainWindow
+
+    app = QApplication.instance() or QApplication(sys.argv[:1])
+    data_dir = resolve_data_dir(args.data_dir)
+    logger.info("using data directory %s", data_dir)
+    try:
+        model = AppModel.open(data_dir)
+    except StorageError as e:
+        QMessageBox.critical(None, "MyMoneyVisualizer", f"Cannot load your data:\n{e}")
+        return 1
+    window = MainWindow(model)
+    window.show()
+    return app.exec()
+
+
+if __name__ == "__main__":
+    sys.exit(main())

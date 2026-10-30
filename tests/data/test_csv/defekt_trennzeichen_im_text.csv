@@ -1,0 +1,22 @@
+Umsatzanzeige;Datei erstellt am: 29.10.2026 08:14
+;Letztes Update: aktuell
+
+IBAN;DE10 5001 0517 5419 3388 21
+Kontoname;Girokonto
+Bank;ING
+Kunde;Max Mustermann
+Zeitraum;01.08.2026 - 29.10.2026
+Saldo;3.112,58;EUR
+
+Sortierung;Datum absteigend
+
+In der CSV-Datei finden Sie alle bereits gebuchten Umsätze. Die vorgemerkten Umsätze werden nicht aufgenommen, auch wenn sie in Ihrem Internetbanking angezeigt werden.
+
+Buchung;Wertstellungsdatum;Auftraggeber/Empfänger;Buchungstext;Verwendungszweck;Saldo;Währung;Betrag;Währung
+28.10.2026;28.10.2026;EDEKA Center Kaiser;Lastschrift;EDEKA SAGT DANKE; Filiale 8124;3.112,58;EUR;-56,21;EUR
+15.10.2026;15.10.2026;Musterfirma GmbH;Gehalt/Rente;Gehalt Oktober 2026;3.168,79;EUR;3.245,67;EUR
+Buchung;Wertstellungsdatum;Auftraggeber/Empfänger;Buchungstext;Verwendungszweck;Saldo;Währung;Betrag;Währung
+01.10.2026;01.10.2026;Wohnungsbaugenossenschaft Süd eG;Dauerauftrag/Terminueberw.;Miete 10/2026; Mitglieds-Nr. 4711; Whg 12;3.112,58;EUR;-890,00;EUR
+15.09.2026;15.09.2026;Musterfirma GmbH;Gehalt/Rente;Gehalt September 2026;4.002,58;EUR;3.245,67;EUR
+01.09.2026;01.09.2026;Wohnungsbaugenossenschaft Süd eG;Dauerauftrag/Terminueberw.;Miete 09/2026; Mitglieds-Nr. 4711; Whg 12;756,91;EUR;-890,00;EUR
+Summe;;;;;;;4.655,13;EUR

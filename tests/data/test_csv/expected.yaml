@@ -1,0 +1,808 @@
+# Ground truth of the generated test exports (see README.md). Do not derive it from the importer.
+transactions1.csv:
+  bank: DKB Girokonto (CSV seit 2023)
+  notes: Empfänger = Spalte Zahlungsempfänger*in, bei Eingängen also der eigene Name.
+  skipped: 0
+  transactions:
+  - date: '2026-10-28'
+    recipient: REWE Markt GmbH
+    description: REWE SAGT DANKE 54713125//Berlin/DE 2026-10-27T18:02:11 Folgenr. 001 Verfalld. 2029-12
+    value: -47.83
+    category: food
+  - date: '2026-10-27'
+    recipient: Stadtwerke Bühl GmbH
+    description: Abschlag Strom Oktober 2026 Vertragskonto 4711-0815
+    value: -78.0
+    category: housing
+  - date: '2026-10-15'
+    recipient: Max Mustermann
+    description: Gehalt 10/2026 PersNr 1234
+    value: 3245.67
+    category: income
+  - date: '2026-10-02'
+    recipient: Hausverwaltung Schröder & Söhne
+    description: Miete Oktober 2026 Whg. 3 OG links
+    value: -1050.0
+    category: housing
+  - date: '2026-10-01'
+    recipient: Netflix International B.V.
+    description: P5C8F1E2D3 Netflix Monthly Subscription
+    value: -13.99
+    category: leisure
+  - date: '2026-09-28'
+    recipient: Bäckerei Müller
+    description: VISA Debitkartenumsatz Bäckerei Müller Fil. 12
+    value: -6.4
+    category: food
+  - date: '2026-09-15'
+    recipient: Max Mustermann
+    description: Gehalt 09/2026 PersNr 1234
+    value: 3245.67
+    category: income
+  - date: '2026-09-12'
+    recipient: HUK-COBURG Allgemeine Versicherung AG
+    description: Kfz-Versicherung B-MM 1234 Beitrag 2026/2027
+    value: -412.8
+    category: insurance
+  - date: '2026-09-02'
+    recipient: Hausverwaltung Schröder & Söhne
+    description: Miete September 2026 Whg. 3 OG links
+    value: -1050.0
+    category: housing
+  - date: '2026-09-01'
+    recipient: Netflix International B.V.
+    description: P4B7E0D1C2 Netflix Monthly Subscription
+    value: -13.99
+    category: leisure
+  - date: '2026-08-20'
+    recipient: Max Mustermann
+    description: Sparen Tagesgeld
+    value: -500.0
+    category: transfer
+  - date: '2026-08-15'
+    recipient: Max Mustermann
+    description: Gehalt 08/2026 PersNr 1234
+    value: 3245.67
+    category: income
+  - date: '2026-08-03'
+    recipient: Max Mustermann
+    description: Umbuchung vom Tagesgeld
+    value: 2000.0
+    category: transfer
+  - date: '2026-08-02'
+    recipient: Hausverwaltung Schröder & Söhne
+    description: Miete August 2026 Whg. 3 OG links
+    value: -1050.0
+    category: housing
+transactions2.csv:
+  bank: Broker mit Verrechnungskonto und Karte (Trade-Republic-ähnlich, Format vermutet)
+  notes: 'Betrag = amount + fee + tax (Annahme: amount enthält Gebühren und Steuern nicht).'
+  skipped: 0
+  transactions:
+  - date: '2026-10-27'
+    recipient: Lidl sagt Danke
+    description: Card Transaction
+    value: -23.57
+    category: food
+  - date: '2026-10-24'
+    recipient: ARAL Station 248
+    description: Card Transaction
+    value: -61.2
+    category: mobility
+  - date: '2026-10-15'
+    recipient: iShares Core MSCI World USD (Acc)
+    description: Savings plan execution
+    value: -150.0
+    category: invest
+  - date: '2026-10-01'
+    recipient: ''
+    description: Interest payment
+    value: 13.56
+    category: income
+  - date: '2026-09-30'
+    recipient: Muster AG
+    description: 'Sell trade DE000A1EWWW0 Muster AG, quantity: 10'
+    value: 471.66
+    category: invest
+  - date: '2026-09-15'
+    recipient: iShares Core MSCI World USD (Acc)
+    description: Savings plan execution
+    value: -150.0
+    category: invest
+  - date: '2026-09-02'
+    recipient: ''
+    description: Incoming transfer from Max Mustermann
+    value: 500.0
+    category: transfer
+  - date: '2026-08-28'
+    recipient: ''
+    description: Card fee
+    value: -5.0
+    category: fees
+  - date: '2026-08-26'
+    recipient: Bauhaus Filiale 512
+    description: Card Transaction
+    value: -139.75
+    category: shopping
+  - date: '2026-08-24'
+    recipient: Bäckerei Müller
+    description: Card Transaction
+    value: -4.8
+    category: food
+  - date: '2026-08-02'
+    recipient: ''
+    description: Incoming transfer from Max Mustermann
+    value: 1000.0
+    category: transfer
+transactions3.csv:
+  bank: DKB Visa Kreditkarte (CSV seit 2023)
+  notes: Keine Empfänger-Spalte; Datum = Belegdatum.
+  skipped: 0
+  transactions:
+  - date: '2026-10-27'
+    recipient: ''
+    description: AMAZON.DE*KJ3HX8TQ5
+    value: -34.99
+    category: shopping
+  - date: '2026-10-24'
+    recipient: ''
+    description: SHELL 2134 MUENCHEN
+    value: -58.4
+    category: mobility
+  - date: '2026-10-22'
+    recipient: ''
+    description: Ausgleich Kreditkarte gem. Abrechnung v. 22.10.26
+    value: 312.45
+    category: transfer
+  - date: '2026-10-22'
+    recipient: ''
+    description: Kartenpreis
+    value: -2.49
+    category: fees
+  - date: '2026-10-15'
+    recipient: ''
+    description: NETFLIX.COM
+    value: -13.99
+    category: leisure
+  - date: '2026-10-03'
+    recipient: ''
+    description: EBAY O*12-34567-89012
+    value: -22.73
+    category: shopping
+  - date: '2026-09-28'
+    recipient: ''
+    description: DB VERTRIEB GMBH
+    value: -89.9
+    category: mobility
+  - date: '2026-09-22'
+    recipient: ''
+    description: Ausgleich Kreditkarte gem. Abrechnung v. 22.09.26
+    value: 145.9
+    category: transfer
+  - date: '2026-09-22'
+    recipient: ''
+    description: Kartenpreis
+    value: -2.49
+    category: fees
+  - date: '2026-09-11'
+    recipient: ''
+    description: LIEFERANDO.DE
+    value: -27.5
+    category: food
+transactions4.csv:
+  bank: DKB Girokonto (CSV bis 2023), Umlaute bereits zerstört
+  notes: Die Datei enthält U+FFFD statt Umlauten (beim Bearbeiten kaputt gegangen); der Text bleibt so.
+  skipped: 0
+  transactions:
+  - date: '2021-09-01'
+    recipient: Telekom Deutschland GmbH
+    description: Festnetz Vertragskonto 123456789 RG 0815/09
+    value: -39.95
+    category: housing
+  - date: '2021-08-31'
+    recipient: Scalable Capital GmbH
+    description: Sparplan ISIN IE00B4L5Y983
+    value: -100.0
+    category: invest
+  - date: '2021-08-31'
+    recipient: Spotify AB
+    description: P0123456789 Spotify Premium
+    value: -9.99
+    category: leisure
+  - date: '2021-08-30'
+    recipient: Musterfirma GmbH
+    description: Gehalt August 2021
+    value: 2987.12
+    category: income
+  - date: '2021-08-16'
+    recipient: B�ckerei M�ller
+    description: 2021-08-14 Debitk.27 VISA Debit
+    value: -7.3
+    category: food
+  - date: '2021-08-05'
+    recipient: Stadtwerke B�hl GmbH
+    description: Abschlag Gas August 2021
+    value: -65.0
+    category: housing
+  - date: '2021-08-02'
+    recipient: Hausverwaltung Schr�der & S�hne
+    description: Miete August 2021
+    value: -950.0
+    category: housing
+  - date: '2021-08-02'
+    recipient: ''
+    description: Kontof�hrungsgeb�hr 07/2021
+    value: -4.5
+    category: fees
+ing_girokonto.csv:
+  bank: ING Girokonto
+  notes: Windows-1252, keine Anführungszeichen, langer Vorspann mit Hinweistext.
+  skipped: 0
+  transactions:
+  - date: '2026-10-28'
+    recipient: EDEKA Center Kaiser
+    description: EDEKA SAGT DANKE 8124 Kartenzahlung girocard
+    value: -56.21
+    category: food
+  - date: '2026-10-27'
+    recipient: PayPal Europe S.a.r.l. et Cie S.C.A
+    description: 1046127386542/PP.7741.PP/. Spotify AB, Ihr Einkauf bei Spotify AB
+    value: -10.99
+    category: leisure
+  - date: '2026-10-15'
+    recipient: Musterfirma GmbH
+    description: Gehalt Oktober 2026
+    value: 3245.67
+    category: income
+  - date: '2026-10-05'
+    recipient: Max Mustermann
+    description: Uebertrag auf Extra-Konto
+    value: -300.0
+    category: transfer
+  - date: '2026-10-01'
+    recipient: Wohnungsbaugenossenschaft Süd eG
+    description: Miete 10/2026 Mitglieds-Nr. 4711
+    value: -890.0
+    category: housing
+  - date: '2026-09-30'
+    recipient: VISA ARAL STATION 22
+    description: ARAL Station 22 Muenchen Kartenzahlung girocard
+    value: -71.04
+    category: mobility
+  - date: '2026-09-15'
+    recipient: Musterfirma GmbH
+    description: Gehalt September 2026
+    value: 3245.67
+    category: income
+  - date: '2026-09-03'
+    recipient: Bargeldauszahlung
+    description: ING Geldautomat Muenchen Hbf
+    value: -200.0
+    category: cash
+  - date: '2026-09-01'
+    recipient: Wohnungsbaugenossenschaft Süd eG
+    description: Miete 09/2026 Mitglieds-Nr. 4711
+    value: -890.0
+    category: housing
+  - date: '2026-08-15'
+    recipient: Musterfirma GmbH
+    description: Gehalt August 2026
+    value: 3245.67
+    category: income
+sparkasse_camt.csv:
+  bank: Sparkasse (CSV-CAMT V2)
+  notes: Windows-1252, alle Felder in Anführungszeichen, Datum TT.MM.JJ.
+  skipped: 0
+  transactions:
+  - date: '2026-10-28'
+    recipient: ALDI SÜD SAGT DANKE
+    description: 2026-10-27T17:12 Debitk.1 2029-12
+    value: -38.47
+    category: food
+  - date: '2026-10-27'
+    recipient: Stadtwerke Bühl GmbH
+    description: Abschlag 10/2026 Strom Kundennr. 30012345
+    value: -78.0
+    category: housing
+  - date: '2026-10-15'
+    recipient: Musterfirma GmbH
+    description: Gehalt Oktober 2026
+    value: 3245.67
+    category: income
+  - date: '2026-10-02'
+    recipient: Hausverwaltung Schröder & Söhne
+    description: Miete Wohnung Lindenstr. 7
+    value: -1050.0
+    category: housing
+  - date: '2026-09-30'
+    recipient: ''
+    description: Entgeltabrechnung siehe Anlage
+    value: -6.95
+    category: fees
+  - date: '2026-09-26'
+    recipient: Sparkasse Musterstadt
+    description: 2026-09-26T11:04 Debitk.1 Geldautomat
+    value: -100.0
+    category: cash
+  - date: '2026-09-15'
+    recipient: Musterfirma GmbH
+    description: Gehalt September 2026
+    value: 3245.67
+    category: income
+  - date: '2026-09-03'
+    recipient: Zahnarztpraxis Dr. Weiß
+    description: 2026-09-02T19:45 Debitk.1 2029-12
+    value: -45.0
+    category: health
+volksbank_neu.csv:
+  bank: Volksbank/Raiffeisenbank (Format seit 2023)
+  notes: Empfänger = Name Zahlungsbeteiligter (nicht 'Bankname Auftragskonto').
+  skipped: 0
+  transactions:
+  - date: '2026-10-28'
+    recipient: Kaufland Musterstadt
+    description: Kaufland Musterstadt 2026-10-27T16:55 Karte 1
+    value: -64.12
+    category: food
+  - date: '2026-10-20'
+    recipient: Allianz Versicherungs-AG
+    description: Hausratversicherung Vers.-Nr. AS-1234567
+    value: -11.9
+    category: insurance
+  - date: '2026-10-15'
+    recipient: Musterfirma GmbH
+    description: Gehalt 10/2026
+    value: 3245.67
+    category: income
+  - date: '2026-10-01'
+    recipient: Vermietung Krause
+    description: Miete Oktober
+    value: -980.0
+    category: housing
+  - date: '2026-09-29'
+    recipient: Deutsche Bahn Fernverkehr AG
+    description: Ticket 4711 0815 4242 Muenchen - Berlin
+    value: -119.9
+    category: mobility
+  - date: '2026-09-15'
+    recipient: Musterfirma GmbH
+    description: Gehalt 09/2026
+    value: 3245.67
+    category: income
+  - date: '2026-09-01'
+    recipient: Vermietung Krause
+    description: Miete September
+    value: -980.0
+    category: housing
+  - date: '2026-08-31'
+    recipient: ''
+    description: Kontoführung 08/2026
+    value: -5.95
+    category: fees
+volksbank_alt_soll_haben.csv:
+  bank: Volksbank/Raiffeisenbank (altes Format, Betrag ohne Vorzeichen + S/H)
+  notes: Betrag ohne Vorzeichen, Spalte ' ' mit S/H; mehrzeiliger Verwendungszweck (Zeilenumbruch bleibt erhalten); Saldozeilen am Ende.
+  skipped: 2
+  transactions:
+  - date: '2026-10-28'
+    recipient: ALDI SUED
+    description: "Basislastschrift\r\nALDI SAGT DANKE\r\nKartenzahlung 27.10. 18:31"
+    value: -31.18
+    category: food
+  - date: '2026-10-15'
+    recipient: Musterfirma GmbH
+    description: "Gutschrift\r\nGehalt 10/2026"
+    value: 3245.67
+    category: income
+  - date: '2026-10-02'
+    recipient: Grundstücksgesellschaft Weber GbR
+    description: "Dauerauftrag\r\nMiete Oktober 2026"
+    value: -870.0
+    category: housing
+  - date: '2026-09-24'
+    recipient: Apotheke am Markt
+    description: "Kartenzahlung\r\nApotheke am Markt 23.09. 10:02"
+    value: -18.45
+    category: health
+  - date: '2026-09-15'
+    recipient: Musterfirma GmbH
+    description: "Gutschrift\r\nGehalt 09/2026"
+    value: 3245.67
+    category: income
+  - date: '2026-09-02'
+    recipient: Grundstücksgesellschaft Weber GbR
+    description: "Dauerauftrag\r\nMiete September 2026"
+    value: -870.0
+    category: housing
+deutsche_bank.csv:
+  bank: Deutsche Bank (Soll/Haben-Spalten)
+  notes: Spalte 'Betrag' leer, Beträge in 'Soll' (negativ) und 'Haben'; Vorspann auf volle Breite aufgefüllt; Kontostand-Zeile am Ende.
+  skipped: 1
+  transactions:
+  - date: '2026-10-28'
+    recipient: REWE Markt GmbH
+    description: REWE SAGT DANKE 54713125
+    value: -35.12
+    category: food
+  - date: '2026-10-26'
+    recipient: Vodafone GmbH
+    description: Kundennummer 123456789 Rechnung 10/2026
+    value: -39.99
+    category: housing
+  - date: '2026-10-15'
+    recipient: Musterfirma GmbH
+    description: Gehalt Oktober 2026
+    value: 3245.67
+    category: income
+  - date: '2026-10-01'
+    recipient: Hausverwaltung Schröder & Söhne
+    description: Miete Oktober 2026
+    value: -1050.0
+    category: housing
+  - date: '2026-09-30'
+    recipient: ''
+    description: Kontoführungsentgelt 09/2026
+    value: -8.9
+    category: fees
+  - date: '2026-09-15'
+    recipient: Musterfirma GmbH
+    description: Gehalt September 2026
+    value: 3245.67
+    category: income
+  - date: '2026-09-01'
+    recipient: Hausverwaltung Schröder & Söhne
+    description: Miete September 2026
+    value: -1050.0
+    category: housing
+postbank.csv:
+  bank: Postbank (älteres Format)
+  notes: Vorspann auf volle Breite aufgefüllt; Betrag mit €; Empfänger = Spalte 'Empfänger' (bei Gutschriften der eigene Name).
+  skipped: 0
+  transactions:
+  - date: '2026-10-27'
+    recipient: Fitnessstudio Sportwerk
+    description: Referenz 7Q2C21X0A1 Mandat 4711 Einreicher-ID DE45ZZZ00000012345 Verwendungszweck Mitgliedsbeitrag 4. Quartal
+    value: -59.9
+    category: leisure
+  - date: '2026-10-24'
+    recipient: Lidl sagt Danke
+    description: Referenz 1234 Verwendungszweck Lidl Dienstleistung 2026-10-24T09:12
+    value: -27.43
+    category: food
+  - date: '2026-10-15'
+    recipient: Max Mustermann
+    description: Referenz NOTPROVIDED Verwendungszweck Gehalt 10/2026
+    value: 3245.67
+    category: income
+  - date: '2026-10-01'
+    recipient: Immobilien Becker
+    description: Referenz NOTPROVIDED Verwendungszweck Miete Oktober
+    value: -925.0
+    category: housing
+  - date: '2026-09-15'
+    recipient: Max Mustermann
+    description: Referenz NOTPROVIDED Verwendungszweck Gehalt 09/2026
+    value: 3245.67
+    category: income
+  - date: '2026-09-01'
+    recipient: Immobilien Becker
+    description: Referenz NOTPROVIDED Verwendungszweck Miete September
+    value: -925.0
+    category: housing
+comdirect.csv:
+  bank: comdirect Girokonto
+  notes: Keine Empfänger-Spalte (steckt im Buchungstext); vorgemerkter Umsatz mit Datum 'offen' wird übersprungen; Kontostand-Zeile am Ende.
+  skipped: 2
+  transactions:
+  - date: '2026-10-28'
+    recipient: ''
+    description: 'Auftraggeber: REWE Markt GmbH Buchungstext: REWE SAGT DANKE 54713125 Ref. 9Q2C21X0A1B2C3D4/1'
+    value: -41.27
+    category: food
+  - date: '2026-10-21'
+    recipient: ''
+    description: STARBUCKS MUENCHEN HBF
+    value: -6.3
+    category: food
+  - date: '2026-10-15'
+    recipient: ''
+    description: 'Auftraggeber: Musterfirma GmbH Buchungstext: Gehalt 10/2026 Ref. 7Y2C21X0A1B2C3D4'
+    value: 3245.67
+    category: income
+  - date: '2026-10-01'
+    recipient: ''
+    description: 'Empfänger: Hausverwaltung Schröder & Söhne Kto/IBAN: DE29100500000123456789 Buchungstext: Miete Oktober'
+    value: -1050.0
+    category: housing
+  - date: '2026-09-30'
+    recipient: ''
+    description: 'Abschluss Kontoführung Buchungstext: Entgelte 09/2026'
+    value: -4.9
+    category: fees
+commerzbank.csv:
+  bank: Commerzbank
+  notes: Keine Empfänger-Spalte; 'Auftraggeberkonto' ist eine Kontonummer und darf nicht als Empfänger erkannt werden; Beträge ohne Tausenderpunkt.
+  skipped: 0
+  transactions:
+  - date: '2026-10-28'
+    recipient: ''
+    description: PENNY Markt GmbH//Musterstadt/DE 2026-10-27T18:34:00 KFN 1 VJ 2912
+    value: -22.18
+    category: food
+  - date: '2026-10-24'
+    recipient: ''
+    description: Amazon Payments Europe S.C.A. 028-1234567-1234567 Amazon.de 4G3HI8JK9LM
+    value: -45.98
+    category: shopping
+  - date: '2026-10-15'
+    recipient: ''
+    description: 'Musterfirma GmbH Gehalt 10/2026 End-to-End-Ref.: NOTPROVIDED'
+    value: 3245.67
+    category: income
+  - date: '2026-10-01'
+    recipient: ''
+    description: Hausverwaltung Schröder & Söhne Miete Oktober 2026
+    value: -1050.0
+    category: housing
+  - date: '2026-09-30'
+    recipient: ''
+    description: Kontoführung 09/2026
+    value: -6.9
+    category: fees
+n26.csv:
+  bank: N26
+  notes: Komma-getrennt, ISO-Datum, Punkt als Dezimalzeichen, englische Spalten.
+  skipped: 0
+  transactions:
+  - date: '2026-10-27'
+    recipient: Lidl sagt Danke
+    description: '-'
+    value: -18.32
+    category: food
+  - date: '2026-10-25'
+    recipient: Uber BV
+    description: '-'
+    value: -14.8
+    category: mobility
+  - date: '2026-10-15'
+    recipient: Musterfirma GmbH
+    description: Gehalt Oktober 2026
+    value: 3245.67
+    category: income
+  - date: '2026-10-02'
+    recipient: Spotify AB
+    description: '-'
+    value: -10.99
+    category: leisure
+  - date: '2026-10-01'
+    recipient: Hausverwaltung Schröder & Söhne
+    description: Miete Oktober 2026
+    value: -1050.0
+    category: housing
+  - date: '2026-09-20'
+    recipient: Booking.com
+    description: '-'
+    value: -264.0
+    category: leisure
+paypal.csv:
+  bank: PayPal (Aktivitäten-Download, deutsch)
+  notes: Komma-getrennt mit Dezimalkomma; Wert = 'Netto' (Brutto + Gebühr); Beschreibung = 'Typ', weil 'Artikelbezeichnung' meist leer ist; Bankgutschriften gleichen Zahlungen aus.
+  skipped: 0
+  transactions:
+  - date: '2026-10-15'
+    recipient: Spotify AB
+    description: Zahlung im Einzugsverfahren mit Zahlungsrechnung
+    value: -10.99
+    category: leisure
+  - date: '2026-10-15'
+    recipient: ''
+    description: Bankgutschrift auf PayPal-Konto
+    value: 10.99
+    category: transfer
+  - date: '2026-10-02'
+    recipient: Erika Musterfrau
+    description: Allgemeine Zahlung
+    value: -25.0
+    category: food
+  - date: '2026-10-02'
+    recipient: ''
+    description: Bankgutschrift auf PayPal-Konto
+    value: 25.0
+    category: transfer
+  - date: '2026-09-20'
+    recipient: Outdoor-Shop Berg & Tal GmbH
+    description: Rückzahlung
+    value: 15.0
+    category: shopping
+  - date: '2026-09-12'
+    recipient: Outdoor-Shop Berg & Tal GmbH
+    description: PayPal Express-Zahlung
+    value: -129.99
+    category: shopping
+  - date: '2026-09-12'
+    recipient: ''
+    description: Bankgutschrift auf PayPal-Konto
+    value: 129.99
+    category: transfer
+  - date: '2026-09-05'
+    recipient: Kleinanzeigen-Käufer Jonas
+    description: Zahlung erhalten
+    value: 43.3
+    category: income
+defekt_doppelt_kodiert.csv:
+  bank: DKB Girokonto, doppelt kodiert (UTF-8 als Windows-1252 gelesen und neu gespeichert)
+  notes: Umlaute als 'Ã¤', '€' als 'â‚¬', auch in der Kopfzeile; der Text bleibt so.
+  skipped: 0
+  transactions:
+  - date: '2026-10-28'
+    recipient: REWE Markt GmbH
+    description: REWE SAGT DANKE 54713125//Berlin/DE 2026-10-27T18:02:11 Folgenr. 001 Verfalld. 2029-12
+    value: -47.83
+    category: food
+  - date: '2026-10-27'
+    recipient: Stadtwerke BÃ¼hl GmbH
+    description: Abschlag Strom Oktober 2026 Vertragskonto 4711-0815
+    value: -78.0
+    category: housing
+  - date: '2026-10-15'
+    recipient: Max Mustermann
+    description: Gehalt 10/2026 PersNr 1234
+    value: 3245.67
+    category: income
+  - date: '2026-10-02'
+    recipient: Hausverwaltung SchrÃ¶der & SÃ¶hne
+    description: Miete Oktober 2026 Whg. 3 OG links
+    value: -1050.0
+    category: housing
+  - date: '2026-10-01'
+    recipient: Netflix International B.V.
+    description: P5C8F1E2D3 Netflix Monthly Subscription
+    value: -13.99
+    category: leisure
+  - date: '2026-09-28'
+    recipient: BÃ¤ckerei MÃ¼ller
+    description: VISA Debitkartenumsatz BÃ¤ckerei MÃ¼ller Fil. 12
+    value: -6.4
+    category: food
+  - date: '2026-09-15'
+    recipient: Max Mustermann
+    description: Gehalt 09/2026 PersNr 1234
+    value: 3245.67
+    category: income
+defekt_gemischte_kodierung.csv:
+  bank: 'Sparkasse, zusammenkopiert: UTF-8 mit zwei Zeilen in Windows-1252'
+  notes: Jede Zeile wird in ihrer eigenen Kodierung gelesen, alle Umlaute sind korrekt.
+  skipped: 0
+  transactions:
+  - date: '2026-10-28'
+    recipient: ALDI SÜD SAGT DANKE
+    description: 2026-10-27T17:12 Debitk.1 2029-12
+    value: -38.47
+    category: food
+  - date: '2026-10-27'
+    recipient: Stadtwerke Bühl GmbH
+    description: Abschlag 10/2026 Strom Kundennr. 30012345
+    value: -78.0
+    category: housing
+  - date: '2026-10-15'
+    recipient: Musterfirma GmbH
+    description: Gehalt Oktober 2026
+    value: 3245.67
+    category: income
+  - date: '2026-10-02'
+    recipient: Hausverwaltung Schröder & Söhne
+    description: Miete Wohnung Lindenstr. 7
+    value: -1050.0
+    category: housing
+  - date: '2026-09-30'
+    recipient: ''
+    description: Entgeltabrechnung siehe Anlage
+    value: -6.95
+    category: fees
+  - date: '2026-09-26'
+    recipient: Sparkasse Musterstadt
+    description: 2026-09-26T11:04 Debitk.1 Geldautomat
+    value: -100.0
+    category: cash
+  - date: '2026-09-15'
+    recipient: Musterfirma GmbH
+    description: Gehalt September 2026
+    value: 3245.67
+    category: income
+  - date: '2026-09-03'
+    recipient: Zahnarztpraxis Dr. Weiß
+    description: 2026-09-02T19:45 Debitk.1 2029-12
+    value: -45.0
+    category: health
+defekt_excel_unicode.txt:
+  bank: ING, in Excel geöffnet und als 'Unicode-Text' gespeichert (UTF-16, Tabulatoren)
+  notes: UTF-16 mit BOM, Tabulator als Trennzeichen.
+  skipped: 0
+  transactions:
+  - date: '2026-10-28'
+    recipient: EDEKA Center Kaiser
+    description: EDEKA SAGT DANKE 8124 Kartenzahlung girocard
+    value: -56.21
+    category: food
+  - date: '2026-10-27'
+    recipient: PayPal Europe S.a.r.l. et Cie S.C.A
+    description: 1046127386542/PP.7741.PP/. Spotify AB, Ihr Einkauf bei Spotify AB
+    value: -10.99
+    category: leisure
+  - date: '2026-10-15'
+    recipient: Musterfirma GmbH
+    description: Gehalt Oktober 2026
+    value: 3245.67
+    category: income
+  - date: '2026-10-05'
+    recipient: Max Mustermann
+    description: Uebertrag auf Extra-Konto
+    value: -300.0
+    category: transfer
+  - date: '2026-10-01'
+    recipient: Wohnungsbaugenossenschaft Süd eG
+    description: Miete 10/2026 Mitglieds-Nr. 4711
+    value: -890.0
+    category: housing
+  - date: '2026-09-30'
+    recipient: VISA ARAL STATION 22
+    description: ARAL Station 22 Muenchen Kartenzahlung girocard
+    value: -71.04
+    category: mobility
+defekt_trennzeichen_im_text.csv:
+  bank: ING, zwei Exporte zusammenkopiert, Semikolon im Verwendungszweck ohne Anführungszeichen
+  notes: Überzählige Felder werden wieder in den Verwendungszweck gefügt; die zweite Kopfzeile und die Summenzeile werden übersprungen.
+  skipped: 2
+  transactions:
+  - date: '2026-10-28'
+    recipient: EDEKA Center Kaiser
+    description: EDEKA SAGT DANKE; Filiale 8124
+    value: -56.21
+    category: food
+  - date: '2026-10-15'
+    recipient: Musterfirma GmbH
+    description: Gehalt Oktober 2026
+    value: 3245.67
+    category: income
+  - date: '2026-10-01'
+    recipient: Wohnungsbaugenossenschaft Süd eG
+    description: Miete 10/2026; Mitglieds-Nr. 4711; Whg 12
+    value: -890.0
+    category: housing
+  - date: '2026-09-15'
+    recipient: Musterfirma GmbH
+    description: Gehalt September 2026
+    value: 3245.67
+    category: income
+  - date: '2026-09-01'
+    recipient: Wohnungsbaugenossenschaft Süd eG
+    description: Miete 09/2026; Mitglieds-Nr. 4711; Whg 12
+    value: -890.0
+    category: housing
+defekt_steuerzeichen.csv:
+  bank: N26-Format mit NUL-Bytes, Tabulator, Zeilenumbruch und U+2028 im Text
+  notes: NUL-Bytes werden entfernt, U+2028/Tab/Zeilenumbruch bleiben im Text; Tagger per Doppelklick treffen trotzdem.
+  skipped: 0
+  transactions:
+  - date: '2026-10-27'
+    recipient: REWE Markt GmbH
+    description: "Einkauf\tFiliale 12"
+    value: -23.45
+    category: food
+  - date: '2026-10-15'
+    recipient: Musterfirma GmbH
+    description: 'Gehalt       Oktober 2026'
+    value: 3245.67
+    category: income
+  - date: '2026-10-01'
+    recipient: Hausverwaltung Schröder & Söhne
+    description: 'Miete
+
+      Oktober 2026'
+    value: -1050.0
+    category: housing
+  - date: '2026-09-30'
+    recipient: Stadtwerke Bühl GmbH
+    description: Abschlag Strom 09/2026
+    value: -78.0
+    category: housing

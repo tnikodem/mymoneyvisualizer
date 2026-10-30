@@ -1,0 +1,12 @@
+Umsätze Girokonto;Zeitraum: 01.09.2026 - 29.10.2026;;;;;;;;;;;;;;;;
+Neuer Kontostand;;;;1.234,56;EUR;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;
+Buchungstag;Wert;Umsatzart;Begünstigter / Auftraggeber;Verwendungszweck;IBAN;BIC;Kundenreferenz;Mandatsreferenz ;Gläubiger ID;Fremde Gebühren;Betrag;Abweichender Empfänger;Anzahl der Aufträge;Anzahl der Schecks;Soll;Haben;Währung
+28.10.2026;28.10.2026;SEPA-Lastschrift von;REWE Markt GmbH;REWE SAGT DANKE 54713125;DE20500105175410213367;INGDDEFFXXX;;;;;;;;;-35,12;;EUR
+26.10.2026;26.10.2026;SEPA-Lastschrift von;Vodafone GmbH;Kundennummer 123456789 Rechnung 10/2026;DE20500105175410213367;INGDDEFFXXX;;;;;;;;;-39,99;;EUR
+15.10.2026;15.10.2026;SEPA-Überweisung an;Musterfirma GmbH;Gehalt Oktober 2026;DE20500105175410213367;INGDDEFFXXX;;;;;;;;;;3.245,67;EUR
+01.10.2026;01.10.2026;SEPA-Dauerauftrag an;Hausverwaltung Schröder & Söhne;Miete Oktober 2026;DE20500105175410213367;INGDDEFFXXX;;;;;;;;;-1.050,00;;EUR
+30.09.2026;30.09.2026;Kontoführungsentgelt;;Kontoführungsentgelt 09/2026;;;;;;;;;;;-8,90;;EUR
+15.09.2026;15.09.2026;SEPA-Überweisung an;Musterfirma GmbH;Gehalt September 2026;DE20500105175410213367;INGDDEFFXXX;;;;;;;;;;3.245,67;EUR
+01.09.2026;01.09.2026;SEPA-Dauerauftrag an;Hausverwaltung Schröder & Söhne;Miete September 2026;DE20500105175410213367;INGDDEFFXXX;;;;;;;;;-1.050,00;;EUR
+Kontostand;29.10.2026;;;1.234,56;EUR;;;;;;;;;;;;

@@ -1,0 +1,14 @@
+name,tag,recurring,count,sum
+salary,income.salary,,32,96200.0
+rent,household.rent,,32,-28800.0
+groceries,household.food,,105,-6338.91
+fuel,car.fuel,,64,-3428.09
+carsharing,carsharing,,32,-558.47
+insurance,car.insurance,1.0,3,-1800.0
+vacation,hobby.travel,,3,-6000.0
+laptop,hobby.tech,3.0,1,-1500.0
+sparen,spar,,32,-6400.0
+sparen_eingang,giro,,32,6400.0
+interest,income.interest,,2,40.0
+bio,household.food.bio,,23,-1316.03
+broken,never,,0,0.0

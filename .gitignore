@@ -29,6 +29,7 @@ coverage/
 
 test_input.csv
 
-# config files
-config/
-mmv_backup*
+# local data directories and backups with real financial data must never be committed
+/config/
+/data/
+/mmv_backup*

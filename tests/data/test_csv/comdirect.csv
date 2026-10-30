@@ -1,0 +1,13 @@
+;
+"Umsätze Girokonto";"Zeitraum: 90 Tage";
+"Neuer Kontostand";"2.003,13 EUR";
+
+"Buchungstag";"Wertstellung (Valuta)";"Vorgang";"Buchungstext";"Umsatz in EUR";
+"offen";"--";"Lastschrift / Belastung";"Auftraggeber: Amazon Payments Europe S.C.A. Buchungstext: 305-1234567-1234567 Amazon.de";"-25,99";
+"28.10.2026";"28.10.2026";"Lastschrift / Belastung";"Auftraggeber: REWE Markt GmbH Buchungstext: REWE SAGT DANKE 54713125 Ref. 9Q2C21X0A1B2C3D4/1";"-41,27";
+"21.10.2026";"21.10.2026";"Visa-Umsatz";"STARBUCKS MUENCHEN HBF";"-6,30";
+"15.10.2026";"15.10.2026";"Übertrag / Überweisung";"Auftraggeber: Musterfirma GmbH Buchungstext: Gehalt 10/2026 Ref. 7Y2C21X0A1B2C3D4";"3.245,67";
+"01.10.2026";"01.10.2026";"Dauerauftrag / Terminüberweisung";"Empfänger: Hausverwaltung Schröder & Söhne Kto/IBAN: DE29100500000123456789 Buchungstext: Miete Oktober";"-1.050,00";
+"30.09.2026";"30.09.2026";"Kontoabschluss";"Abschluss Kontoführung Buchungstext: Entgelte 09/2026";"-4,90";
+
+"Alter Kontostand";"1.234,56 EUR";
