@@ -139,10 +139,10 @@ def test_rows_with_invalid_date_or_amount_are_counted(write):
 def test_to_transactions_requires_date_and_value(write):
     path = write("Datum;Name;Saldo\n01.02.2024;A;-1,00\n")
     profile = _profile_for(path)
-    with pytest.raises(ImportFormatError, match="value"):
+    with pytest.raises(ImportFormatError, match="Betrag"):
         to_transactions(read_table(path, profile), profile)
     profile = profile.with_mapping(col_value="Saldo", decimal=",", thousands=",")
-    with pytest.raises(ImportFormatError, match="thousands"):
+    with pytest.raises(ImportFormatError, match="Tausendertrennzeichen"):
         to_transactions(read_table(path, profile), profile)
 
 

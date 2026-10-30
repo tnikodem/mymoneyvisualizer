@@ -4,37 +4,166 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Sequence
 
-from PyQt6.QtCore import QMargins, QObject, QPoint, QRect, QSize, QTimer, pyqtSignal
+from PyQt6.QtCore import QMargins, QObject, QPoint, QRect, QSize, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QColor, QShowEvent
-from PyQt6.QtWidgets import QHBoxLayout, QLabel, QMainWindow, QMessageBox, QWidget
+from PyQt6.QtWidgets import (
+    QCompleter,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QMainWindow,
+    QMessageBox,
+    QPushButton,
+    QToolButton,
+    QVBoxLayout,
+    QWidget,
+)
 from pyqt6_multiselect_combobox import MultiSelectComboBox
 
 from mymoneyvisualizer.app import AppModel
 from mymoneyvisualizer.domain.categories import display_category
+from mymoneyvisualizer.ui.style import set_variant
 
-GREY = QColor(123, 123, 123)
-GREEN = QColor(203, 255, 179)
-RED = QColor(255, 122, 111)
-TOTAL_BACKGROUND = QColor(0, 0, 0, 40)
-MORE_EXPENSE = QColor(255, 196, 186)
-LESS_EXPENSE = QColor(206, 242, 196)
-
-PLOT_COLORS = [
-    (246, 112, 136),
-    (219, 136, 49),
-    (173, 156, 49),
-    (119, 170, 49),
-    (51, 176, 122),
-    (53, 172, 164),
-    (56, 168, 197),
-    (110, 154, 244),
-    (204, 121, 244),
-    (245, 101, 204),
-]
+GREY = QColor("#e6e9ee")
+GREEN = QColor("#d9f0df")
+RED = QColor("#fbdcd8")
+TOTAL_BACKGROUND = QColor("#eef1f5")
+MORE_EXPENSE = QColor("#f8cfca")
+LESS_EXPENSE = QColor("#cdebd5")
 
 
 def line_edit_style(color: QColor | None) -> str:
     return "" if color is None else f"QLineEdit {{ background: {color.name()}; }}"
+
+
+def make_button(
+    text: str, tooltip: str = "", parent: QWidget | None = None, *, primary: bool = False, link: bool = False
+) -> QPushButton:
+    """A button with an explanation; ``primary`` for the main action of a window, ``link`` for a text link."""
+    button = QPushButton(text, parent)
+    button.setToolTip(tooltip)
+    if primary:
+        button.setProperty("primary", True)
+    if link:
+        button.setProperty("link", True)
+        button.setCursor(Qt.CursorShape.PointingHandCursor)
+    return button
+
+
+def make_label(text: str = "", parent: QWidget | None = None, role: str | None = None, wrap: bool = False) -> QLabel:
+    """A label; ``role`` is one of title, heading, hint (secondary text) and kpi (a big number)."""
+    label = QLabel(text, parent)
+    if role is not None:
+        label.setProperty("role", role)
+    label.setWordWrap(wrap)
+    return label
+
+
+def set_tone(widget: QWidget, tone: str | None) -> None:
+    """Color a label or card by what it means: good, bad, warning or neutral (``None``)."""
+    set_variant(widget, "tone", tone or "")
+
+
+class Card(QFrame):
+    """A white panel with rounded corners; ``layout`` takes its content."""
+
+    def __init__(self, parent: QWidget | None = None, horizontal: bool = False, margins: int = 14):
+        super().__init__(parent)
+        self.setProperty("card", True)
+        self.content = QHBoxLayout(self) if horizontal else QVBoxLayout(self)
+        self.content.setContentsMargins(margins, margins - 2, margins, margins - 2)
+
+
+class HelpButton(QToolButton):
+    """The "?" of a window: its explanation as tooltip, a click shows it in a dialog."""
+
+    def __init__(self, text: str, title: str, parent: QWidget | None = None):
+        super().__init__(parent)
+        self.setText("?")
+        self.setProperty("help", True)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.text_, self.title = text, title
+        self.setToolTip(text)
+        self.clicked.connect(self.show_help)
+
+    def show_help(self) -> None:
+        QMessageBox.information(self, self.title, self.text_)
+
+
+class InfoBanner(QFrame):
+    """A short explanation at the top of a window until it is closed; the help button of the window keeps it.
+
+    ``name`` remembers the closing in the settings, so a banner is read once, not every day.
+    """
+
+    def __init__(self, model: AppModel, name: str, text: str, details: str = "", title: str = "", parent=None):
+        super().__init__(parent)
+        self.setProperty("banner", True)
+        self.model, self.name = model, name
+        self.details, self.title = details, title
+        icon = make_label("ⓘ", self)
+        icon.setStyleSheet("font-size: 13pt; color: #2a78d6;")
+        self.label = make_label(text, self, wrap=True)
+        self.label.setTextFormat(Qt.TextFormat.RichText)
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(12, 6, 6, 6)
+        layout.addWidget(icon, 0, Qt.AlignmentFlag.AlignVCenter)
+        layout.addWidget(self.label, 1)
+        self.more_button = None
+        if details:
+            self.more_button = make_button("Mehr", "Ausführliche Erklärung anzeigen", self, link=True)
+            self.more_button.clicked.connect(self.show_details)
+            layout.addWidget(self.more_button, 0, Qt.AlignmentFlag.AlignVCenter)
+        self.close_button = QToolButton(self)
+        self.close_button.setText("✕")
+        self.close_button.setProperty("close", True)
+        self.close_button.setToolTip("Hinweis ausblenden; die Erklärung bleibt über das „?“ des Fensters erreichbar.")
+        self.close_button.clicked.connect(self.dismiss)
+        layout.addWidget(self.close_button, 0, Qt.AlignmentFlag.AlignVCenter)
+        self.update_visibility()
+
+    def update_visibility(self) -> None:
+        self.setHidden(self.name in self.model.settings.hidden_hints)
+
+    def dismiss(self) -> None:
+        self.hide()
+        self.model.hide_hint(self.name)
+
+    def show_details(self) -> None:
+        QMessageBox.information(self, self.title or "Erklärung", self.details)
+
+
+class KeyFigure(QFrame):
+    """A key figure as a card: what it is, the big number and one line that says what it means."""
+
+    def __init__(self, title: str, tooltip: str = "", parent: QWidget | None = None):
+        super().__init__(parent)
+        self.setProperty("card", True)
+        self.setToolTip(tooltip)
+        self.title = make_label(title, self, "hint")
+        self.value = make_label("–", self, "kpi")
+        self.detail = make_label("", self, "hint", wrap=True)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(14, 10, 14, 10)
+        layout.setSpacing(2)
+        layout.addWidget(self.title)
+        layout.addWidget(self.value)
+        layout.addWidget(self.detail)
+        layout.addStretch(1)
+
+    def set(self, value: str, detail: str = "", tone: str | None = None) -> None:
+        self.value.setText(value)
+        self.detail.setText(detail)
+        set_tone(self, tone)
+        set_tone(self.value, tone)
+
+
+def category_completer(model: AppModel, parent: QObject) -> QCompleter:
+    """Proposes the known categories and the account names (internal transfers) while a category is typed."""
+    completer = QCompleter(model.unique_categories() + model.account_names, parent)
+    completer.setFilterMode(Qt.MatchFlag.MatchContains)
+    completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+    return completer
 
 
 class ModelBridge(QObject):
@@ -160,7 +289,7 @@ class CategorySelect(QWidget):
     def __init__(self, label: str, parent: QWidget | None = None):
         super().__init__(parent)
         self.combo = MultiSelectComboBox(self)
-        self.combo.setPlaceholderText("none")
+        self.combo.setPlaceholderText("keine")
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(QLabel(label, self))

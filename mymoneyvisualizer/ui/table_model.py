@@ -13,12 +13,16 @@ from PyQt6.QtCore import QAbstractTableModel, QModelIndex, Qt
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QAbstractItemView, QHeaderView, QTableView, QWidget
 
+from mymoneyvisualizer.ui.style import GOOD, rich
+
 SORT_ROLE = Qt.ItemDataRole.UserRole + 1
 
 TEXT, CATEGORY, DATE, MONEY, MONEY0, NUMBER = "text", "category", "date", "money", "money0", "number"
 #: spread in months and residual value in percent; 0 (not spread) stays empty
 MONTHS, PERCENT = "months", "percent"
 NUMERIC = (MONEY, MONEY0, NUMBER, MONTHS, PERCENT)
+#: text color of money that comes in
+INCOMING = QColor(GOOD)
 
 
 @dataclass(frozen=True)
@@ -28,6 +32,8 @@ class Column:
     kind: str = TEXT
     width: int | None = None
     hidden: bool = False
+    #: explanation shown when the mouse rests on the column header
+    tooltip: str = ""
 
 
 def _is_missing(value: Any) -> bool:
@@ -40,14 +46,35 @@ def format_money(value: float, decimals: int = 2) -> str:
     return text.replace(",", "\x00").replace(".", ",").replace("\x00", ".")
 
 
+MONTH_NAMES = ("Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez")
+
+
+def format_month(month: pd.Period | str) -> str:
+    """``2025-10`` -> ``Okt 2025``."""
+    period = pd.Period(month, freq="M")
+    return f"{MONTH_NAMES[period.month - 1]} {period.year}"
+
+
+def format_month_range(start: pd.Period | str, end: pd.Period | str) -> str:
+    """``Okt 2025 – Sep 2026``; a single month once, a calendar year as ``2025``."""
+    start, end = pd.Period(start, freq="M"), pd.Period(end, freq="M")
+    if start == end:
+        return format_month(start)
+    if start.year == end.year and start.month == 1 and end.month == 12:
+        return str(start.year)
+    if start.year == end.year:
+        return f"{MONTH_NAMES[start.month - 1]} – {format_month(end)}"
+    return f"{format_month(start)} – {format_month(end)}"
+
+
 def format_months(months: int) -> str:
-    """``60`` -> ``5 years``, ``18`` -> ``18 months``, ``0`` -> ``""``."""
+    """``60`` -> ``5 Jahre``, ``18`` -> ``18 Monate``, ``0`` -> ``""``."""
     if months <= 0:
         return ""
     if months % 12 == 0:
         years = months // 12
-        return f"{years} year" if years == 1 else f"{years} years"
-    return f"{months} month" if months == 1 else f"{months} months"
+        return "1 Jahr" if years == 1 else f"{years} Jahre"
+    return "1 Monat" if months == 1 else f"{months} Monate"
 
 
 def format_value(value: Any, kind: str) -> str:
@@ -59,8 +86,8 @@ def format_value(value: Any, kind: str) -> str:
         return f"{int(value)} %" if value else ""
     if kind == DATE:
         return pd.Timestamp(value).strftime("%d.%m.%Y")
-    if kind == MONEY:
-        return format_money(float(value))
+    if kind == MONEY:  # a single amount; the sums of the monthly table (MONEY0) go without the unit
+        return f"{format_money(float(value))} €"
     if kind == MONEY0:
         return format_money(float(value), 0)
     if kind == NUMBER:
@@ -166,8 +193,12 @@ class DataFrameModel(QAbstractTableModel):
         return 0 if parent is not None and parent.isValid() else len(self.columns)
 
     def headerData(self, section, orientation, role=Qt.ItemDataRole.DisplayRole):  # noqa: N802 (Qt API)
-        if role == Qt.ItemDataRole.DisplayRole and orientation == Qt.Orientation.Horizontal:
+        if orientation != Qt.Orientation.Horizontal:
+            return None
+        if role == Qt.ItemDataRole.DisplayRole:
             return self.columns[section].title
+        if role == Qt.ItemDataRole.ToolTipRole:
+            return rich(self.columns[section].tooltip) or None
         return None
 
     def data(self, index: QModelIndex, role=Qt.ItemDataRole.DisplayRole):
@@ -179,11 +210,14 @@ class DataFrameModel(QAbstractTableModel):
         if role == Qt.ItemDataRole.BackgroundRole:
             return self.background(index.row(), column.key) if self.background is not None else None
         if role == Qt.ItemDataRole.ToolTipRole:
-            return self.tooltip(index.row(), column.key) if self.tooltip is not None else None
-        if role not in (Qt.ItemDataRole.DisplayRole, SORT_ROLE):
+            return rich(self.tooltip(index.row(), column.key) or "") or None if self.tooltip is not None else None
+        if role not in (Qt.ItemDataRole.DisplayRole, SORT_ROLE, Qt.ItemDataRole.ForegroundRole):
             return None
         array = self._arrays[index.column()]
         value = None if array is None else array[index.row()]
+        if role == Qt.ItemDataRole.ForegroundRole:  # money that comes in is green
+            positive = column.kind in (MONEY, MONEY0) and not _is_missing(value) and float(value) >= 0.5
+            return INCOMING if positive else None
         return format_value(value, column.kind) if role == Qt.ItemDataRole.DisplayRole else sort_key(value, column.kind)
 
 
@@ -201,8 +235,10 @@ class DataFrameView(QTableView):
         self.setSortingEnabled(sortable)
         self.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.setAlternatingRowColors(True)
         self.verticalHeader().setVisible(False)
         self.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
+        self.verticalHeader().setDefaultSectionSize(28)
         self.horizontalHeader().setStretchLastSection(True)
         self.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         model.modelReset.connect(self.apply_columns)

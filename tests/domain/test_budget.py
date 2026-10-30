@@ -1,21 +1,33 @@
-import numpy as np
 import pandas as pd
 import pytest
 
 from mymoneyvisualizer.domain.budget import (
+    IN_PERIOD,
+    NEXT_MONTH,
+    REMAINING,
     SAVED,
+    SOLD,
+    SPREAD_AMOUNT,
+    SPREAD_FROM,
+    SPREAD_TO,
+    UNTIL,
     BudgetSeries,
     budget_report,
     budget_series,
+    contributions,
     group_totals,
+    period_months,
+    prepaid,
+    previous_months,
     smooth,
-    stacked_curves,
 )
-from mymoneyvisualizer.domain.models import GroupAssignment
+from mymoneyvisualizer.domain.columns import Col
+from mymoneyvisualizer.domain.models import LAST_12_MONTHS, GroupAssignment
 
 from ..helpers import categorized
 
 SHARES = {"needs": 0.5, "wants": 0.3}
+YEAR_2024 = (pd.Period("2024-01", "M"), pd.Period("2024-12", "M"))
 GROUPS = [
     GroupAssignment("income", "income"),
     GroupAssignment("household", "needs"),
@@ -56,7 +68,7 @@ def test_budget_series_empty():
     series = budget_series(categorized(("2024-01-01", "a", "b", -1.0), categories=["x"]), excluded_categories=["x"])
     assert series.monthly.empty
     assert series.last_date is None
-    assert budget_report(series, [], 2024, 2024, SHARES) is None
+    assert budget_report(series, [], *YEAR_2024, SHARES) is None
 
 
 def _series(last_date="2024-12-31"):
@@ -79,10 +91,11 @@ def test_group_totals():
 
 
 def test_budget_report():
-    report = budget_report(_series(), GROUPS, 2024, 2024, SHARES)
+    report = budget_report(_series(), GROUPS, *YEAR_2024, SHARES)
     assert report.months == report.period_months == 12
     assert report.is_complete
     assert report.income == pytest.approx(36000.0)
+    assert report.income_categories == [("income", 36000.0)]
     assert report.needs.amount == pytest.approx(12 * 1530.0)
     assert report.needs.categories == [("household", 14400.0), ("car", 3600.0), ("", 360.0)]
     assert report.wants.amount == pytest.approx(7200.0)
@@ -98,7 +111,7 @@ def test_budget_report():
 def test_too_little_saved_gives_negative_room():
     series = _series()
     series.monthly["hobby"] = -1470.0
-    report = budget_report(series, GROUPS, 2024, 2024, SHARES)
+    report = budget_report(series, GROUPS, *YEAR_2024, SHARES)
     assert report.savings_rate == pytest.approx(0.0)
     assert report.room_per_month == pytest.approx(-0.2 * 3000.0)
 
@@ -106,7 +119,7 @@ def test_too_little_saved_gives_negative_room():
 def test_budget_report_counts_only_the_months_of_the_period_with_data():
     series = _series()
     series.monthly.index = pd.period_range("2023-07", "2024-06", freq="M")
-    report = budget_report(series, GROUPS, 2024, 2025, SHARES)
+    report = budget_report(series, GROUPS, pd.Period("2024-01", "M"), pd.Period("2025-12", "M"), SHARES)
     assert (report.months, report.period_months) == (6, 24)
     assert not report.is_complete
     assert report.income == pytest.approx(18000.0)
@@ -116,28 +129,93 @@ def test_budget_report_counts_only_the_months_of_the_period_with_data():
 def test_budget_report_without_income():
     series = _series()
     series.monthly["income"] = 0.0
-    report = budget_report(series, GROUPS, 2024, 2024, SHARES)
+    report = budget_report(series, GROUPS, *YEAR_2024, SHARES)
     assert report.savings_rate is None
     assert report.room_per_month is None
 
 
 def test_budget_report_outside_the_data():
-    report = budget_report(_series(), GROUPS, 2030, 2030, SHARES)
+    report = budget_report(_series(), GROUPS, pd.Period("2030-01", "M"), pd.Period("2030-12", "M"), SHARES)
     assert report.months == 0
     assert report.room_per_month is None
     assert report.per_month(100.0) == 0.0
 
 
-def test_stacked_curves_in_reverse_group_order():
-    monthly = _series().monthly
-    curves = stacked_curves(monthly, GROUPS, "needs")
-    assert [name for name, _ in curves] == ["car", "household"]
-    np.testing.assert_allclose(curves[-1][1], 1500.0)
-
-
-def test_smooth_is_a_moving_average_of_twelve_months():
+def test_smooth_starts_with_a_full_year():
+    """An average of fewer months would show a single large payment (here 12 in January) as a spike."""
     monthly = pd.DataFrame({"x": [12.0] + [0.0] * 13}, index=pd.period_range("2024-01", periods=14, freq="M"))
-    smoothed = smooth(monthly)["x"].tolist()
-    assert smoothed[:2] == [12.0, 6.0]
-    assert smoothed[11] == pytest.approx(1.0)
-    assert smoothed[12] == 0.0
+    smoothed = smooth(monthly)["x"]
+    assert smoothed.index[0] == pd.Period("2024-12", "M")
+    assert smoothed.tolist() == pytest.approx([1.0, 0.0, 0.0])
+    assert smooth(monthly.iloc[:11]).empty
+
+
+def test_period_months():
+    last = pd.Period("2026-09", "M")
+    assert period_months(LAST_12_MONTHS, last) == (pd.Period("2025-10", "M"), last)
+    assert period_months("2025", last) == (pd.Period("2025-01", "M"), pd.Period("2025-12", "M"))
+    assert period_months("2026", last) == (pd.Period("2026-01", "M"), last)  # only complete months
+    assert previous_months(*period_months("2026", last)) == (pd.Period("2025-01", "M"), pd.Period("2025-09", "M"))
+    assert period_months("2025-03:2025-08", last) == (pd.Period("2025-03", "M"), pd.Period("2025-08", "M"))
+    assert period_months("2026-03:2026-12", last) == (pd.Period("2026-03", "M"), last)  # only complete months
+
+
+def _month(text):
+    return pd.Period(text, freq="M")
+
+
+def test_contributions_of_a_period_include_spread_payments_made_before():
+    df = categorized(
+        ("2024-01-10", "Möbelhaus", "Sofa", -2400.0),  # 10 years: 20 € per month
+        ("2025-03-05", "REWE", "x", -10.0),
+        ("2025-06-01", "HUK", "Kfz", -600.0),  # June 2025 to May 2026: 50 € per month
+        ("2025-07-01", "Ich", "Sparen", -100.0),  # internal transfer
+        categories=["home.sofa", "food", "insurance", "spar"],
+        spread_months=[120, 0, 12, 0],
+    )
+    rows = contributions(df, _month("2025-01"), _month("2025-12"), own_accounts=["spar"])
+    assert list(rows[Col.recipient]) == ["Möbelhaus", "REWE", "HUK"]
+    assert list(rows[IN_PERIOD]) == [-240.0, -10.0, -350.0]  # the insurance counts 7 of its 12 months
+    assert list(rows[SPREAD_AMOUNT]) == [-2400.0, -10.0, -600.0]
+    assert (rows[SPREAD_FROM].iloc[0], rows[SPREAD_TO].iloc[0]) == (_month("2024-01"), _month("2033-12"))
+    assert not rows[SOLD].any()
+    only = contributions(df, _month("2025-01"), _month("2025-12"), categories=["home"])
+    assert list(only[Col.recipient]) == ["Möbelhaus"]  # main categories
+    assert contributions(df, _month("2023-01"), _month("2023-12")).empty
+
+
+def test_prepaid_is_what_was_paid_for_the_months_after_the_period():
+    df = categorized(
+        ("2024-01-10", "Möbelhaus", "Sofa", -2400.0),  # 10 years: 20 € per month until December 2033
+        ("2025-03-05", "REWE", "x", -10.0),
+        ("2025-06-01", "HUK", "Kfz", -600.0),  # June 2025 to May 2026: 50 € per month
+        ("2025-07-01", "Ich", "Sparen", -100.0),  # internal transfer
+        ("2025-11-28", "Arbeitgeber", "Weihnachtsgeld", 1200.0),  # November 2025 to October 2026: 100 € per month
+        categories=["home.sofa", "food", "insurance", "spar", "income.bonus"],
+        spread_months=[120, 0, 12, 0, 12],
+    )
+    rows = prepaid(df, _month("2025-12"), own_accounts=["spar"])
+    assert list(rows.index) == ["home", "income", "insurance"]  # main categories with payments ahead
+    assert list(rows[NEXT_MONTH]) == [-20.0, 100.0, -50.0]  # paid already for January 2026
+    assert list(rows[REMAINING]) == [-20.0 * 96, 100.0 * 10, -50.0 * 5]
+    assert list(rows[UNTIL]) == [_month("2033-12"), _month("2026-10"), _month("2026-05")]
+    assert list(prepaid(df, _month("2025-05")).index) == ["home"]  # the insurance is paid in June
+    assert prepaid(df, _month("2033-12")).empty
+
+
+def test_contributions_of_a_sold_purchase():
+    """A car for 30,000 € sold for 10,000 € after 18 months: 20,000 € over 18 months; the sale has no row."""
+    df = categorized(
+        ("2024-01-15", "Autohaus", "Auto", -30000.0),
+        ("2025-06-20", "Max Mustermann", "Verkauf Auto", 10000.0),
+        categories=["car", "car"],
+        spread_months=[60, 0],
+        residual_percent=[40, 0],
+    )
+    df.loc[1, Col.sale_of] = df.loc[0, Col.transaction_id]
+    rows = contributions(df, _month("2025-01"), _month("2025-12"))
+    assert list(rows[Col.recipient]) == ["Autohaus"]
+    assert rows[IN_PERIOD].iloc[0] == pytest.approx(-20000 / 18 * 6, abs=0.01)
+    assert rows[SPREAD_AMOUNT].iloc[0] == -20000.0  # the loss of value, not the price
+    assert rows[SPREAD_TO].iloc[0] == _month("2025-06")
+    assert rows[SOLD].iloc[0]

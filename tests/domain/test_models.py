@@ -1,16 +1,18 @@
-import datetime
 import math
 
 import pytest
 
 from mymoneyvisualizer.domain.models import (
+    LAST_12_MONTHS,
     GroupAssignment,
     ManualCategory,
     Rule,
     Settings,
     clean_months,
     clean_percent,
+    custom_period,
     reorder_groups,
+    valid_budget_period,
 )
 
 
@@ -28,19 +30,26 @@ def test_clean_percent(value, expected):
 
 
 def test_rule_roundtrip_and_missing_values():
-    rule = Rule(name="t", category="car", regex_recipient="Autohaus", spread_months=72, residual_percent=40)
+    rule = Rule(category="car", regex_recipient="Autohaus", spread_months=72, residual_percent=40)
     assert Rule.from_dict(rule.to_dict()) == rule
-    assert Rule.from_dict({"name": "t", "category": None}) == Rule(name="t")
+    assert Rule.from_dict({"category": None}) == Rule()
+
+
+def test_rule_id_tells_rules_apart_but_is_not_stored_or_compared():
+    first, second = Rule(category="food"), Rule(category="food")
+    assert first.id != second.id
+    assert first == second
+    assert "id" not in first.to_dict()
+    assert Rule.from_dict(first.to_dict()).id != first.id
 
 
 def test_unspread_rule_has_no_spread_keys():
-    assert Rule("t", "food", "REWE").to_dict() == {
-        "name": "t",
+    assert Rule("food", "REWE").to_dict() == {
         "category": "food",
         "regex_recipient": "REWE",
         "regex_description": "",
     }
-    assert "residual_percent" not in Rule("t", spread_months=12).to_dict()
+    assert "residual_percent" not in Rule(spread_months=12).to_dict()
 
 
 def test_manual_category_roundtrip():
@@ -57,9 +66,28 @@ def test_group_assignment_unknown_category():
     assert GroupAssignment.from_dict({"category": "x"}).to_dict() == {"category": "x", "group": "needs"}
 
 
-def test_settings_defaults_use_current_year():
+@pytest.mark.parametrize(
+    ("period", "valid"),
+    [
+        ("last 12 months", True),
+        ("2025", True),
+        ("2025-03:2026-02", True),
+        ("2025-03:2025-03", True),
+        ("2026-02:2025-03", False),
+        ("2025-13:2026-01", False),
+        ("25", False),
+        (2025, False),
+    ],
+)
+def test_budget_periods(period, valid):
+    assert valid_budget_period(period) is valid
+    if valid and isinstance(period, str) and ":" in period:
+        assert custom_period(*period.split(":")) == period
+
+
+def test_settings_defaults():
     settings = Settings()
-    assert settings.budget_start == settings.budget_end == datetime.date.today().year
+    assert settings.budget_period == LAST_12_MONTHS
     assert settings.budget_shares == {"needs": 0.5, "wants": 0.3}
     assert settings.savings_share == pytest.approx(0.2)
     assert settings.hide_internal_transfers is True
@@ -81,7 +109,9 @@ def test_settings_instances_do_not_share_state():
 
 
 def test_settings_roundtrip():
-    settings = Settings(excluded_categories=["x"], budget_start=2020, budget_end=2022, hide_internal_transfers=False)
+    settings = Settings(
+        excluded_categories=["x"], budget_period="2022", hide_internal_transfers=False, hidden_hints=["budget"]
+    )
     settings.budget_shares["needs"] = 0.4
     assert Settings.from_dict(settings.to_dict()) == settings
 
@@ -92,19 +122,16 @@ def test_settings_roundtrip():
         None,
         {},
         {"budget": "garbage"},
-        {"budget": {"start": 2020}},
+        {"budget": {"period": 2020}},
+        {"budget": {"period": "last year"}},
         {"budget": {"shares": {"needs": 7}}},
         {"budget": {"shares": "garbage"}},
         {"excluded_categories": "not-a-list"},
+        {"hidden_hints": "not-a-list"},
     ],
 )
 def test_settings_ignore_invalid_values(data):
     assert Settings.from_dict(data) == Settings()
-
-
-def test_settings_swap_inverted_period():
-    settings = Settings.from_dict({"budget": {"start": 2024, "end": 2020}})
-    assert (settings.budget_start, settings.budget_end) == (2020, 2024)
 
 
 def test_reorder_groups_moves_and_recategorizes():

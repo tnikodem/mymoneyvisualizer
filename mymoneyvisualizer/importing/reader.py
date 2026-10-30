@@ -52,6 +52,19 @@ BALANCE_WORDS = frozenset(
 )
 
 
+#: names of the profile fields in messages
+FIELD_NAMES = {
+    "col_date": "Datum",
+    "col_recipient": "Empfänger",
+    "col_description": "Verwendungszweck",
+    "col_value": "Betrag",
+    "col_debit": "Soll",
+    "col_credit": "Haben",
+    "col_sign": "Soll/Haben-Kennzeichen",
+    "col_value_extra": "Zum Betrag addieren",
+}
+
+
 class ImportFormatError(ValueError):
     """The file cannot be read with the given profile."""
 
@@ -263,7 +276,7 @@ def to_transactions(table: pd.DataFrame, profile: ImportProfile) -> tuple[pd.Dat
     """``(transactions, invalid, zero)``: rows without a valid date/amount and zero amounts are dropped."""
     missing = profile.missing_columns(table.columns)
     if missing:
-        raise ImportFormatError("please select a column for " + ", ".join(m.removeprefix("col_") for m in missing))
+        raise ImportFormatError("Bitte eine Spalte wählen für: " + ", ".join(FIELD_NAMES.get(m, m) for m in missing))
     errors = profile.errors()
     if errors:
         raise ImportFormatError(next(iter(errors.values())))

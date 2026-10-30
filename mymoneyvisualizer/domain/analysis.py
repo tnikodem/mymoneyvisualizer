@@ -9,16 +9,20 @@ import numpy as np
 import pandas as pd
 
 from mymoneyvisualizer.domain.categories import category_at_level, matches_category
+from mymoneyvisualizer.domain.categorization import RuleMatcher, readable_pattern
 from mymoneyvisualizer.domain.columns import Col
 from mymoneyvisualizer.domain.models import CONSUMPTION_GROUPS, GROUP_INCOME, GROUP_SAVINGS, Rule
 
 TOTAL = "total"
 MONTHLY_AVERAGE = "monthly average"
+#: Column of the rule overview (a number) and the rule preview (the id of the winning rule or manual category):
+#: transactions a rule matches that get their category elsewhere.
+OVERRIDDEN = "overridden"
 
 #: Column of the income & expenses table that marks the summary rows below the categories ("" for categories).
 SUMMARY = "summary"
 INCOME, EXPENSES, SAVINGS, NET = "income", "expenses", "savings", "net"
-SUMMARY_LABELS = {INCOME: "Income", EXPENSES: "Expenses", SAVINGS: "Savings", NET: "Net"}
+SUMMARY_LABELS = {INCOME: "Einnahmen", EXPENSES: "Ausgaben", SAVINGS: "Sparen", NET: "Saldo"}
 
 MonthLike = str | pd.Period | pd.Timestamp
 
@@ -29,6 +33,12 @@ def to_month(value: MonthLike) -> pd.Period:
 
 def month_key(value: MonthLike) -> str:
     return to_month(value).strftime("%Y-%m")
+
+
+def last_complete_month(last_date: MonthLike, today: MonthLike | None = None) -> pd.Period:
+    """The month of the last transaction, but at most the previous month: the current month is not over yet."""
+    current = to_month(today if today is not None else pd.Timestamp.today())
+    return min(to_month(last_date), current - 1)
 
 
 def month_range(start: MonthLike, end: MonthLike) -> list[str]:
@@ -219,21 +229,44 @@ def detail_transactions(
     return data.sort_values(Col.date, kind="stable").reset_index(drop=True)
 
 
-def rule_overview(categorized: pd.DataFrame, rules: Iterable[Rule]) -> pd.DataFrame:
-    """Number of transactions and their sum per rule."""
+def rule_overview(categorized: pd.DataFrame, rules: Iterable[Rule], matcher: RuleMatcher | None = None) -> pd.DataFrame:
+    """One row per rule in the order they are applied: what it matches, what it sets and what it categorizes.
+
+    ``position`` counts from 1, ``recipient`` and ``description`` are the regexes for reading, ``count`` and ``sum``
+    cover the transactions the rule categorizes. :data:`OVERRIDDEN` counts the transactions it matches that get their
+    category from a later rule or a manual category instead. Pass the :class:`RuleMatcher` of ``categorized`` to reuse
+    its cached results.
+    """
+    matcher = matcher if matcher is not None else RuleMatcher(categorized)
     groups = categorized.groupby(Col.rule)[Col.value].agg(["count", "sum"])
     rows = []
-    for rule in rules:
-        count, total = groups.loc[rule.name] if rule.name in groups.index else (0, 0.0)
+    for position, rule in enumerate(rules, start=1):
+        count, total = groups.loc[rule.id] if rule.id in groups.index else (0, 0.0)
+        matches = int(matcher.mask(rule).sum())
         rows.append(
             {
-                "name": rule.name,
+                "id": rule.id,
+                "position": position,
+                "recipient": readable_pattern(rule.regex_recipient),
+                "description": readable_pattern(rule.regex_description),
                 Col.category: rule.category,
                 Col.spread_months: rule.spread_months,
                 Col.residual_percent: rule.residual_percent,
                 "count": int(count),
+                OVERRIDDEN: matches - int(count),
                 "sum": round(float(total), 2),
             }
         )
-    columns = ["name", Col.category, Col.spread_months, Col.residual_percent, "count", "sum"]
+    columns = [
+        "id",
+        "position",
+        "recipient",
+        "description",
+        Col.category,
+        Col.spread_months,
+        Col.residual_percent,
+        "count",
+        OVERRIDDEN,
+        "sum",
+    ]
     return pd.DataFrame(rows, columns=columns)

@@ -116,42 +116,38 @@ def build_state(
     rng = random.Random(seed)
     start = pd.Period("2014-11", "M")
     names = ["Girokonto", "Tagesgeld", *[f"Konto {i}" for i in range(2, accounts)]]
-    state = State(settings=Settings(budget_start=2025, budget_end=2026))
+    state = State(settings=Settings(budget_period="2025"))
     for i, name in enumerate(names):
         state.accounts[name] = _transactions(rng, i, start, years * 12, per_month * (1.0 if i < 2 else 0.6))
     combined = pd.concat(state.accounts.values(), ignore_index=True)
 
     rule_list: list[Rule] = []
     for recipient, _purpose, base, sub, _amount in FIXED:
-        rule_list.append(Rule(f"fixed {recipient}", category=f"{base}.{sub}", regex_recipient=re.escape(recipient)))
-    rule_list.append(Rule("savings out", category="Tagesgeld", regex_description="^Sparen ", regex_recipient="Max"))
-    rule_list.append(Rule("savings in", category="Girokonto", regex_description="^Sparen ", regex_recipient="Max"))
+        rule_list.append(Rule(category=f"{base}.{sub}", regex_recipient=re.escape(recipient)))
+    rule_list.append(Rule(category="Tagesgeld", regex_description="^Sparen ", regex_recipient="Max"))
+    rule_list.append(Rule(category="Girokonto", regex_description="^Sparen ", regex_recipient="Max"))
     kinds = ["merchant", "double click", "description", "alternation", "regex"]
     weights = [30, 40, 12, 12, 6]
     while len(rule_list) < rules:
         kind = rng.choices(kinds, weights)[0]
         merchant, base, sub, *_ = rng.choice(MERCHANTS)
         category = f"{base}.{sub}" if rng.random() < 0.8 else f"{base}.{sub}.{rng.randint(1, 5)}"
-        n = len(rule_list)
         if kind == "merchant":
-            rule = Rule(f"t{n}", category=category, regex_recipient=f"{re.escape(merchant)} {rng.randint(1, 120)}$")
+            rule = Rule(category=category, regex_recipient=f"{re.escape(merchant)} {rng.randint(1, 120)}$")
         elif kind == "double click":
             row = combined.iloc[rng.randrange(len(combined))]
             rule = Rule(
-                f"t{n}",
                 category=category,
                 regex_recipient=regex_for(row[Col.recipient]),
                 regex_description=regex_for(row[Col.description]),
             )
         elif kind == "description":
-            rule = Rule(f"t{n}", category=category, regex_description=re.escape(merchant.upper()))
+            rule = Rule(category=category, regex_description=re.escape(merchant.upper()))
         elif kind == "alternation":
             others = rng.sample(MERCHANTS, 3)
-            rule = Rule(f"t{n}", category=category, regex_recipient="|".join(re.escape(o[0]) for o in others))
+            rule = Rule(category=category, regex_recipient="|".join(re.escape(o[0]) for o in others))
         else:
-            rule = Rule(
-                f"t{n}", category=category, regex_description=rf"^{re.escape(merchant.upper()[:4])}.* \d{{8}}//20\d\d-"
-            )
+            rule = Rule(category=category, regex_description=rf"^{re.escape(merchant.upper()[:4])}.* \d{{8}}//20\d\d-")
         rule_list.append(rule)
     state.rules = rule_list
 

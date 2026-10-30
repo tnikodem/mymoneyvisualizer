@@ -20,7 +20,7 @@ def test_debit_and_credit_columns_are_proposed(window, model):
     assert window.column_combos["col_value"].currentText() == ""
     assert window.column_combos["col_debit"].currentText() == "Soll"
     assert window.column_combos["col_credit"].currentText() == "Haben"
-    assert window.status_text() == "7 new transactions, 1 rows without valid date or value"
+    assert window.status_text() == "<b>7 neue Buchungen</b> · 1 Zeile ohne gültiges Datum oder gültigen Betrag"
     window.import_transactions()
     assert model.account_transactions("konto")[Col.value].sum() == pytest.approx(4307.33)
 
@@ -30,7 +30,7 @@ def test_fee_and_tax_columns_can_be_switched_off(window, model):
     assert window.extra_combo.currentData() == ["fee", "tax"]
     assert window.table_model.frame[Col.value].sum() == pytest.approx(1450.90)
     window.extra_combo.setCurrentIndexes([])
-    assert window.status_text() == "10 new transactions, 1 with value 0"  # the card fee is lost without "fee"
+    assert window.status_text() == "<b>10 neue Buchungen</b> · 1 mit Betrag 0"  # the card fee is lost without "fee"
     window.extra_combo.setCurrentIndexes([window.extra_combo.findText("fee")])
     assert window.table_model.frame[Col.value].sum() == pytest.approx(1450.90 + 4.86 + 12.34)
     assert window.profile().col_value_extra == ["fee"]
@@ -44,7 +44,9 @@ def test_debit_credit_mark_is_proposed_and_saved(window, model):
     assert sorted(model.account_transactions("konto")[Col.value]) == [-870.0, -870.0, -31.18, -18.45, 3245.67, 3245.67]
     window.open_file(DATA / "volksbank_alt_soll_haben.csv", "konto")  # stored profile is found again
     assert window.original_name == model.profiles[0].name
-    assert window.status_text() == "0 new transactions, 6 already imported, 2 rows without valid date or value"
+    assert window.status_text() == (
+        "<b>0 neue Buchungen</b> · 6 schon vorhanden · 2 Zeilen ohne gültiges Datum oder gültigen Betrag"
+    )
 
 
 @pytest.mark.parametrize(
@@ -91,4 +93,4 @@ def test_mixed_encoding_is_offered(window):
     assert "Stadtwerke Bühl GmbH" in set(window.table_model.frame[Col.recipient])
     window.encoding_combo.setCurrentText("utf-8")  # wrong choice: the cp1252 lines show broken characters
     assert "Stadtwerke B�hl GmbH" in set(window.table_model.frame[Col.recipient])
-    assert window.status_text().startswith("8 new transactions")
+    assert window.status_text().startswith("<b>8 neue Buchungen</b>")

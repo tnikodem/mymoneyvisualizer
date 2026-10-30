@@ -107,15 +107,15 @@ class ImportProfile:
     def errors(self) -> dict[str, str]:
         errors = {}
         if len(self.separator) != 1:
-            errors["separator"] = "separator must be exactly one character"
+            errors["separator"] = "Das Trennzeichen muss genau ein Zeichen sein."
         if len(self.decimal) != 1:
-            errors["decimal"] = "decimal mark must be exactly one character"
+            errors["decimal"] = "Das Dezimalzeichen muss genau ein Zeichen sein."
         if len(self.thousands) > 1:
-            errors["thousands"] = "thousands separator must be at most one character"
+            errors["thousands"] = "Das Tausendertrennzeichen darf höchstens ein Zeichen sein."
         elif self.thousands and self.thousands == self.decimal:
-            errors["thousands"] = "thousands separator and decimal mark must differ"
+            errors["thousands"] = "Tausendertrennzeichen und Dezimalzeichen müssen verschieden sein."
         if self.skiprows < 0:
-            errors["skiprows"] = "header line must not be negative"
+            errors["skiprows"] = "Die Zahl der Zeilen vor der Kopfzeile darf nicht negativ sein."
         return errors
 
     def with_mapping(self, **mapping: Any) -> ImportProfile:

@@ -27,7 +27,7 @@ def reference_categorization(df, rules, manual_categories=None):
     out[Col.spread_months] = out[Col.residual_percent] = 0
     for rule in rules:
         mask = rule_mask(out, rule)
-        out.loc[mask, [Col.category, Col.rule]] = [rule.category, rule.name]
+        out.loc[mask, [Col.category, Col.rule]] = [rule.category, rule.id]
         out.loc[mask, [Col.spread_months, Col.residual_percent]] = [rule.spread_months, rule.residual_percent]
     for transaction_id, manual in (manual_categories or {}).items():
         mask = out[Col.transaction_id] == transaction_id
@@ -145,9 +145,9 @@ def test_matcher_caches_and_handles_invalid_regex(caplog):
     matcher = RuleMatcher(df)
     first = matcher.distinct_matches(Col.recipient, "RE")
     assert matcher.distinct_matches(Col.recipient, "RE") is first
-    assert not matcher.mask(Rule("bad", regex_recipient="([")).any()
+    assert not matcher.mask(Rule(regex_recipient="([")).any()
     assert "invalid regex" in caplog.text
-    assert matcher.mask(Rule("all")).all()
+    assert matcher.mask(Rule()).all()
     matcher.CACHE_LIMIT = 1
     matcher.distinct_matches(Col.description, "x")
     assert len(matcher._cache) == 1
@@ -169,7 +169,7 @@ def test_engine_equals_reference_on_large_data():
 def test_engine_equals_reference_with_tricky_rules():
     df = transactions(*[(f"2024-01-{i % 28 + 1:02d}", text, text[::-1], -1.0) for i, text in enumerate(TEXTS)])
     rules = [
-        Rule(f"t{i}", category=f"category{i}", regex_recipient=p, regex_description=q, spread_months=12 * (i % 3))
+        Rule(category=f"category{i}", regex_recipient=p, regex_description=q, spread_months=12 * (i % 3))
         for i, (p, q) in enumerate(
             [
                 ("REWE", ""),
@@ -203,17 +203,26 @@ def test_result_is_identical_after_restart(tmp_path):
     model = AppModel.open(tmp_path / "data")
     model.transactions()  # fill the caches
     first = model.rules[10]
-    model.save_rule(Rule("new", category="x.new", regex_recipient="REWE Markt 1"))
-    model.save_rule(Rule(first.name, category="y.changed", regex_description="SAGT DANKE"), original_name=first.name)
-    model.delete_rules([model.rules[20].name])
+    model.save_rule(Rule(category="x.new", regex_recipient="REWE Markt 1"))
+    model.save_rule(Rule(category="y.changed", regex_description="SAGT DANKE"), original_id=first.id)
+    model.update_rule(model.rules[5].id, spread_months=12, residual_percent=20)
+    model.delete_rules([model.rules[20].id])
     some_id = model.transactions()[Col.transaction_id].iloc[100]
     model.save_manual_category(ManualCategory(some_id, "z.once", spread_months=36))
     model.remove_manual_category(next(iter(model.manual_categories)))
-    model.preview_rule(Rule("draft", regex_recipient="Shell"), first.name, some_id)
+    model.preview_rule(Rule(regex_recipient="Shell"), first.id, some_id)
     model.import_transactions("Girokonto", transactions(("2026-10-01", "REWE Markt 1", "Einkauf", -5.0)))
 
-    restarted = AppModel.open(tmp_path / "data")
     columns = [Col.transaction_id, Col.account, *CATEGORY_COLUMNS]
-    pd.testing.assert_frame_equal(model.transactions()[columns], restarted.transactions()[columns])
+
+    def categories(model, df):
+        """Rule ids are new after a restart, so the winning rule is compared by its position."""
+        positions = {rule.id: f"#{i}" for i, rule in enumerate(model.rules)}
+        return df[columns].assign(**{Col.rule: df[Col.rule].map(lambda r: positions.get(r, r))})
+
+    restarted = AppModel.open(tmp_path / "data")
+    pd.testing.assert_frame_equal(
+        categories(model, model.transactions()), categories(restarted, restarted.transactions())
+    )
     fresh = apply_rules(restarted._combined_raw(), restarted.rules, restarted.manual_categories)
     pd.testing.assert_frame_equal(restarted.transactions()[columns], fresh[columns])

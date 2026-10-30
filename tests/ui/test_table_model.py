@@ -27,7 +27,7 @@ from mymoneyvisualizer.ui.table_model import (
 @pytest.mark.parametrize(
     ("value", "kind", "expected"),
     [
-        (-1234.567, MONEY, "-1.234,57"),
+        (-1234.567, MONEY, "-1.234,57 €"),
         (1234.5, MONEY0, "1.234"),
         (2.0, NUMBER, "2"),
         (2.5, NUMBER, "2.5"),
@@ -73,11 +73,11 @@ def test_model_roles(qtbot):
     model.set_frame(_frame())
     assert (model.rowCount(), model.columnCount()) == (4, 3)
     index = model.index(1, 1)
-    assert model.data(index) == "10,00"
+    assert model.data(index) == "10,00 €"
     assert model.data(index, SORT_ROLE) == 10.0
     assert model.data(index, Qt.ItemDataRole.TextAlignmentRole) & Qt.AlignmentFlag.AlignRight
     assert model.data(index, Qt.ItemDataRole.BackgroundRole) == QColor("red")
-    assert model.data(index, Qt.ItemDataRole.ToolTipRole) == "1:value"
+    assert model.data(index, Qt.ItemDataRole.ToolTipRole) == "<p>1:value</p>"  # rich text wraps
     assert model.data(model.index(0, 0), Qt.ItemDataRole.TextAlignmentRole) is None
     assert model.data(model.index(0, 0), Qt.ItemDataRole.DecorationRole) is None
     assert model.data(model.index(9, 9)) is None

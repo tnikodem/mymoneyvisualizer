@@ -24,13 +24,16 @@ from mymoneyvisualizer.domain.columns import (
 from mymoneyvisualizer.domain.models import (
     GROUP_INCOME,
     GROUP_NEEDS,
+    LAST_12_MONTHS,
     GroupAssignment,
     ManualCategory,
     Rule,
     Settings,
     clean_months,
     clean_percent,
+    new_rule_id,
     reorder_groups,
+    valid_budget_period,
 )
 from mymoneyvisualizer.importing.profile import ImportProfile
 from mymoneyvisualizer.storage.backup import create_backup, restore_backup
@@ -46,8 +49,7 @@ PROFILES = "profiles"
 SETTINGS = "settings"
 ALL_TOPICS = frozenset({ACCOUNTS, TRANSACTIONS, RULES, GROUPS, PROFILES, SETTINGS})
 
-DEFAULT_ACCOUNT_NAME = "new account"
-DEFAULT_RULE_NAME = "new_rule"
+DEFAULT_ACCOUNT_NAME = "Neues Konto"
 
 
 class Event:
@@ -114,6 +116,7 @@ class AppModel:
         self._categorized: pd.DataFrame | None = None
         self._positions: dict[str, int] | None = None
         self._without: tuple[str, pd.DataFrame] | None = None
+        self._later: tuple[str | None, np.ndarray] | None = None
         if raw:
             self._raw: pd.DataFrame | None = None
             self._matcher: RuleMatcher | None = None
@@ -135,8 +138,8 @@ class AppModel:
     def rules(self) -> list[Rule]:
         return [replace(r) for r in self._rules]
 
-    def rule(self, name: str) -> Rule | None:
-        return next((replace(r) for r in self._rules if r.name == name), None)
+    def rule(self, rule_id: str) -> Rule | None:
+        return next((replace(r) for r in self._rules if r.id == rule_id), None)
 
     @property
     def manual_categories(self) -> dict[str, ManualCategory]:
@@ -254,21 +257,20 @@ class AppModel:
         return len(new)
 
     # ------------------------------------------------------------------ categorization
-    def free_rule_name(self, base: str = DEFAULT_RULE_NAME, ignore: str | None = None) -> str:
-        taken = {r.name for r in self._rules if r.name != ignore} | {MANUAL_RULE}
-        return _free_name(base or DEFAULT_RULE_NAME, taken)
-
-    def save_rule(self, rule: Rule, original_name: str | None = None) -> Rule:
-        """Insert a new rule or replace ``original_name``. Names are made unique."""
+    def save_rule(self, rule: Rule, original_id: str | None = None) -> Rule:
+        """Replace the rule ``original_id`` (it keeps its id and position) or append a new rule."""
         errors = rule_errors(rule)
         if errors:
             raise InvalidRuleError(errors)
-        names = [r.name for r in self._rules]
-        index = names.index(original_name) if original_name in names else None
+        ids = [r.id for r in self._rules]
+        index = ids.index(original_id) if original_id in ids else None
+        rule_id = rule.id if index is None else original_id
+        if index is None and rule_id in ids:  # a copy of a saved rule becomes a new rule
+            rule_id = new_rule_id()
         spread_months = clean_months(rule.spread_months)
         saved = replace(
             rule,
-            name=self.free_rule_name(rule.name.strip(), ignore=original_name),
+            id=rule_id,
             spread_months=spread_months,
             residual_percent=clean_percent(rule.residual_percent) if spread_months else 0,
         )
@@ -280,11 +282,19 @@ class AppModel:
         self._notify(RULES, TRANSACTIONS)
         return replace(saved)
 
-    def delete_rules(self, names: Iterable[str]) -> None:
-        names = set(names)
-        if not names & {r.name for r in self._rules}:
+    def update_rule(self, rule_id: str, **changes) -> Rule | None:
+        """Change single fields of a rule, e.g. its spread; ``None`` if the rule does not exist (any more)."""
+        rule = self.rule(rule_id)
+        if rule is None:
+            return None
+        changed = replace(rule, **changes)
+        return rule if changed == rule else self.save_rule(changed, rule_id)
+
+    def delete_rules(self, rule_ids: Iterable[str]) -> None:
+        rule_ids = set(rule_ids)
+        if not rule_ids & {r.id for r in self._rules}:
             return
-        self._rules = [r for r in self._rules if r.name not in names]
+        self._rules = [r for r in self._rules if r.id not in rule_ids]
         self.repository.save_rules(self._rules)
         self._notify(RULES, TRANSACTIONS)
 
@@ -335,26 +345,44 @@ class AppModel:
         )
         return df.loc[candidates].sort_values(Col.date, ascending=False, kind="stable")
 
-    def _categorized_without(self, name: str) -> pd.DataFrame:
-        """Categorization without the rule ``name`` (cached while it is edited in the rule window)."""
-        if self._without is None or self._without[0] != name:
-            self._without = (name, self._apply([r for r in self._rules if r.name != name]))
+    def _categorized_without(self, rule_id: str) -> pd.DataFrame:
+        """Categorization without the rule ``rule_id`` (cached while it is edited in the rule window)."""
+        if self._without is None or self._without[0] != rule_id:
+            self._without = (rule_id, self._apply([r for r in self._rules if r.id != rule_id]))
         return self._without[1]
 
-    def preview_rule(
-        self, rule: Rule, original_name: str | None = None, transaction_id: str | None = None
-    ) -> pd.DataFrame:
-        """Transactions ``rule`` would categorize (shown with its category), the transaction ``transaction_id`` first.
+    def _later_rules_mask(self, rule_id: str | None) -> np.ndarray:
+        """Transactions a rule after ``rule_id`` matches: those rules win over it. Nothing comes after a new rule.
 
-        The saved version ``original_name`` is ignored, so the preview shows exactly what the edited rule does.
-        Only the patterns of ``rule`` are evaluated, the rest comes from caches: fast enough per key press.
+        Cached while the rule is edited in the rule window.
         """
-        names = {r.name for r in self._rules}
-        base = self._categorized_without(original_name) if original_name in names else self.transactions()
-        if rule_errors(rule):
-            matched = np.zeros(len(base), dtype=bool)
-        else:
-            matched = self._get_matcher().mask(rule) & (base[Col.rule] != MANUAL_RULE).to_numpy()
+        if self._later is None or self._later[0] != rule_id:
+            ids = [r.id for r in self._rules]
+            mask = np.zeros(len(self._combined_raw()), dtype=bool)
+            if rule_id in ids:
+                matcher = self._get_matcher()
+                for later in self._rules[ids.index(rule_id) + 1 :]:
+                    mask |= matcher.mask(later)
+            self._later = (rule_id, mask)
+        return self._later[1]
+
+    def preview_rule(
+        self, rule: Rule, original_id: str | None = None, transaction_id: str | None = None
+    ) -> pd.DataFrame:
+        """Transactions ``rule`` matches, the transaction ``transaction_id`` first.
+
+        Those the rule categorizes are shown with its category. Those that get their category from a later rule or a
+        manual category keep it and name the winner in the column :data:`~analysis.OVERRIDDEN`. The saved version
+        ``original_id`` is ignored, so the preview shows exactly what the edited rule does at its position; a new rule
+        comes last. Only the patterns of ``rule`` are evaluated, the rest comes from caches: fast enough per key press.
+        """
+        ids = {r.id for r in self._rules}
+        existing = original_id in ids
+        base = self._categorized_without(original_id) if existing else self.transactions()
+        matched = np.zeros(len(base), dtype=bool) if rule_errors(rule) else self._get_matcher().mask(rule)
+        overridden = matched & (
+            (base[Col.rule] == MANUAL_RULE).to_numpy() | self._later_rules_mask(original_id if existing else None)
+        )
         selected = (
             (base[Col.transaction_id] == transaction_id).to_numpy()
             if transaction_id
@@ -362,9 +390,12 @@ class AppModel:
         )
         shown = selected | matched
         rows = base.loc[shown].copy()
-        hit = matched[shown]
+        rows[analysis.OVERRIDDEN] = ""
+        taken = overridden[shown]
+        rows.loc[taken, analysis.OVERRIDDEN] = rows.loc[taken, Col.rule]
+        hit = (matched & ~overridden)[shown]
         rows.loc[hit, Col.category] = rule.category
-        rows.loc[hit, Col.rule] = rule.name
+        rows.loc[hit, Col.rule] = rule.id
         rows.loc[hit, Col.spread_months] = clean_months(rule.spread_months)
         rows.loc[hit, Col.residual_percent] = clean_percent(rule.residual_percent) if rule.spread_months else 0
         first = selected[shown]
@@ -395,8 +426,16 @@ class AppModel:
         shares[group] = share
         self.update_settings(budget_shares=shares)
 
-    def set_budget_period(self, start: int, end: int) -> None:
-        self.update_settings(budget_start=min(start, end), budget_end=max(start, end))
+    def set_budget_period(self, period: str) -> None:
+        """:data:`~mymoneyvisualizer.domain.models.LAST_12_MONTHS` or a year such as ``"2025"``."""
+        if not valid_budget_period(period):
+            raise ValueError(f"invalid budget period {period!r}")
+        self.update_settings(budget_period=period)
+
+    def hide_hint(self, name: str) -> None:
+        """Do not show the explanation ``name`` again; it stays available behind the help button."""
+        if name not in self._settings.hidden_hints:
+            self.update_settings(hidden_hints=[*self._settings.hidden_hints, name])
 
     def assign_groups(self, assignment: Mapping[str, Iterable[str]]) -> None:
         self._groups = reorder_groups(self._groups, {k: list(v) for k, v in assignment.items()})
@@ -464,7 +503,7 @@ class AppModel:
         )
 
     def rule_overview(self) -> pd.DataFrame:
-        return analysis.rule_overview(self.transactions(), self._rules)
+        return analysis.rule_overview(self.transactions(), self._rules, self._get_matcher())
 
     def budget_series(self) -> budget.BudgetSeries:
         return budget.budget_series(
@@ -473,15 +512,64 @@ class AppModel:
             excluded_categories=self._settings.excluded_categories,
         )
 
-    def budget_report(self, series: budget.BudgetSeries | None = None) -> budget.BudgetReport | None:
-        settings = self._settings
-        return budget.budget_report(
-            series if series is not None else self.budget_series(),
-            self._groups,
-            settings.budget_start,
-            settings.budget_end,
-            settings.budget_shares,
+    def budget_periods(self, series: budget.BudgetSeries | None = None) -> list[tuple[str, pd.Period, pd.Period]]:
+        """``(period, first month, last month)`` of the budget periods with data, newest first.
+
+        The last twelve complete months come first, then every calendar year, cut to the months with data.
+        """
+        series = series if series is not None else self.budget_series()
+        if series.last_date is None:
+            return []
+        first, last = series.monthly.index[0], analysis.last_complete_month(series.last_date)
+        if last < first:
+            return []
+        periods = [(LAST_12_MONTHS, *budget.period_months(LAST_12_MONTHS, last))]
+        for year in range(last.year, first.year - 1, -1):
+            start, end = budget.period_months(str(year), last)
+            periods.append((str(year), max(start, first), end))
+        return periods
+
+    def budget_months(
+        self, series: budget.BudgetSeries | None = None, previous: bool = False
+    ) -> tuple[pd.Period, pd.Period] | None:
+        """First and last month of the budget period (``previous``: of the year before); only complete months."""
+        series = series if series is not None else self.budget_series()
+        if series.last_date is None:
+            return None
+        months = budget.period_months(self._settings.budget_period, analysis.last_complete_month(series.last_date))
+        return budget.previous_months(*months) if previous else months
+
+    def budget_contributions(
+        self, start: pd.Period, end: pd.Period, categories: Sequence[str] | None = None
+    ) -> pd.DataFrame:
+        """The transactions that count in the budget of ``start`` to ``end``, see :func:`budget.contributions`."""
+        return budget.contributions(
+            self.transactions(),
+            start,
+            end,
+            own_accounts=self._own_accounts(),
+            excluded_categories=self._settings.excluded_categories,
+            categories=categories,
         )
+
+    def budget_prepaid(self, end: pd.Period) -> pd.DataFrame:
+        """What was paid by the end of ``end`` for the months after it, see :func:`budget.prepaid`."""
+        return budget.prepaid(
+            self.transactions(),
+            end,
+            own_accounts=self._own_accounts(),
+            excluded_categories=self._settings.excluded_categories,
+        )
+
+    def budget_report(
+        self, series: budget.BudgetSeries | None = None, previous: bool = False
+    ) -> budget.BudgetReport | None:
+        """Income, needs, wants and savings in the budget period (``previous``: in the year before)."""
+        series = series if series is not None else self.budget_series()
+        months = self.budget_months(series, previous)
+        if months is None:
+            return None
+        return budget.budget_report(series, self._groups, *months, self._settings.budget_shares)
 
     # ------------------------------------------------------------------ backup
     def create_backup(self, zip_path: str | Path) -> list[str]:

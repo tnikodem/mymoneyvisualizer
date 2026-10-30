@@ -57,7 +57,7 @@ def rule_mask(df: pd.DataFrame, rule: Rule) -> pd.Series:
         try:
             mask &= df[column].astype(str).str.contains(pattern, regex=True, na=False)
         except re.error as e:
-            logger.error("rule %r has an invalid regex %r: %s", rule.name, pattern, e)
+            logger.error("invalid regex %r: %s", pattern, e)
             return pd.Series(False, index=df.index)
     return mask
 
@@ -65,8 +65,8 @@ def rule_mask(df: pd.DataFrame, rule: Rule) -> pd.Series:
 def rule_matches(rule: Rule, recipient: str, description: str) -> tuple[bool, bool]:
     """Whether the recipient and description regex of ``rule`` match a single transaction."""
     row = pd.DataFrame({Col.recipient: [recipient], Col.description: [description]})
-    recipient_only = Rule(name=rule.name, regex_recipient=rule.regex_recipient)
-    description_only = Rule(name=rule.name, regex_description=rule.regex_description)
+    recipient_only = Rule(regex_recipient=rule.regex_recipient)
+    description_only = Rule(regex_description=rule.regex_description)
     return bool(rule_mask(row, recipient_only).iloc[0]), bool(rule_mask(row, description_only).iloc[0])
 
 
@@ -111,6 +111,17 @@ def literal_alternatives(pattern: str) -> list[str] | None:
     if parts is None or any(at_start or at_end for _, at_start, at_end in parts):
         return None
     return [text for text, _, _ in parts]
+
+
+def readable_pattern(pattern: str) -> str:
+    """``pattern`` for reading: ``PayPal \\(Europe\\)|^IKEA\\ 66$`` -> ``PayPal (Europe) | ^IKEA 66$``.
+
+    A pattern with other regex syntax than ``|``, ``^``, ``$`` and escaped characters stays as it is.
+    """
+    parts = anchored_literals(pattern)
+    if parts is None:
+        return pattern
+    return " | ".join(f"{'^' if at_start else ''}{text}{'$' if at_end else ''}" for text, at_start, at_end in parts)
 
 
 _SEPARATOR = "\x1f"
@@ -229,13 +240,13 @@ def apply_rules(
         winner[matcher.mask(rule)] = i
     # index -1 (no rule) picks the last element: uncategorized, not spread
     categories = np.array([r.category for r in rules] + [UNCATEGORIZED], dtype=object)
-    names = np.array([r.name for r in rules] + [""], dtype=object)
+    ids = np.array([r.id for r in rules] + [""], dtype=object)
     months = np.array([r.spread_months for r in rules] + [0], dtype=np.int64)
     residual = np.array([r.residual_percent for r in rules] + [0], dtype=np.int64)
 
     df = transactions.copy()
     df[Col.category] = categories[winner]
-    df[Col.rule] = names[winner]
+    df[Col.rule] = ids[winner]
     df[Col.spread_months] = months[winner]
     df[Col.residual_percent] = residual[winner]
     df[Col.sale_of] = ""
