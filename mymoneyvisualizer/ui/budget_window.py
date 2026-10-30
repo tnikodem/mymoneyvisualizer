@@ -35,7 +35,16 @@ from PyQt6.QtWidgets import (
 
 from mymoneyvisualizer.app import ACCOUNTS, GROUPS, RULES, SETTINGS, TRANSACTIONS
 from mymoneyvisualizer.domain.analysis import month_key, ordered_month_range
-from mymoneyvisualizer.domain.budget import SAVED, BudgetReport, BudgetSeries, group_totals, smooth
+from mymoneyvisualizer.domain.budget import (
+    NEXT_MONTH,
+    REMAINING,
+    SAVED,
+    UNTIL,
+    BudgetReport,
+    BudgetSeries,
+    group_totals,
+    smooth,
+)
 from mymoneyvisualizer.domain.categories import display_category
 from mymoneyvisualizer.domain.models import (
     GROUP_INCOME,
@@ -81,7 +90,7 @@ CUSTOM = "custom"
 CATEGORY_FLAGS = Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsDragEnabled
 GROUP_FLAGS = Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsDropEnabled
 #: columns of the breakdown
-NAME, AVERAGE, SHARE, TARGET, CHANGE = range(5)
+NAME, AVERAGE, SHARE, TARGET, CHANGE, PREPAID = range(6)
 
 BANNER = (
     "<b>Periodengerecht:</b> Zahlungen sind auf ihre Nutzungsdauer verteilt, Umbuchungen zählen nicht. Daher andere"
@@ -98,17 +107,31 @@ ACCRUAL_DETAILS = (
     "<p>Außerdem zählen Umbuchungen zwischen eigenen Konten nicht, und der laufende Monat zählt erst, wenn er vorbei"
     " ist.</p>"
 )
+#: the help of the window: what is counted; the table and the chart have help of their own
 HELP = (
-    "<p><b>Kennzahlen</b> für den gewählten Zeitraum, als Durchschnitt pro Monat.</p>"
-    "<p><b>Kategorien:</b> Klick auf eine Zeile zeigt ihre Entwicklung im Diagramm, noch ein Klick (oder Esc) wieder"
-    " das Ganze; Doppelklick zeigt alle Buchungen, die in den Zeitraum zählen. Eine Kategorie mit der Maus ziehen"
-    " ändert ihre Reihenfolge, in einer anderen Gruppe fallen gelassen ihre Gruppe; das Diagramm bleibt dabei, wie es"
-    " ist. Die Ziele änderst du unter <i>Gruppen &amp; Ziele</i>.</p>"
-    "<p><b>ggü. Vorjahr</b> (bei 12 Monaten): Veränderung gegenüber den 12 Monaten davor; rot ungünstig, grün"
-    " günstig.</p>"
-    "<p><b>Diagramm:</b> Mausrad oder + und − zoomen, Ziehen verschiebt. Die blauen Linien begrenzen den Zeitraum,"
-    " die Linie Ø ist der Durchschnitt darin. Die Maus auf einer Fläche zeigt ihren Wert im Monat, ein Klick ihre"
-    " Buchungen (beim gleitenden Ø die der 12 Monate bis dahin).</p>" + ACCRUAL_DETAILS
+    "<p><b>Zeitraum:</b> die letzten 12 abgeschlossenen Monate, ein Kalenderjahr oder ein eigener Zeitraum. Alle"
+    " Werte sind Durchschnitte pro Monat darin.</p>"
+    "<p><b>Ausblenden:</b> Kategorien, die nicht mitzählen, z. B. eine einmalige Erbschaft.</p>" + ACCRUAL_DETAILS
+)
+BREAKDOWN_HELP = (
+    "<p><b>Klick</b> auf eine Zeile zeigt ihre Entwicklung im Diagramm, noch ein Klick oder Esc wieder alles."
+    " <b>Doppelklick</b> zeigt die Buchungen, die in den Zeitraum zählen. <b>Ziehen</b> ändert die Reihenfolge oder,"
+    " in einer anderen Gruppe fallen gelassen, die Gruppe.</p>"
+    "<p><b>Ø Monat:</b> Durchschnitt pro Monat im Zeitraum.<br>"
+    "<b>Anteil:</b> am Nettoeinkommen.<br>"
+    "<b>Ziel:</b> der Gruppe nach der 50/30/20-Regel, änderbar unter <i>Gruppen &amp; Ziele</i>.<br>"
+    "<b>ggü. Vorjahr</b> (bei 12 Monaten): Veränderung gegenüber den 12 Monaten davor; rot ungünstig, grün"
+    " günstig.<br>"
+    "<b>vorausbezahlt:</b> So viel des Monats nach dem Zeitraum ist durch verteilte Zahlungen schon bezahlt, z. B."
+    " Versicherungen oder Anschaffungen; das lässt sich kurzfristig nicht sparen. Beim Einkommen: schon erhalten.</p>"
+    "<p>Ein Klick auf eine Spaltenüberschrift erklärt die Spalte.</p>"
+)
+CHART_HELP = (
+    "<p><b>Maus auf einer Fläche:</b> ihr Wert im Monat. <b>Klick:</b> ihre Buchungen.</p>"
+    "<p><b>Zoomen</b> mit dem Mausrad oder + und −, <b>Ziehen</b> verschiebt, ↺ zeigt alles.</p>"
+    "<p>Die <b>blauen Linien</b> begrenzen den Zeitraum, die Linie <b>Ø</b> ist der Durchschnitt darin.</p>"
+    "<p><b>Gleitender Ø 12 Monate:</b> Jeder Punkt ist der Durchschnitt der 12 Monate bis dahin; ein Klick zeigt dann"
+    " die Buchungen dieser 12 Monate. Aus: jeder Monat einzeln.</p>"
 )
 FIGURE_TIPS = {
     "income": "Alle Kategorien der Gruppe Einkommen, Durchschnitt pro Monat im Zeitraum.",
@@ -126,6 +149,9 @@ COLUMN_TIPS = (
     "Anteil am Nettoeinkommen",
     "Ziel der Gruppe in % des Einkommens (50/30/20-Regel); ändern unter Gruppen & Ziele",
     "Veränderung pro Monat gegenüber den 12 Monaten davor; rot ungünstig, grün günstig",
+    "So viel des Monats nach dem Zeitraum ist schon bezahlt: der Anteil verteilter Zahlungen wie Versicherungen oder"
+    " Anschaffungen. Er lässt sich kurzfristig nicht sparen. Beim Einkommen: schon erhalten, z. B. verteiltes"
+    " Weihnachtsgeld.\nFachbegriff: Rechnungsabgrenzung",
 )
 KEPT = "kept"
 
@@ -236,6 +262,7 @@ class BudgetChart(QWidget):
         self.zoom_in = round_button("+", "Hineinzoomen (auch mit dem Mausrad)", self)
         self.zoom_out = round_button("−", "Herauszoomen", self)
         self.zoom_reset = round_button("↺", "Alles zeigen", self)
+        self.help_button = HelpButton(CHART_HELP, "Diagramm", self)
         self.legend = make_label("", self, wrap=True)
         self.legend.setTextFormat(Qt.TextFormat.RichText)
         self.plot = pg.PlotWidget(axisItems={"bottom": GermanDateAxis(orientation="bottom"), "left": EuroAxis("left")})
@@ -251,7 +278,9 @@ class BudgetChart(QWidget):
             axis.setPen(pg.mkPen(BORDER))
             axis.setTextPen(pg.mkPen(MUTED))
         header = QHBoxLayout()
-        header.addWidget(self.title, 1)
+        header.addWidget(self.title)
+        header.addWidget(self.help_button)
+        header.addStretch(1)
         header.addWidget(self.smooth_check)
         header.addSpacing(8)
         for button in (self.zoom_in, self.zoom_out, self.zoom_reset):
@@ -528,6 +557,8 @@ class BudgetWindow(Window):
         self.series: BudgetSeries | None = None
         self.report: BudgetReport | None = None
         self.previous: BudgetReport | None = None
+        #: per main category what is paid already for the month after the period, see :func:`budget.prepaid`
+        self.prepaid: pd.DataFrame | None = None
         self.selected: tuple[str, str] | None = None
         self.groups_dialog: GroupsDialog | None = None
         self._group_by_category: dict[str, str] = {}
@@ -559,12 +590,12 @@ class BudgetWindow(Window):
             self.start_combo,
             self.dash,
             self.end_combo,
+            self.help_button,
             self.period_note,
         ):
             controls.addWidget(widget)
         controls.addStretch(1)
         controls.addWidget(self.exclude_select)
-        controls.addWidget(self.help_button)
 
         self.figures = {
             "income": KeyFigure("Nettoeinkommen", FIGURE_TIPS["income"], self),
@@ -578,15 +609,16 @@ class BudgetWindow(Window):
             figures.addWidget(figure, 1)
 
         self.tree = BreakdownTree(self)
-        self.tree.setColumnCount(5)
-        self.tree.setHeaderLabels(["Kategorie", "Ø Monat", "Anteil", "Ziel", "ggü. Vorjahr"])
+        self.tree.setColumnCount(6)
+        self.tree.setHeaderLabels(["Kategorie", "Ø Monat", "Anteil", "Ziel", "ggü. Vorjahr", "vorausbezahlt"])
         for column, tip in enumerate(COLUMN_TIPS):
             self.tree.headerItem().setToolTip(column, rich(tip))
             if column:
                 self.tree.headerItem().setTextAlignment(column, Qt.AlignmentFlag.AlignRight)
         self.tree.header().setStretchLastSection(False)
+        self.tree.header().setSectionsClickable(True)  # a click explains the column
         self.tree.header().setSectionResizeMode(NAME, QHeaderView.ResizeMode.Stretch)
-        for column, width in ((AVERAGE, 84), (SHARE, 60), (TARGET, 56), (CHANGE, 96)):
+        for column, width in ((AVERAGE, 84), (SHARE, 60), (TARGET, 56), (CHANGE, 96), (PREPAID, 104)):
             self.tree.setColumnWidth(column, width)
         self.tree.setRootIsDecorated(True)
         self.tree.setUniformRowHeights(True)
@@ -595,9 +627,12 @@ class BudgetWindow(Window):
             "Kategorien den Budgetgruppen zuordnen und die Ziele der 50/30/20-Regel ändern",
             self,
         )
+        self.breakdown_help = HelpButton(BREAKDOWN_HELP, "Kategorien", self)
         breakdown = Card(self)
         header = QHBoxLayout()
-        header.addWidget(make_label("Kategorien", breakdown, "heading"), 1)
+        header.addWidget(make_label("Kategorien", breakdown, "heading"))
+        header.addWidget(self.breakdown_help)
+        header.addStretch(1)
         header.addWidget(self.groups_button)
         breakdown.content.addLayout(header)
         breakdown.content.addWidget(self.tree, 1)
@@ -609,7 +644,7 @@ class BudgetWindow(Window):
         splitter.addWidget(breakdown)
         splitter.addWidget(chart_card)
         splitter.setChildrenCollapsible(False)
-        splitter.setSizes([580, 780])
+        splitter.setSizes([660, 700])
 
         central = QWidget(self)
         layout = QVBoxLayout(central)
@@ -634,6 +669,7 @@ class BudgetWindow(Window):
         self.tree.drag_finished.connect(self._mark_selected)
         self.tree.itemDoubleClicked.connect(self.open_detail)
         self.tree.reordered.connect(self.save_order)
+        self.tree.header().sectionClicked.connect(self.explain_column)
 
     # ------------------------------------------------------------------ user input
     def _period_changed(self, _index: int) -> None:
@@ -652,6 +688,10 @@ class BudgetWindow(Window):
             return
         start, end = ordered_month_range(self.start_combo.currentData(), self.end_combo.currentData(), changed)
         self.model.set_budget_period(custom_period(start, end))
+
+    def explain_column(self, column: int) -> None:
+        """The explanation of a column right at its header, as when the mouse rests on it."""
+        QToolTip.showText(QCursor.pos(), rich(COLUMN_TIPS[column]), self.tree.header())
 
     def open_groups(self) -> GroupsDialog:
         if self.groups_dialog is None:
@@ -737,11 +777,15 @@ class BudgetWindow(Window):
         self.report = self.model.budget_report(self.series)
         compared = self.report is not None and self.report.period_months == COMPARED_MONTHS
         self.previous = self.model.budget_report(self.series, previous=True) if compared else None
+        months = self.model.budget_months(self.series)
+        self.prepaid = self.model.budget_prepaid(months[1]) if months is not None else None
         self._filling = True
         try:
             self.exclude_select.set_options(self.model.unique_categories(), settings.excluded_categories)
             self._fill_periods(settings.budget_period)
             self.tree.setColumnHidden(CHANGE, not compared)
+            prepaid = self.prepaid is not None and bool((self.prepaid[NEXT_MONTH].abs() >= 0.5).any())
+            self.tree.setColumnHidden(PREPAID, not prepaid)
             self._fill_tree()
         finally:
             self._filling = False
@@ -834,9 +878,10 @@ class BudgetWindow(Window):
             item.setText(NAME, TITLES[group])
             item.setIcon(NAME, dot_icon(GROUP_COLORS[group]))
             item.setToolTip(NAME, rich(SAVINGS_HINT if group == GROUP_SAVINGS else HINTS[group]))
-            for column in range(5):
+            for column in range(self.tree.columnCount()):
                 item.setFont(column, bold)
             self._amounts(item, report, amount, previous.get(("group", group)), group)
+            self._prepaid(item, [category for category, _ in categories], group)
             if group in targets:
                 item.setText(TARGET, percent(targets[group]))
                 share = report.share(amount)
@@ -852,6 +897,7 @@ class BudgetWindow(Window):
                 child.setData(NAME, Qt.ItemDataRole.UserRole, ("category", category))
                 child.setText(NAME, display_category(category))
                 self._amounts(child, report, value, previous.get(("category", category)), group)
+                self._prepaid(child, [category], group)
                 if self.selected == ("category", category):
                     current = child
             if group == GROUP_SAVINGS:
@@ -914,8 +960,26 @@ class BudgetWindow(Window):
             if notable:
                 more_is_good = group in (GROUP_INCOME, GROUP_SAVINGS)
                 item.setForeground(CHANGE, pg.mkColor(GOOD if (change > 0) == more_is_good else BAD))
-        for column in (AVERAGE, SHARE, TARGET, CHANGE):
+        for column in (AVERAGE, SHARE, TARGET, CHANGE, PREPAID):
             item.setTextAlignment(column, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+
+    def _prepaid(self, item: QTreeWidgetItem, categories: list[str], group: str) -> None:
+        """The part of the month after the period that is paid already; nothing where there is none."""
+        months = self.model.budget_months(self.series)
+        if self.prepaid is None or months is None:
+            return
+        rows = self.prepaid.loc[self.prepaid.index.intersection(categories)]
+        sign = 1 if group == GROUP_INCOME else -1  # used money is positive, as in the other columns
+        value = sign * float(rows[NEXT_MONTH].sum())
+        if abs(value) < 0.5:
+            return
+        done, before = ("erhalten", "im Voraus erhalten") if sign > 0 else ("bezahlt", "vorausbezahlt")
+        item.setText(PREPAID, euro(value))
+        item.setToolTip(
+            PREPAID,
+            f"Für {format_month(months[1] + 1)} schon {done}: {euro(value)}\nInsgesamt {before}:"
+            f" {euro(sign * float(rows[REMAINING].sum()))} bis {format_month(rows[UNTIL].max())}",
+        )
 
     # ------------------------------------------------------------------ chart
     def _smoothed(self) -> bool:

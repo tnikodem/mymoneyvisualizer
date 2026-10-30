@@ -113,6 +113,8 @@ def test_unusual_month_is_highlighted(window):
     assert "-350 €" in tooltip and "-100 €" in tooltip
     window.deviation_check.setChecked(False)
     assert _cell(window, "household.food", "2024-01", Qt.ItemDataRole.BackgroundRole) is None
+    # explained next to the check box, not in the help of the window
+    assert "Median" in window.deviation_help.toolTip() and "Median" not in window.help_button.toolTip()
 
 
 def test_summary_rows_stay_last_when_sorting(window):

@@ -3,17 +3,21 @@ import pytest
 
 from mymoneyvisualizer.domain.budget import (
     IN_PERIOD,
+    NEXT_MONTH,
+    REMAINING,
     SAVED,
     SOLD,
     SPREAD_AMOUNT,
     SPREAD_FROM,
     SPREAD_TO,
+    UNTIL,
     BudgetSeries,
     budget_report,
     budget_series,
     contributions,
     group_totals,
     period_months,
+    prepaid,
     previous_months,
     smooth,
 )
@@ -178,6 +182,25 @@ def test_contributions_of_a_period_include_spread_payments_made_before():
     only = contributions(df, _month("2025-01"), _month("2025-12"), categories=["home"])
     assert list(only[Col.recipient]) == ["Möbelhaus"]  # main categories
     assert contributions(df, _month("2023-01"), _month("2023-12")).empty
+
+
+def test_prepaid_is_what_was_paid_for_the_months_after_the_period():
+    df = categorized(
+        ("2024-01-10", "Möbelhaus", "Sofa", -2400.0),  # 10 years: 20 € per month until December 2033
+        ("2025-03-05", "REWE", "x", -10.0),
+        ("2025-06-01", "HUK", "Kfz", -600.0),  # June 2025 to May 2026: 50 € per month
+        ("2025-07-01", "Ich", "Sparen", -100.0),  # internal transfer
+        ("2025-11-28", "Arbeitgeber", "Weihnachtsgeld", 1200.0),  # November 2025 to October 2026: 100 € per month
+        categories=["home.sofa", "food", "insurance", "spar", "income.bonus"],
+        spread_months=[120, 0, 12, 0, 12],
+    )
+    rows = prepaid(df, _month("2025-12"), own_accounts=["spar"])
+    assert list(rows.index) == ["home", "income", "insurance"]  # main categories with payments ahead
+    assert list(rows[NEXT_MONTH]) == [-20.0, 100.0, -50.0]  # paid already for January 2026
+    assert list(rows[REMAINING]) == [-20.0 * 96, 100.0 * 10, -50.0 * 5]
+    assert list(rows[UNTIL]) == [_month("2033-12"), _month("2026-10"), _month("2026-05")]
+    assert list(prepaid(df, _month("2025-05")).index) == ["home"]  # the insurance is paid in June
+    assert prepaid(df, _month("2033-12")).empty
 
 
 def test_contributions_of_a_sold_purchase():

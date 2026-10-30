@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pandas as pd
-from PyQt6.QtCore import QDate, Qt
+from PyQt6.QtCore import QDate
 from PyQt6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -59,12 +59,13 @@ MAPPING_TIPS = {
     "col_sign": "Nur nötig, wenn die Beträge kein Vorzeichen haben und eine Spalte S (Soll) oder H (Haben) angibt.",
 }
 MAIN_FIELDS = ("col_date", "col_value", "col_recipient", "col_description")
-HELP = (
+MAPPING_HELP = (
     "<p>Die Spalten sind vorgeschlagen; prüfe sie an der Vorschau. Die Zuordnung wird für die nächste Datei derselben"
     " Bank gespeichert.</p>"
     "<p>Buchungen, die schon im Konto sind, werden übersprungen.</p>"
-    "<p>Sehen Umlaute oder Beträge in der Vorschau falsch aus, helfen die <b>erweiterten Einstellungen</b>"
-    " (Zeichensatz, Trennzeichen, Dezimalzeichen).</p>"
+)
+ADVANCED_HELP = (
+    "Sehen Umlaute oder Beträge in der Vorschau falsch aus, helfen Zeichensatz, Trennzeichen und Dezimalzeichen."
 )
 
 
@@ -139,12 +140,15 @@ class ImportWindow(Window):
         texts.addWidget(self.title)
         texts.addWidget(self.status_label)
         header.addLayout(texts, 1)
-        header.addWidget(HelpButton(HELP, "Import", self))
         header.addWidget(self.cancel_button)
         header.addWidget(self.import_button)
 
         mapping = Card(self)
-        mapping.content.addWidget(make_label("Spaltenzuordnung", mapping, "heading"))
+        heading = QHBoxLayout()
+        heading.addWidget(make_label("Spaltenzuordnung", mapping, "heading"))
+        heading.addWidget(HelpButton(MAPPING_HELP, "Spaltenzuordnung", mapping))
+        heading.addStretch(1)
+        mapping.content.addLayout(heading)
         grid = QGridLayout()
         grid.setHorizontalSpacing(16)
         for column, field in enumerate(MAIN_FIELDS):
@@ -186,7 +190,11 @@ class ImportWindow(Window):
             advanced.addWidget(make_label(MAPPING_LABELS[field], self.advanced), 2, 2 * column - 2, 1, 2)
             advanced.addWidget(self.column_combos[field], 3, 2 * column - 2, 1, 2)
         advanced.setColumnStretch(len(format_fields) + 2, 1)
-        mapping.content.addWidget(self.advanced_button, 0, Qt.AlignmentFlag.AlignLeft)
+        advanced_row = QHBoxLayout()
+        advanced_row.addWidget(self.advanced_button)
+        advanced_row.addWidget(HelpButton(ADVANCED_HELP, "Erweiterte Einstellungen", mapping))
+        advanced_row.addStretch(1)
+        mapping.content.addLayout(advanced_row)
         mapping.content.addWidget(self.advanced)
         self.advanced.hide()
 

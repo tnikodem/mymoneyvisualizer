@@ -38,8 +38,8 @@ The main window leads through four steps, shows the state of each and highlights
 4. **Budget**: is the spending right in the long run? Payments are spread over the time they are used in (accrual
    basis) and compared with the 50/30/20 rule. The main window already shows the savings rate.
 
-Little text stays on screen: buttons, columns and key figures explain themselves in tooltips, every window has a
-**?** with its explanation. The windows with numbers say in a banner how they count; close it with **✕** once read,
+Little text stays on screen: buttons, columns and key figures explain themselves in tooltips, a **?** next to a
+window's controls or a heading explains that part in a few lines. The windows with numbers say in a banner how they count; close it with **✕** once read,
 it does not come back.
 
 
@@ -98,6 +98,11 @@ will sell again, the **Restwert** in the rule or for the single transaction:
   used longer than a year, and payments for a service period. Typical useful lives: phone or laptop 3-5 years,
   furniture 10-15 years, kitchen 15 years, bike 7 years. For a car take the time you plan to keep it and the price
   you expect to get as residual value.
+* Spread special payments of income too: a Christmas or holiday bonus over 12 months, so it does not make one month
+  look rich. This needs a transaction of its own; a bonus paid together with the salary cannot be split. A severance
+  pay replaces income: spread it over the months it has to cover until the next job. With a new job right away it is
+  a gain in wealth rather than income; leave its category out with **Ausblenden** (in both views), or it raises the
+  savings rate.
 
 
 3. Einnahmen & Ausgaben (cash basis)
@@ -128,6 +133,14 @@ the chart next to it, another click (or Escape, or **Gesamt** in the path above 
 click lists everything that counts in the period: also payments made before and spread into it, and of payments
 spread beyond it only their share (**Betrag im Zeitraum**); together they add up to the value in the budget.
 **verteilt** names the whole amount spread and for how long, e.g. `-900,00 € über 1 Jahr`.
+
+The **?** next to **Kategorien** explains the table and its columns, a click on a column header that column alone.
+
+**vorausbezahlt** shows, where there is any, how much of the month after the period is paid already by spread
+payments, e.g. the insurance paid in January for the whole year (accounting: *aktive Rechnungsabgrenzung*). Compare it
+with **Ø Monat**: if 450 € of 500 € per month are paid ahead, there is little to save at short notice. Its tooltip
+shows the whole amount paid ahead and until when it lasts. For income it is what was received ahead, e.g. a spread
+Christmas bonus.
 
 Drag a category in **Kategorien** to change its order (also in the chart) or, dropped into another group, its group;
 a drag selects nothing, so the chart stays as it is, also in the overall view.
@@ -169,7 +182,8 @@ Glossary
 | internal transfer        | Umbuchung                                | transfer between your own accounts                        |
 | cash basis               | Zahlungssicht, Zufluss-Abfluss-Prinzip   | counted when paid                                         |
 | accrual basis            | periodengerechte Sicht, Periodisierung   | counted when used                                         |
-| prepaid expense          | (aktive) Rechnungsabgrenzung             | payment for a later service period                        |
+| prepaid expense          | (aktive) Rechnungsabgrenzung             | payment for a later service period (**vorausbezahlt**)    |
+| income received ahead    | passive Rechnungsabgrenzung              | income for a later period, e.g. a spread bonus            |
 | depreciation             | Abschreibung (AfA)                       | price of a durable good spread over its useful life       |
 | useful life              | Nutzungsdauer                            | how long a durable good is used                           |
 | residual value           | Restwert                                 | what a durable good is still worth at the end             |

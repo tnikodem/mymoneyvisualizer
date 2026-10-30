@@ -38,29 +38,26 @@ def thousands(number: int) -> str:
 
 
 HELP = (
-    "<p>Vier Schritte, der nächste ist blau hervorgehoben:</p>"
-    "<p><b>1 Konten:</b> CSV-Exporte der Bank importieren, für jedes Konto einzeln. Schon vorhandene Buchungen werden"
-    " übersprungen.</p>"
-    "<p><b>2 Kategorisieren:</b> jeder Buchung eine Kategorie geben, z. B. Wohnen.Miete. Eine Regel erledigt das für"
-    " alle ähnlichen Buchungen, auch künftige.</p>"
-    "<p><b>3 Einnahmen &amp; Ausgaben:</b> Monat für Monat in Zahlungssicht. Fällt eine Zahlung aus dem Rahmen?</p>"
-    "<p><b>4 Budget:</b> periodengerecht: Sparquote, Konsumausgaben nach Kategorien, Entwicklung und Vergleich zum"
-    " Vorjahr.</p>"
+    "<p>In vier Schritten von den Kontoauszügen zum Budget; der nächste Schritt ist blau hervorgehoben.</p>"
     "<p>Alle Daten bleiben auf diesem Computer.</p>"
 )
 
 
 class StepCard(Card):
-    """One step of the workflow: number, title, its state and the buttons that start it; hover explains it."""
+    """One step of the workflow: number, title with its explanation, its state and the buttons that start it."""
 
     def __init__(self, number: int, title: str, text: str, buttons: Sequence[QPushButton], parent: QWidget):
         super().__init__(parent, horizontal=True)
-        self.setToolTip(text)
         badge = make_label(str(number), self, "step")
         badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.help_button = HelpButton(text, title, self)
+        heading = QHBoxLayout()
+        heading.addWidget(make_label(title, self, "heading"))
+        heading.addWidget(self.help_button)
+        heading.addStretch(1)
         texts = QVBoxLayout()
         texts.setSpacing(3)
-        texts.addWidget(make_label(title, self, "heading"))
+        texts.addLayout(heading)
         self.status = make_label("", self, wrap=True)
         texts.addWidget(self.status)
         self.content.setSpacing(14)
@@ -110,7 +107,8 @@ class MainWindow(QMainWindow):
         self.accounts_card = StepCard(
             1,
             "Konten",
-            "CSV-Exporte der Bank importieren, für jedes Konto einzeln.",
+            "CSV-Exporte der Bank importieren, für jedes Konto einzeln. Schon vorhandene Buchungen werden"
+            " übersprungen.",
             [self.accounts_button],
             self,
         )
@@ -118,7 +116,7 @@ class MainWindow(QMainWindow):
             2,
             "Kategorisieren",
             "Jeder Buchung eine Kategorie geben, z. B. Wohnen.Miete. Eine Regel erledigt das für alle ähnlichen"
-            " Buchungen.",
+            " Buchungen, auch künftige.",
             [self.uncategorized_button, self.rules_button],
             self,
         )
@@ -162,8 +160,9 @@ class MainWindow(QMainWindow):
         layout.setSpacing(10)
         self.help_button = HelpButton(HELP, "MyMoneyVisualizer", self)
         header = QHBoxLayout()
-        header.addWidget(make_label("MyMoneyVisualizer", self, "title"), 1)
+        header.addWidget(make_label("MyMoneyVisualizer", self, "title"))
         header.addWidget(self.help_button)
+        header.addStretch(1)
         layout.addLayout(header)
         layout.addSpacing(4)
         for card in (self.accounts_card, self.categorize_card, self.income_expenses_card, self.budget_card):

@@ -45,6 +45,13 @@ def test_main_window_answers_the_budget_question(main, model, qtbot):
     qtbot.waitUntil(lambda: "Ziel 0 %" in main.budget_status.text())
 
 
+def test_every_step_explains_itself(main):
+    """A small "?" at each step instead of one long text for the whole window."""
+    assert "Periodengerecht" in main.budget_card.help_button.toolTip()
+    assert "übersprungen" in main.accounts_card.help_button.toolTip()
+    assert "Budget" not in main.help_button.toolTip().replace("zum Budget", "")
+
+
 def test_main_window_guides_a_new_user(qtbot, tmp_path):
     from mymoneyvisualizer.app import AppModel
     from mymoneyvisualizer.ui.main_window import MainWindow

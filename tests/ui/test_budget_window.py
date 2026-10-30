@@ -4,11 +4,11 @@ import pandas as pd
 import pyqtgraph as pg
 import pytest
 from PyQt6.QtCore import QPoint, QPointF, Qt
-from PyQt6.QtWidgets import QMenu
+from PyQt6.QtWidgets import QMenu, QToolTip
 
 from mymoneyvisualizer.domain.columns import Col
 from mymoneyvisualizer.domain.models import LAST_12_MONTHS
-from mymoneyvisualizer.ui.budget_window import AVERAGE, CHANGE, SHARE, TARGET, euro, percent, period_label
+from mymoneyvisualizer.ui.budget_window import AVERAGE, CHANGE, PREPAID, SHARE, TARGET, euro, percent, period_label
 
 from ..helpers import transactions
 
@@ -122,6 +122,22 @@ def test_change_against_the_12_months_before(window, model):
     income = _top(window, "Einkommen")
     assert income.text(CHANGE) == "−250 €"  # 11 salaries in 12 months against one in one month
     assert income.foreground(CHANGE).color().name() == "#000000"  # less than 10 %: not highlighted
+
+
+def test_prepaid_shows_what_is_paid_already_for_the_month_after_the_period(window, model):
+    """The rent of 900 € spread over 12 months: the rents of February to December 2023 count in January 2024 too."""
+    assert window.tree.isColumnHidden(PREPAID)  # nothing spread
+    rent = next(r for r in model.rules if r.category == "household.rent")
+    model.update_rule(rent.id, spread_months=12)
+    assert not window.tree.isColumnHidden(PREPAID)
+    household = _child(window, "Grundbedarf", "household")
+    assert household.text(PREPAID) == "825 €"  # 11 * 75 €, against 1,000 € per month
+    assert household.toolTip(PREPAID) == (
+        "Für Jan 2024 schon bezahlt: 825 €\nInsgesamt vorausbezahlt: 4.950 € bis Nov 2024"  # (0+1+...+11) * 75 €
+    )
+    assert _top(window, "Grundbedarf").text(PREPAID) == "825 €"
+    assert _child(window, "Grundbedarf", "car").text(PREPAID) == ""  # only where something is paid ahead
+    assert _top(window, "Einkommen").text(PREPAID) == ""
 
 
 def test_groups_and_targets_in_their_own_window(window, model, qtbot, monkeypatch):
@@ -407,6 +423,22 @@ def test_double_click_lists_what_counts_in_the_period(main, window, model):
     assert detail.label.text() == "Grundbedarf · 2023, periodengerecht"
     window.open_detail(_child(window, "Sparen", "Rest auf den Konten"))
     assert detail.label.text() == "Grundbedarf · 2023, periodengerecht"  # nothing to list
+
+
+def test_small_explanations_where_they_are_needed(window, model, dialogs):
+    """Instead of one long text: the table, its columns and the chart explain themselves."""
+    window.breakdown_help.click()
+    kind, title, text = dialogs.shown[-1]
+    assert title == "Kategorien"
+    assert "<b>vorausbezahlt:</b>" in text and "Doppelklick" in text
+    window.chart.help_button.click()
+    assert dialogs.shown[-1][1] == "Diagramm" and "Mausrad" in dialogs.shown[-1][2]
+    assert "Mausrad" not in window.help_button.toolTip() and "Zeitraum" in window.help_button.toolTip()
+
+    rent = next(r for r in model.rules if r.category == "household.rent")
+    model.update_rule(rent.id, spread_months=12)
+    window.tree.header().sectionClicked.emit(PREPAID)  # a click on the header explains the column
+    assert "kurzfristig nicht sparen" in QToolTip.text()
 
 
 def test_banner_explains_why_the_numbers_differ_until_it_is_closed(window, model, dialogs):

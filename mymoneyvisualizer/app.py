@@ -552,6 +552,15 @@ class AppModel:
             categories=categories,
         )
 
+    def budget_prepaid(self, end: pd.Period) -> pd.DataFrame:
+        """What was paid by the end of ``end`` for the months after it, see :func:`budget.prepaid`."""
+        return budget.prepaid(
+            self.transactions(),
+            end,
+            own_accounts=self._own_accounts(),
+            excluded_categories=self._settings.excluded_categories,
+        )
+
     def budget_report(
         self, series: budget.BudgetSeries | None = None, previous: bool = False
     ) -> budget.BudgetReport | None:

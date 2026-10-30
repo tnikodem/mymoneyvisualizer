@@ -91,17 +91,22 @@ def match_text(rule: Rule) -> str:
     return f"Erfasst alle Buchungen, deren {conditions[0]} und deren {conditions[1]} enthalten."
 
 
-HELP = (
+MODE_HELP = (
     "<p><b>Regel:</b> gibt allen Buchungen die Kategorie, deren Empfänger und Verwendungszweck die Texte enthalten,"
-    " auch künftig importierten. <b>Nur diese Buchung</b> gilt vor allen Regeln.</p>"
-    "<p><b>Vorschau:</b> oben die Buchung, von der du kommst: grün, wenn die Regel sie erfasst, rot, wenn nicht. Ebenso"
-    " färben sich die Felder Empfänger und Verwendungszweck. Grau sind Buchungen, auf die die Regel passt, die ihre"
-    " Kategorie aber von einer späteren Regel (passen mehrere, gewinnt die spätere) oder einer Einzelzuordnung"
-    " bekommen.</p>"
+    " auch künftig importierten.</p>"
+    "<p><b>Nur diese Buchung</b> gilt vor allen Regeln, z. B. für einen einmaligen Kauf.</p>"
+)
+SPREAD_HELP = (
     "<p><b>Verteilen über:</b> verteilt jede Zahlung im Budget auf ihre Laufzeit oder Nutzungsdauer, z. B."
-    " Jahresversicherung 12 Monate, Sofa 10 Jahre. <b>Restwert:</b> der erwartete Wiederverkaufswert, z. B. beim"
-    " Auto.</p>"
-    "<p>Enter speichert, Esc bricht ab.</p>"
+    " Jahresversicherung 12 Monate, Sofa 10 Jahre.</p>"
+    "<p><b>Restwert:</b> der erwartete Wiederverkaufswert, z. B. beim Auto. Er ist kein Verbrauch; verteilt wird nur"
+    " der Wertverlust.</p>"
+)
+PREVIEW_HELP = (
+    "<p>Oben die Buchung, von der du kommst: grün, wenn die Regel sie erfasst, rot, wenn nicht. Ebenso färben sich die"
+    " Felder Empfänger und Verwendungszweck.</p>"
+    "<p>Grau sind Buchungen, auf die die Regel passt, die ihre Kategorie aber von einer späteren Regel (passen mehrere,"
+    " gewinnt die spätere) oder einer Einzelzuordnung bekommen.</p>"
 )
 
 
@@ -140,6 +145,7 @@ class SpreadEdit(QWidget):
         layout.addSpacing(20)
         layout.addWidget(QLabel("Restwert:", self))
         layout.addWidget(self.residual_spin)
+        layout.addWidget(HelpButton(SPREAD_HELP, "Verteilen", self))
         layout.addStretch(1)
         self.residual_spin.setEnabled(False)
         for signal in (
@@ -218,16 +224,16 @@ class RuleWindow(Window):
             edit.setToolTip(REGEX_HINT)
         self.message_label = make_label("", self, wrap=True)
         set_tone(self.message_label, "bad")
-        self.preview_label = make_label("", self, "hint", wrap=True)
+        self.preview_label = make_label("", self, "hint")
 
         buttons = QHBoxLayout()
         buttons.addWidget(self.title, 1)
-        buttons.addWidget(HelpButton(HELP, "Kategorisieren", self))
         buttons.addWidget(self.cancel_button)
         buttons.addWidget(self.ok_button)
         apply_to = QHBoxLayout()
         apply_to.addWidget(self.rule_radio)
         apply_to.addWidget(self.manual_radio)
+        apply_to.addWidget(HelpButton(MODE_HELP, "Regel oder nur diese Buchung", self))
         apply_to.addStretch(1)
         form = QFormLayout()
         form.addRow("Gilt für:", apply_to)
@@ -258,7 +264,11 @@ class RuleWindow(Window):
         layout.setSpacing(10)
         layout.addLayout(buttons)
         layout.addWidget(card)
-        layout.addWidget(self.preview_label)
+        preview = QHBoxLayout()
+        preview.addWidget(self.preview_label)
+        preview.addWidget(HelpButton(PREVIEW_HELP, "Vorschau", self))
+        preview.addStretch(1)
+        layout.addLayout(preview)
         layout.addWidget(self.table)
         self.setCentralWidget(central)
 

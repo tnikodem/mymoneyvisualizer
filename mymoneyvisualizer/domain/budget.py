@@ -49,6 +49,8 @@ IN_PERIOD, SPREAD_AMOUNT, SPREAD_FROM, SPREAD_TO, SOLD = (
     "spread_to",
     "sold",
 )
+#: Columns of :func:`prepaid`.
+NEXT_MONTH, REMAINING, UNTIL = "next_month", "remaining", "until"
 
 
 @dataclass
@@ -140,6 +142,36 @@ def contributions(
     sold = data.index[list(linked_sales(data))]
     rows[SOLD] = rows.index.isin(sold)
     return rows.sort_values(Col.date, kind="stable").reset_index(drop=True)
+
+
+def prepaid(
+    categorized: pd.DataFrame,
+    end: pd.Period,
+    *,
+    own_accounts: Collection[str] = (),
+    excluded_categories: Collection[str] = (),
+) -> pd.DataFrame:
+    """Per main category: what was paid by the end of the month ``end`` and counts in the months after it.
+
+    :data:`NEXT_MONTH` is the part that counts in the month after ``end``: so much of that month is paid already and
+    cannot be saved at short notice. :data:`REMAINING` is all of it, :data:`UNTIL` the last month it reaches. In
+    accounting these are prepaid expenses (aktive Rechnungsabgrenzung) or, for income, income received in advance
+    (passive Rechnungsabgrenzung). Signed like the transactions; only main categories with such payments are listed.
+    """
+    data = filter_transactions(categorized, excluded_categories=excluded_categories, own_accounts=own_accounts)
+    plan = schedule(data)
+    (last,) = month_numbers(pd.Series([end.start_time]))
+    plan = plan.loc[(plan[FIRST] <= last) & (plan[LAST] > last)]
+    grouped = plan.assign(
+        **{Col.category: category_at_level(plan[Col.category], 0), REMAINING: plan[AMOUNT] * (plan[LAST] - last)}
+    ).groupby(Col.category)
+    return pd.DataFrame(
+        {
+            NEXT_MONTH: grouped[AMOUNT].sum().round(2),
+            REMAINING: grouped[REMAINING].sum().round(2),
+            UNTIL: grouped[LAST].max().map(lambda month: to_period(int(month))),
+        }
+    )
 
 
 def _group_of(groups: Sequence[GroupAssignment]) -> dict[str, str]:

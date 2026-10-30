@@ -34,11 +34,11 @@ TRANSACTION_COLUMNS = [
     Column(Col.residual_percent, "Restwert", PERCENT, 70, tooltip="Erwarteter Wiederverkaufswert, z. B. beim Auto."),
 ]
 EMPTY_HINT = "Noch keine Buchungen: Umsätze im Online-Banking als CSV exportieren und hier importieren."
-HELP = (
-    "<p>Jedes Konto hat einen eigenen Reiter; Kategorien und Regeln gelten für alle Konten.</p>"
+HELP = "Jedes Konto hat einen eigenen Reiter; Kategorien und Regeln gelten für alle Konten."
+TABLE_HELP = (
+    "<p><b>Doppelklick</b> auf eine Buchung ändert ihre Kategorie.</p>"
     "<p><b>CSV-Datei importieren:</b> den Export des Online-Bankings einlesen. Format und Spalten werden erkannt,"
     " schon vorhandene Buchungen übersprungen; überlappende Exporte sind also kein Problem.</p>"
-    "<p>Doppelklick auf eine Buchung ändert ihre Kategorie.</p>"
 )
 
 
@@ -67,7 +67,9 @@ class AccountTab(QWidget):
         controls.addWidget(make_label("Name:", self))
         controls.addWidget(self.name_edit)
         controls.addSpacing(12)
-        controls.addWidget(self.summary, 1)
+        controls.addWidget(self.summary)
+        controls.addWidget(HelpButton(TABLE_HELP, "Buchungen", self))
+        controls.addStretch(1)
         controls.addWidget(self.import_button)
 
         self.empty_hint = make_label(EMPTY_HINT, self, wrap=True)
@@ -137,8 +139,8 @@ class AccountsWindow(Window):
         for button in (self.new_button, self.delete_button):
             button.setMinimumWidth(150)
             controls.addWidget(button)
-        controls.addStretch(1)
         controls.addWidget(HelpButton(HELP, "Konten", self))
+        controls.addStretch(1)
 
         self.tabs = QTabWidget(self)
         self.tabs.setDocumentMode(False)

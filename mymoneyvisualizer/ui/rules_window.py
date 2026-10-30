@@ -193,9 +193,9 @@ class RulesWindow(Window):
         controls = QHBoxLayout()
         for button in (self.ok_button, self.add_button, self.delete_button):
             controls.addWidget(button)
+        controls.addWidget(HelpButton(HELP, "Regeln", self))
         controls.addSpacing(20)
         controls.addWidget(self.filter_edit, 1)
-        controls.addWidget(HelpButton(HELP, "Regeln", self))
 
         self.table_model = RuleTableModel(self)
         self.table = DataFrameView(self.table_model, self)

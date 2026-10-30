@@ -69,11 +69,15 @@ BANNER = (
     " andere Werte."
 )
 HELP = (
-    "<p>Summen pro Monat und Kategorie in Zahlungssicht. Doppelklick auf eine Zelle zeigt die Buchungen dahinter.</p>"
-    "<p><b>Abweichungen:</b> Monate, die deutlich vom Median der 12 Monate davor abweichen, z. B. eine doppelte oder"
-    " fehlende Miete. Rot ungünstig (mehr Ausgaben, weniger Einnahmen), grün günstig; die Maus auf der Zelle zeigt den"
+    "<p>Summen pro Monat und Kategorie in Zahlungssicht. <b>Doppelklick</b> auf eine Zelle zeigt die Buchungen"
+    " dahinter.</p>"
+    "<p>Unten stehen Einnahmen, Ausgaben, Sparen und der Saldo, die Veränderung des Geldes auf allen Konten; die Maus"
+    " auf der Zeile erklärt sie.</p>"
+)
+DEVIATION_HELP = (
+    "<p>Monate, die deutlich vom Median der 12 Monate davor abweichen, z. B. eine doppelte oder fehlende Miete.</p>"
+    "<p>Rot ungünstig (mehr Ausgaben, weniger Einnahmen), grün günstig; die Maus auf der Zelle zeigt den"
     " Vergleich.</p>"
-    "<p><b>Saldo:</b> Veränderung des Geldes auf allen Konten zusammen.</p>"
 )
 DETAIL_HELP = "Doppelklick auf eine Buchung ändert ihre Kategorie."
 BUDGET_DETAIL_HELP = (
@@ -153,6 +157,7 @@ class IncomeExpensesWindow(Window):
 
         self.banner = InfoBanner(model, "income expenses", BANNER, ACCRUAL_DETAILS, "Zahlungssicht", self)
         self.help_button = HelpButton(HELP + ACCRUAL_DETAILS, "Einnahmen & Ausgaben", self)
+        self.deviation_help = HelpButton(DEVIATION_HELP, "Abweichungen", self)
         self.period_combo = QComboBox(self)
         self.period_combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
         self.period_combo.setToolTip("Schnellwahl des Zeitraums; der laufende Monat zählt erst, wenn er vorbei ist.")
@@ -198,15 +203,22 @@ class IncomeExpensesWindow(Window):
             self.start_combo,
             make_label("–", self),
             self.end_combo,
+            self.help_button,
             make_label("   Ebene:", self),
             self.level_combo,
             self.filter_edit,
         ):
             selection.addWidget(widget)
-        for widget in (self.exclude_select, self.internal_transfers_check, self.deviation_check, more, less):
+        for widget in (
+            self.exclude_select,
+            self.internal_transfers_check,
+            self.deviation_check,
+            more,
+            less,
+            self.deviation_help,
+        ):
             display.addWidget(widget)
         selection.addStretch(1)
-        selection.addWidget(self.help_button)
         display.addStretch(1)
 
         self.table_model = DataFrameModel([], self, background=self._background, tooltip=self._tooltip)
@@ -439,8 +451,9 @@ class DetailWindow(Window):
         layout = QVBoxLayout(central)
         layout.setContentsMargins(16, 14, 16, 12)
         header = QHBoxLayout()
-        header.addWidget(self.summary_label, 1)
+        header.addWidget(self.summary_label)
         header.addWidget(self.help_button)
+        header.addStretch(1)
         layout.addWidget(self.label)
         layout.addLayout(header)
         layout.addWidget(self.table)
