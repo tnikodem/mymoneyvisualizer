@@ -10,7 +10,7 @@ import pandas as pd
 
 from mymoneyvisualizer.domain.analysis import filter_transactions
 from mymoneyvisualizer.domain.columns import Col
-from mymoneyvisualizer.domain.models import CATEGORY_INCOME, TagCategory
+from mymoneyvisualizer.domain.models import GROUP_INCOME, GroupAssignment
 
 #: Recurring transactions of the last ``n`` years are projected this many years past the budget period.
 HORIZON_YEARS = 5
@@ -27,11 +27,11 @@ def _period(month_number: int) -> pd.Period:
 
 
 def amortize_recurring(df: pd.DataFrame, horizon_end: pd.Period) -> pd.DataFrame:
-    """Monthly amounts per tag where a transaction recurring every ``r`` years is spread over ``12 * r`` months.
+    """Monthly amounts per category where a transaction recurring every ``r`` years is spread over ``12 * r`` months.
 
     Recurring transactions of the most recent ``r`` years are expected to happen again and are continued
     up to ``horizon_end``; older ones only cover their own ``12 * r`` months. ``df`` needs the columns
-    date, tag, value and recurring (NaN means every year). Returns months as rows and tags as columns.
+    date, category, value and recurring (NaN means every year). Returns months as rows and categories as columns.
     """
     if df.empty:
         return pd.DataFrame(index=pd.PeriodIndex([], freq="M"))
@@ -44,14 +44,14 @@ def amortize_recurring(df: pd.DataFrame, horizon_end: pd.Period) -> pd.DataFrame
     groups = (
         pd.DataFrame(
             {
-                Col.tag: df[Col.tag].to_numpy(),
+                Col.category: df[Col.category].to_numpy(),
                 "years": recurring.to_numpy(),
                 "month": _month_number(df[Col.date]),
                 "current": current,
                 Col.value: df[Col.value].to_numpy(),
             }
         )
-        .groupby([Col.tag, "years", "month", "current"], as_index=False)[Col.value]
+        .groupby([Col.category, "years", "month", "current"], as_index=False)[Col.value]
         .sum()
     )
     horizon = horizon_end.year * 12 + horizon_end.month - 1
@@ -64,15 +64,15 @@ def amortize_recurring(df: pd.DataFrame, horizon_end: pd.Period) -> pd.DataFrame
     groups, start, end = groups.loc[keep], start[keep], end[keep]
     amount = (groups[Col.value] / (12 * groups["years"])).to_numpy()
 
-    tags = sorted(groups[Col.tag].unique())
-    tag_index = pd.Index(tags).get_indexer(groups[Col.tag])
+    categories = sorted(groups[Col.category].unique())
+    category_index = pd.Index(categories).get_indexer(groups[Col.category])
     first, last = int(start.min()), int(end.max())
-    steps = np.zeros((len(tags), last - first + 2))
-    np.add.at(steps, (tag_index, start - first), amount)
-    np.add.at(steps, (tag_index, end - first + 1), -amount)
+    steps = np.zeros((len(categories), last - first + 2))
+    np.add.at(steps, (category_index, start - first), amount)
+    np.add.at(steps, (category_index, end - first + 1), -amount)
     values = np.cumsum(steps, axis=1)[:, :-1]
     index = pd.period_range(_period(first), _period(last), freq="M")
-    return pd.DataFrame(values.T, index=index, columns=tags)
+    return pd.DataFrame(values.T, index=index, columns=categories)
 
 
 @dataclass
@@ -82,50 +82,50 @@ class BudgetSeries:
 
 
 def budget_series(
-    tagged: pd.DataFrame,
+    categorized: pd.DataFrame,
     *,
     budget_end_year: int,
-    transfer_accounts: Collection[str] = (),
-    excluded_tags: Collection[str] = (),
+    own_accounts: Collection[str] = (),
+    excluded_categories: Collection[str] = (),
     horizon_years: int = HORIZON_YEARS,
 ) -> BudgetSeries:
-    """Amortized monthly amounts per base tag, ignoring transfers between own accounts."""
-    data = filter_transactions(tagged, excluded_tags=excluded_tags, transfer_accounts=transfer_accounts)
+    """Amortized monthly amounts per main category, ignoring transfers between own accounts."""
+    data = filter_transactions(categorized, excluded_categories=excluded_categories, own_accounts=own_accounts)
     if data.empty:
         return BudgetSeries(pd.DataFrame(index=pd.PeriodIndex([], freq="M")), None)
-    data = data.assign(**{Col.tag: data[Col.tag].astype(str).str.split(".", n=1).str[0]})
+    data = data.assign(**{Col.category: data[Col.category].astype(str).str.split(".", n=1).str[0]})
     horizon = pd.Period(year=budget_end_year + horizon_years, month=12, freq="M")
     return BudgetSeries(amortize_recurring(data, horizon), data[Col.date].max())
 
 
-def income_series(monthly: pd.DataFrame, categories: Sequence[TagCategory]) -> pd.Series:
+def income_series(monthly: pd.DataFrame, groups: Sequence[GroupAssignment]) -> pd.Series:
     income = pd.Series(0.0, index=monthly.index)
-    for category in categories:
-        if category.category == CATEGORY_INCOME and category.name in monthly.columns:
-            income = income + monthly[category.name]
+    for assignment in groups:
+        if assignment.group == GROUP_INCOME and assignment.category in monthly.columns:
+            income = income + monthly[assignment.category]
     return income
 
 
 def stacked_expenses(
-    monthly: pd.DataFrame, categories: Sequence[TagCategory], category: str
+    monthly: pd.DataFrame, groups: Sequence[GroupAssignment], group: str
 ) -> list[tuple[str, np.ndarray]]:
-    """Cumulative expense curves (positive numbers) of one category, in reverse category order."""
+    """Cumulative expense curves (positive numbers) of one group, in reverse group order."""
     curves = []
     level = np.zeros(len(monthly))
-    for tag_category in reversed(categories):
-        if tag_category.category != category or tag_category.name not in monthly.columns:
+    for assignment in reversed(groups):
+        if assignment.group != group or assignment.category not in monthly.columns:
             continue
-        level = level - monthly[tag_category.name].to_numpy()
-        curves.append((tag_category.name, level))
+        level = level - monthly[assignment.category].to_numpy()
+        curves.append((assignment.category, level))
     return curves
 
 
 @dataclass
 class BudgetReport:
-    category: str
+    group: str
     start_year: int
     end_year: int
-    factor: float
+    share: float
     expected_total: float
     consumed: list[tuple[str, float]]
     total_consumed: float
@@ -174,30 +174,30 @@ def covered_days(start_year: int, end_year: int, last_recorded_date: pd.Timestam
 
 def budget_report(
     series: BudgetSeries,
-    categories: Sequence[TagCategory],
-    category: str,
+    groups: Sequence[GroupAssignment],
+    group: str,
     start_year: int,
     end_year: int,
-    factor: float,
+    share: float,
 ) -> BudgetReport | None:
     monthly = series.monthly
     if monthly.empty or series.last_recorded_date is None:
         return None
     in_period = (monthly.index.year >= start_year) & (monthly.index.year <= end_year)
-    expected = float(income_series(monthly, categories)[in_period].sum() * factor)
+    expected = float(income_series(monthly, groups)[in_period].sum() * share)
 
     consumed = [
-        (c.name, float(-monthly.loc[in_period, c.name].sum()))
-        for c in reversed(categories)
-        if c.category == category and c.name in monthly.columns
+        (a.category, float(-monthly.loc[in_period, a.category].sum()))
+        for a in reversed(groups)
+        if a.group == group and a.category in monthly.columns
     ]
     consumed.sort(key=lambda item: item[1], reverse=True)
     covered, total = covered_days(start_year, end_year, series.last_recorded_date)
     return BudgetReport(
-        category=category,
+        group=group,
         start_year=start_year,
         end_year=end_year,
-        factor=factor,
+        share=share,
         expected_total=expected,
         consumed=consumed,
         total_consumed=float(sum(amount for _, amount in consumed)),

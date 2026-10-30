@@ -8,13 +8,13 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
-CATEGORY_INCOME = "income"
-CATEGORY_BASIC = "basic"
-CATEGORY_OPTIONAL = "optional"
-CATEGORIES = (CATEGORY_INCOME, CATEGORY_BASIC, CATEGORY_OPTIONAL)
-EXPENSE_CATEGORIES = (CATEGORY_BASIC, CATEGORY_OPTIONAL)
+GROUP_INCOME = "income"
+GROUP_NEEDS = "needs"
+GROUP_WANTS = "wants"
+GROUPS = (GROUP_INCOME, GROUP_NEEDS, GROUP_WANTS)
+EXPENSE_GROUPS = (GROUP_NEEDS, GROUP_WANTS)
 
-DEFAULT_BUDGET_FACTORS = {CATEGORY_BASIC: 0.3, CATEGORY_OPTIONAL: 0.5}
+DEFAULT_BUDGET_SHARES = {GROUP_NEEDS: 0.3, GROUP_WANTS: 0.5}
 
 
 def clean_recurring(value: Any) -> int | None:
@@ -39,20 +39,20 @@ def _str(value: Any) -> str:
 
 
 @dataclass
-class Tagger:
-    """Rule that assigns ``tag`` to every transaction whose recipient and description match the regexes."""
+class Rule:
+    """Rule that assigns ``category`` to every transaction whose recipient and description match the regexes."""
 
     name: str
-    tag: str = ""
+    category: str = ""
     regex_recipient: str = ""
     regex_description: str = ""
     recurring: int | None = None
 
     @classmethod
-    def from_dict(cls, data: Mapping[str, Any]) -> Tagger:
+    def from_dict(cls, data: Mapping[str, Any]) -> Rule:
         return cls(
             name=_str(data.get("name")),
-            tag=_str(data.get("tag")),
+            category=_str(data.get("category")),
             regex_recipient=_str(data.get("regex_recipient")),
             regex_description=_str(data.get("regex_description")),
             recurring=clean_recurring(data.get("recurring")),
@@ -61,7 +61,7 @@ class Tagger:
     def to_dict(self) -> dict[str, Any]:
         return {
             "name": self.name,
-            "tag": self.tag,
+            "category": self.category,
             "regex_recipient": self.regex_recipient,
             "regex_description": self.regex_description,
             "recurring": self.recurring,
@@ -69,39 +69,39 @@ class Tagger:
 
 
 @dataclass
-class OneTimeTag:
-    """Tag of a single transaction; wins over all taggers."""
+class ManualCategory:
+    """Category of a single transaction; wins over all rules."""
 
     transaction_id: str
-    tag: str
+    category: str
     recurring: int | None = None
 
     @classmethod
-    def from_dict(cls, data: Mapping[str, Any]) -> OneTimeTag:
+    def from_dict(cls, data: Mapping[str, Any]) -> ManualCategory:
         return cls(
             transaction_id=_str(data.get("transaction_id")),
-            tag=_str(data.get("tag")),
+            category=_str(data.get("category")),
             recurring=clean_recurring(data.get("recurring")),
         )
 
     def to_dict(self) -> dict[str, Any]:
-        return {"transaction_id": self.transaction_id, "tag": self.tag, "recurring": self.recurring}
+        return {"transaction_id": self.transaction_id, "category": self.category, "recurring": self.recurring}
 
 
 @dataclass
-class TagCategory:
-    """Assigns a base tag to income, basic or optional expenses. The list order is the stacking order."""
+class GroupAssignment:
+    """Puts a main category into a budget group. The list order is the stacking order of the budget graph."""
 
-    name: str
-    category: str = CATEGORY_BASIC
+    category: str
+    group: str = GROUP_NEEDS
 
     @classmethod
-    def from_dict(cls, data: Mapping[str, Any]) -> TagCategory:
-        category = _str(data.get("category"))
-        return cls(name=_str(data.get("name")), category=category if category in CATEGORIES else CATEGORY_BASIC)
+    def from_dict(cls, data: Mapping[str, Any]) -> GroupAssignment:
+        group = _str(data.get("group"))
+        return cls(category=_str(data.get("category")), group=group if group in GROUPS else GROUP_NEEDS)
 
     def to_dict(self) -> dict[str, Any]:
-        return {"name": self.name, "category": self.category}
+        return {"category": self.category, "group": self.group}
 
 
 def _current_year() -> int:
@@ -110,44 +110,44 @@ def _current_year() -> int:
 
 @dataclass
 class Settings:
-    excluded_tags: list[str] = field(default_factory=list)
+    excluded_categories: list[str] = field(default_factory=list)
     budget_start: int = field(default_factory=_current_year)
     budget_end: int = field(default_factory=_current_year)
-    budget_factors: dict[str, float] = field(default_factory=lambda: dict(DEFAULT_BUDGET_FACTORS))
-    hide_transfers: bool = True
+    budget_shares: dict[str, float] = field(default_factory=lambda: dict(DEFAULT_BUDGET_SHARES))
+    hide_internal_transfers: bool = True
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any] | None) -> Settings:
         settings = cls()
         if not data:
             return settings
-        excluded = data.get("excluded_tags")
+        excluded = data.get("excluded_categories")
         if isinstance(excluded, Sequence) and not isinstance(excluded, str):
-            settings.excluded_tags = [str(t) for t in excluded]
-        if "hide_transfers" in data:
-            settings.hide_transfers = bool(data["hide_transfers"])
+            settings.excluded_categories = [str(t) for t in excluded]
+        if "hide_internal_transfers" in data:
+            settings.hide_internal_transfers = bool(data["hide_internal_transfers"])
 
         budget = data.get("budget")
         budget = budget if isinstance(budget, Mapping) else {}
         start, end = budget.get("start"), budget.get("end")
         if isinstance(start, int) and isinstance(end, int):
             settings.budget_start, settings.budget_end = min(start, end), max(start, end)
-        factors = budget.get("factors")
-        factors = factors if isinstance(factors, Mapping) else {}
-        for cat in EXPENSE_CATEGORIES:
-            factor = factors.get(cat)
-            if isinstance(factor, int | float) and 0 <= factor <= 1:
-                settings.budget_factors[cat] = float(factor)
+        shares = budget.get("shares")
+        shares = shares if isinstance(shares, Mapping) else {}
+        for group in EXPENSE_GROUPS:
+            share = shares.get(group)
+            if isinstance(share, int | float) and 0 <= share <= 1:
+                settings.budget_shares[group] = float(share)
         return settings
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "excluded_tags": list(self.excluded_tags),
-            "hide_transfers": self.hide_transfers,
+            "excluded_categories": list(self.excluded_categories),
+            "hide_internal_transfers": self.hide_internal_transfers,
             "budget": {
                 "start": self.budget_start,
                 "end": self.budget_end,
-                "factors": dict(self.budget_factors),
+                "shares": dict(self.budget_shares),
             },
         }
 
@@ -176,13 +176,15 @@ def _match_orders(old_names: list[str], new_names: list[str]) -> list[str]:
     return new_order
 
 
-def reorder_categories(current: Sequence[TagCategory], assignment: Mapping[str, Sequence[str]]) -> list[TagCategory]:
-    """Apply a drag-and-drop result: ``assignment`` maps a category to the tag names shown in its list."""
-    by_name = {c.name: TagCategory(c.name, c.category) for c in current}
-    new_names: list[str] = []
-    for category, names in assignment.items():
-        for name in names:
-            by_name.setdefault(name, TagCategory(name, category)).category = category
-            new_names.append(name)
-    order = _match_orders([c.name for c in current], new_names)
-    return [by_name[name] for name in order]
+def reorder_groups(
+    current: Sequence[GroupAssignment], assignment: Mapping[str, Sequence[str]]
+) -> list[GroupAssignment]:
+    """Apply a drag-and-drop result: ``assignment`` maps a group to the categories shown in its list."""
+    by_category = {a.category: GroupAssignment(a.category, a.group) for a in current}
+    new_order: list[str] = []
+    for group, categories in assignment.items():
+        for category in categories:
+            by_category.setdefault(category, GroupAssignment(category, group)).group = group
+            new_order.append(category)
+    order = _match_orders([a.category for a in current], new_order)
+    return [by_category[category] for category in order]

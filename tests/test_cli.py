@@ -29,11 +29,11 @@ def test_main_starts_window(qtbot, tmp_path, monkeypatch):
 
 
 def test_main_reports_unreadable_data(qtbot, tmp_path, monkeypatch):
-    (tmp_path / "taggers.yaml").write_text("{not: [valid")
+    (tmp_path / "rules.yaml").write_text("{not: [valid")
     messages = []
     monkeypatch.setattr(QMessageBox, "critical", lambda *args: messages.append(args[2]))
     assert cli.main(["--data-dir", str(tmp_path)]) == 1
-    assert "taggers.yaml" in messages[0]
+    assert "rules.yaml" in messages[0]
 
 
 def test_python_dash_m(monkeypatch):

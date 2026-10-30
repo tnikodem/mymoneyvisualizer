@@ -4,13 +4,13 @@ import math
 import pytest
 
 from mymoneyvisualizer.domain.models import (
-    OneTimeTag,
+    GroupAssignment,
+    ManualCategory,
+    Rule,
     Settings,
-    TagCategory,
-    Tagger,
     clean_recurring,
     recurring_to_float,
-    reorder_categories,
+    reorder_groups,
 )
 
 
@@ -38,43 +38,43 @@ def test_recurring_to_float():
     assert recurring_to_float(2) == 2.0
 
 
-def test_tagger_roundtrip_and_missing_values():
-    tagger = Tagger(name="t", tag="food", regex_recipient="REWE", regex_description="", recurring=2)
-    assert Tagger.from_dict(tagger.to_dict()) == tagger
-    assert Tagger.from_dict({"name": "t", "tag": None, "recurring": None}) == Tagger(name="t")
+def test_rule_roundtrip_and_missing_values():
+    rule = Rule(name="t", category="food", regex_recipient="REWE", regex_description="", recurring=2)
+    assert Rule.from_dict(rule.to_dict()) == rule
+    assert Rule.from_dict({"name": "t", "category": None, "recurring": None}) == Rule(name="t")
 
 
-def test_one_time_tag_roundtrip():
-    tag = OneTimeTag("id-1", "hobby", 3)
-    assert OneTimeTag.from_dict(tag.to_dict()) == tag
+def test_manual_category_roundtrip():
+    category = ManualCategory("id-1", "hobby", 3)
+    assert ManualCategory.from_dict(category.to_dict()) == category
 
 
-def test_tag_category_unknown_category():
-    assert TagCategory.from_dict({"name": "", "category": "income"}) == TagCategory("", "income")
-    assert TagCategory.from_dict({"name": "x", "category": "nonsense"}).category == "basic"
-    assert TagCategory.from_dict({"name": "x"}).to_dict() == {"name": "x", "category": "basic"}
+def test_group_assignment_unknown_category():
+    assert GroupAssignment.from_dict({"category": "", "group": "income"}) == GroupAssignment("", "income")
+    assert GroupAssignment.from_dict({"category": "x", "group": "nonsense"}).group == "needs"
+    assert GroupAssignment.from_dict({"category": "x"}).to_dict() == {"category": "x", "group": "needs"}
 
 
 def test_settings_defaults_use_current_year():
     settings = Settings()
     assert settings.budget_start == settings.budget_end == datetime.date.today().year
-    assert settings.budget_factors == {"basic": 0.3, "optional": 0.5}
-    assert settings.hide_transfers is True
+    assert settings.budget_shares == {"needs": 0.3, "wants": 0.5}
+    assert settings.hide_internal_transfers is True
 
 
 def test_settings_instances_do_not_share_state():
     """Regression: loading a configuration overwrote the module level DEFAULT_SETTINGS dict."""
-    first = Settings.from_dict({"excluded_tags": ["a"], "budget": {"factors": {"basic": 0.9}}})
-    first.excluded_tags.append("b")
-    first.budget_factors["optional"] = 0.1
+    first = Settings.from_dict({"excluded_categories": ["a"], "budget": {"factors": {"needs": 0.9}}})
+    first.excluded_categories.append("b")
+    first.budget_shares["wants"] = 0.1
     second = Settings()
-    assert second.excluded_tags == []
-    assert second.budget_factors == {"basic": 0.3, "optional": 0.5}
+    assert second.excluded_categories == []
+    assert second.budget_shares == {"needs": 0.3, "wants": 0.5}
 
 
 def test_settings_roundtrip():
-    settings = Settings(excluded_tags=["x"], budget_start=2020, budget_end=2022, hide_transfers=False)
-    settings.budget_factors["basic"] = 0.4
+    settings = Settings(excluded_categories=["x"], budget_start=2020, budget_end=2022, hide_internal_transfers=False)
+    settings.budget_shares["needs"] = 0.4
     assert Settings.from_dict(settings.to_dict()) == settings
 
 
@@ -85,9 +85,9 @@ def test_settings_roundtrip():
         {},
         {"budget": "garbage"},
         {"budget": {"start": 2020}},
-        {"budget": {"factors": {"basic": 7}}},
+        {"budget": {"factors": {"needs": 7}}},
         {"budget": {"factors": "garbage"}},
-        {"excluded_tags": "not-a-list"},
+        {"excluded_categories": "not-a-list"},
     ],
 )
 def test_settings_ignore_invalid_values(data):
@@ -99,29 +99,33 @@ def test_settings_swap_inverted_period():
     assert (settings.budget_start, settings.budget_end) == (2020, 2024)
 
 
-def test_reorder_categories_moves_and_recategorizes():
-    current = [TagCategory("income", "income"), TagCategory("food", "basic"), TagCategory("hobby", "optional")]
-    result = reorder_categories(current, {"basic": ["food", "hobby"], "optional": [], "income": ["income"]})
-    assert [(c.name, c.category) for c in result] == [("food", "basic"), ("hobby", "basic"), ("income", "income")]
+def test_reorder_groups_moves_and_recategorizes():
+    current = [GroupAssignment("income", "income"), GroupAssignment("food", "needs"), GroupAssignment("hobby", "wants")]
+    result = reorder_groups(current, {"needs": ["food", "hobby"], "wants": [], "income": ["income"]})
+    assert [(a.category, a.group) for a in result] == [("food", "needs"), ("hobby", "needs"), ("income", "income")]
     # input is not modified
-    assert current[2].category == "optional"
+    assert current[2].group == "wants"
 
 
-def test_reorder_categories_matches_old_order_algorithm():
+def test_reorder_groups_matches_old_order_algorithm():
     old = [" ", "amazon", "bank", "cash", "food", "hobby", "home", "mobility", "person", "savings", "transfer", "work"]
     new = [" ", "food", "amazon", "bank", "cash", "hobby", "home", "mobility", "person", "savings", "transfer", "work"]
-    current = [TagCategory(n, "basic") for n in old]
-    assert [c.name for c in reorder_categories(current, {"basic": new})] == new
+    current = [GroupAssignment(n, "needs") for n in old]
+    assert [a.category for a in reorder_groups(current, {"needs": new})] == new
 
 
-def test_reorder_categories_keeps_tags_missing_in_the_lists():
-    """Regression: tags not shown in the lists (e.g. excluded tags) lost their category after drag & drop."""
-    current = [TagCategory("income", "income"), TagCategory("food", "basic"), TagCategory("hidden", "optional")]
-    result = reorder_categories(current, {"basic": ["food"], "income": ["income"]})
-    assert ("hidden", "optional") in [(c.name, c.category) for c in result]
+def test_reorder_groups_keeps_categories_missing_in_the_lists():
+    """Regression: categories not shown in the lists (e.g. excluded categories) lost their group after drag & drop."""
+    current = [
+        GroupAssignment("income", "income"),
+        GroupAssignment("food", "needs"),
+        GroupAssignment("hidden", "wants"),
+    ]
+    result = reorder_groups(current, {"needs": ["food"], "income": ["income"]})
+    assert ("hidden", "wants") in [(a.category, a.group) for a in result]
     assert len(result) == 3
 
 
-def test_reorder_categories_adds_new_names():
-    result = reorder_categories([TagCategory("a")], {"optional": ["a", "b"]})
-    assert [(c.name, c.category) for c in result] == [("a", "optional"), ("b", "optional")]
+def test_reorder_groups_adds_new_names():
+    result = reorder_groups([GroupAssignment("a")], {"wants": ["a", "b"]})
+    assert [(a.category, a.group) for a in result] == [("a", "wants"), ("b", "wants")]

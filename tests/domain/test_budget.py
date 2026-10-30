@@ -12,17 +12,17 @@ from mymoneyvisualizer.domain.budget import (
     income_series,
     stacked_expenses,
 )
-from mymoneyvisualizer.domain.models import TagCategory
+from mymoneyvisualizer.domain.models import GroupAssignment
 
-from ..helpers import tagged
+from ..helpers import categorized
 
 
-def _amortize(rows, tags, recurring, horizon="2025-12"):
-    return amortize_recurring(tagged(*rows, tags=tags, recurring=recurring), pd.Period(horizon, "M"))
+def _amortize(rows, categories, recurring, horizon="2025-12"):
+    return amortize_recurring(categorized(*rows, categories=categories, recurring=recurring), pd.Period(horizon, "M"))
 
 
 def test_amortize_empty():
-    assert amortize_recurring(tagged(tags=[]), pd.Period("2025-12", "M")).empty
+    assert amortize_recurring(categorized(categories=[]), pd.Period("2025-12", "M")).empty
 
 
 def test_current_yearly_event_is_continued_until_horizon():
@@ -62,33 +62,33 @@ def test_transactions_after_horizon_are_ignored():
     assert _amortize([rows[0]], ["late"], [None], horizon="2025-12").empty
 
 
-def test_budget_series_filters_and_uses_base_tags():
-    df = tagged(
+def test_budget_series_filters_and_uses_main_categories():
+    df = categorized(
         ("2024-01-01", "ACME", "Gehalt", 1200.0),
         ("2024-01-02", "REWE", "x", -120.0),
         ("2024-01-03", "Ich", "Sparen", -500.0),
         ("2024-01-04", "Kiosk", "x", -12.0),
-        tags=["income.salary", "household.food", "spar", "misc"],
+        categories=["income.salary", "household.food", "spar", "misc"],
     )
-    series = budget_series(df, budget_end_year=2024, transfer_accounts=["spar"], excluded_tags=["misc"])
+    series = budget_series(df, budget_end_year=2024, own_accounts=["spar"], excluded_categories=["misc"])
     assert list(series.monthly.columns) == ["household", "income"]
     assert series.monthly.index[-1] == pd.Period("2029-12", "M")
 
 
 def test_budget_series_last_recorded_date_is_last_transaction():
     """Regression: the projection moved ``last_date`` to the horizon, so every budget period looked complete."""
-    df = tagged(("2024-01-01", "a", "b", -1.0), ("2024-05-17", "a", "b", -1.0), tags=["x", "x"])
+    df = categorized(("2024-01-01", "a", "b", -1.0), ("2024-05-17", "a", "b", -1.0), categories=["x", "x"])
     series = budget_series(df, budget_end_year=2024)
     assert series.last_recorded_date == pd.Timestamp("2024-05-17")
 
 
 def test_budget_series_empty():
     series = budget_series(
-        tagged(("2024-01-01", "a", "b", -1.0), tags=["x"]), budget_end_year=2024, excluded_tags=["x"]
+        categorized(("2024-01-01", "a", "b", -1.0), categories=["x"]), budget_end_year=2024, excluded_categories=["x"]
     )
     assert series.monthly.empty
     assert series.last_recorded_date is None
-    assert budget_report(series, [], "basic", 2024, 2024, 0.3) is None
+    assert budget_report(series, [], "needs", 2024, 2024, 0.3) is None
 
 
 @pytest.mark.parametrize(
@@ -116,26 +116,26 @@ def _series():
     return BudgetSeries(monthly, pd.Timestamp("2024-06-30"))
 
 
-CATEGORIES = [
-    TagCategory("income", "income"),
-    TagCategory("household", "basic"),
-    TagCategory("car", "basic"),
-    TagCategory("hobby", "optional"),
-    TagCategory("", "basic"),
-    TagCategory("unknown", "basic"),
+GROUPS = [
+    GroupAssignment("income", "income"),
+    GroupAssignment("household", "needs"),
+    GroupAssignment("car", "needs"),
+    GroupAssignment("hobby", "wants"),
+    GroupAssignment("", "needs"),
+    GroupAssignment("unknown", "needs"),
 ]
 
 
 def test_income_series_and_stacking():
     monthly = _series().monthly
-    np.testing.assert_allclose(income_series(monthly, CATEGORIES), 1000.0)
-    curves = stacked_expenses(monthly, CATEGORIES, "basic")
+    np.testing.assert_allclose(income_series(monthly, GROUPS), 1000.0)
+    curves = stacked_expenses(monthly, GROUPS, "needs")
     assert [name for name, _ in curves] == ["", "car", "household"]
     np.testing.assert_allclose(curves[-1][1], 255.0)
 
 
 def test_budget_report():
-    report = budget_report(_series(), CATEGORIES, "basic", 2024, 2024, 0.3)
+    report = budget_report(_series(), GROUPS, "needs", 2024, 2024, 0.3)
     assert report.expected_total == pytest.approx(3600.0)
     assert report.consumed == [("household", 2400.0), ("car", 600.0), ("", 60.0)]
     assert report.total_consumed == pytest.approx(3060.0)
@@ -149,16 +149,16 @@ def test_budget_report():
 
 
 def test_budget_report_complete_and_empty_coverage():
-    complete = BudgetReport("basic", 2024, 2024, 0.3, 100.0, [], 0.0, 366, 366, pd.Timestamp("2024-12-31"))
+    complete = BudgetReport("needs", 2024, 2024, 0.3, 100.0, [], 0.0, 366, 366, pd.Timestamp("2024-12-31"))
     assert complete.is_complete
     assert complete.remaining_per_month is None
-    nothing = BudgetReport("basic", 2024, 2024, 0.3, 100.0, [], 0.0, 366, 0, pd.Timestamp("2023-12-31"))
+    nothing = BudgetReport("needs", 2024, 2024, 0.3, 100.0, [], 0.0, 366, 0, pd.Timestamp("2023-12-31"))
     assert nothing.trend is None
 
 
 def test_budget_report_period_selects_months():
     series = _series()
     series.monthly.index = pd.period_range("2023-07", "2024-06", freq="M")
-    report = budget_report(series, CATEGORIES, "optional", 2024, 2024, 0.5)
+    report = budget_report(series, GROUPS, "wants", 2024, 2024, 0.5)
     assert report.expected_total == pytest.approx(3000.0)
     assert report.consumed == [("hobby", 180.0)]

@@ -10,15 +10,15 @@ from mymoneyvisualizer.storage.paths import ENV_VAR, default_data_dir, resolve_d
 
 def test_yaml_roundtrip_keeps_unicode(tmp_path):
     path = tmp_path / "sub" / "x.yaml"
-    write_yaml(path, [{"tag": "küche", "recurring": None}])
+    write_yaml(path, [{"category": "küche", "recurring": None}])
     assert "küche" in path.read_text(encoding="utf-8")
-    assert read_yaml(path) == [{"tag": "küche", "recurring": None}]
+    assert read_yaml(path) == [{"category": "küche", "recurring": None}]
 
 
 def test_read_yaml_missing_and_not_utf8(tmp_path):
     assert read_yaml(tmp_path / "missing.yaml") is None
     path = tmp_path / "latin.yaml"
-    path.write_bytes("- tag: küche\n".encode("latin-1"))
+    path.write_bytes("- category: küche\n".encode("latin-1"))
     with pytest.raises(StorageError, match="UTF-8"):
         read_yaml(path)
 

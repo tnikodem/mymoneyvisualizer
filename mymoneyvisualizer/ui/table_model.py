@@ -15,7 +15,7 @@ from PyQt6.QtWidgets import QAbstractItemView, QHeaderView, QTableView, QWidget
 
 SORT_ROLE = Qt.ItemDataRole.UserRole + 1
 
-TEXT, TAG, DATE, MONEY, MONEY0, NUMBER = "text", "tag", "date", "money", "money0", "number"
+TEXT, CATEGORY, DATE, MONEY, MONEY0, NUMBER = "text", "category", "date", "money", "money0", "number"
 NUMERIC = (MONEY, MONEY0, NUMBER)
 
 
@@ -50,7 +50,7 @@ def format_value(value: Any, kind: str) -> str:
     if kind == NUMBER:
         number = float(value)
         return str(int(number)) if number.is_integer() else str(number)
-    return str(value)  # an empty tag stays empty, so missing tags stand out
+    return str(value)  # an empty category stays empty, so missing categories stand out
 
 
 def sort_key(value: Any, kind: str) -> Any:

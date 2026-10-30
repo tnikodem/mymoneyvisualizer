@@ -3,7 +3,7 @@ import pytest
 import yaml
 
 from mymoneyvisualizer.domain.columns import RAW_COLUMNS
-from mymoneyvisualizer.domain.models import OneTimeTag, Settings, TagCategory, Tagger
+from mymoneyvisualizer.domain.models import GroupAssignment, ManualCategory, Rule, Settings
 from mymoneyvisualizer.importing.profile import ImportProfile
 from mymoneyvisualizer.storage.files import StorageError
 from mymoneyvisualizer.storage.repository import Repository, State, account_file_name
@@ -32,20 +32,20 @@ def test_roundtrip(tmp_path):
     repo = Repository(tmp_path)
     state = State(
         accounts={"Giro Konto": transactions(("2024-01-02", "Müller", "Brot", -3.5)), "empty": transactions()},
-        taggers=[Tagger("t", tag="küche", regex_recipient="Müller", recurring=2)],
-        one_time_tags={"id": OneTimeTag("id", "hobby", None)},
-        categories=[TagCategory("küche", "optional"), TagCategory("", "basic")],
+        rules=[Rule("t", category="küche", regex_recipient="Müller", recurring=2)],
+        manual_categories={"id": ManualCategory("id", "hobby", None)},
+        groups=[GroupAssignment("küche", "wants"), GroupAssignment("", "needs")],
         profiles=[ImportProfile(name="dkb", skiprows=4)],
-        settings=Settings(excluded_tags=["x"], budget_start=2020, budget_end=2021),
+        settings=Settings(excluded_categories=["x"], budget_start=2020, budget_end=2021),
     )
     repo.save_all(state)
     loaded = Repository(tmp_path).load()
     pd.testing.assert_frame_equal(loaded.accounts["Giro Konto"], state.accounts["Giro Konto"])
     assert loaded.accounts["empty"].empty
-    assert (loaded.taggers, loaded.one_time_tags, loaded.categories, loaded.profiles, loaded.settings) == (
-        state.taggers,
-        state.one_time_tags,
-        state.categories,
+    assert (loaded.rules, loaded.manual_categories, loaded.groups, loaded.profiles, loaded.settings) == (
+        state.rules,
+        state.manual_categories,
+        state.groups,
         state.profiles,
         state.settings,
     )
@@ -57,7 +57,7 @@ def test_roundtrip(tmp_path):
 
 def test_account_csv_contains_only_raw_columns(tmp_path):
     repo = Repository(tmp_path)
-    df = transactions(("2024-01-02", "a", "b", -1.0)).assign(tag="derived")
+    df = transactions(("2024-01-02", "a", "b", -1.0)).assign(category="derived")
     repo.save_account("x", df)
     assert (tmp_path / "accounts" / "x.csv").read_text().splitlines()[0] == ",".join(RAW_COLUMNS)
 
@@ -76,8 +76,8 @@ def test_rename_and_delete_account_files(tmp_path):
 
 
 def test_invalid_files_raise_instead_of_losing_data(tmp_path):
-    (tmp_path / "taggers.yaml").write_text("name: not a list\n")
-    with pytest.raises(StorageError, match="taggers.yaml"):
+    (tmp_path / "rules.yaml").write_text("name: not a list\n")
+    with pytest.raises(StorageError, match="rules.yaml"):
         Repository(tmp_path).load()
 
 
@@ -103,6 +103,7 @@ def test_account_csv_must_be_utf8(tmp_path):
         Repository(tmp_path).load()
 
 
-def test_duplicate_categories_keep_first(tmp_path):
-    (tmp_path / "tag_categories.yaml").write_text("- {name: food, category: basic}\n- {name: food, category: income}\n")
-    assert Repository(tmp_path).load().categories == [TagCategory("food", "basic")]
+def test_duplicate_group_assignments_keep_first(tmp_path):
+    content = "- {category: food, group: needs}\n- {category: food, group: income}\n"
+    (tmp_path / "budget_groups.yaml").write_text(content)
+    assert Repository(tmp_path).load().groups == [GroupAssignment("food", "needs")]

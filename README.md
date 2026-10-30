@@ -30,26 +30,26 @@ German banks. Check the preview and import. The settings are stored as an import
 next file with the same columns. Transactions that are already in the account are skipped, so overlapping
 exports can be imported safely.
 
-Tags and Subtags
-----------------
-Each transaction can be given a tag. Either double click on a transaction or use **Add Tagger** in the tagger
-overview to define a new *tagger*. A tagger tags all transactions whose recipient and description match its
-regular expressions. Taggers are applied in order, later ones win. A single transaction can get a **one time tag**
-that wins over all taggers.
+Categories and Rules
+--------------------
+Each transaction gets a category. Double click a transaction or use **Add Rule** in the rules overview to define a
+new *rule*. A rule assigns its category to all transactions whose recipient and description match its regular
+expressions. Rules are applied in order, later ones win. A single transaction can get a **manual category** that
+wins over all rules.
 
-Split tag and subtag with a point, e.g. `household.food.grocery`. Transactions tagged with the name of one of
-your accounts are transfers between your own accounts and can be hidden in the summary.
+Split category and subcategory with a point, e.g. `household.food.grocery`. Transactions categorized with the name
+of one of your accounts are internal transfers between your own accounts and can be hidden.
 
-A tagger can mark transactions as *recurring every n years* (e.g. a yearly insurance). The budget graph spreads
+A rule can mark transactions as *recurring every n years* (e.g. a yearly insurance). The budget graph spreads
 them over that period and expects them to happen again.
 
-Summary and Budget
-------------------
-* **Summary Table**: monthly sums per tag. Months that differ clearly from the median of the previous 12 months
-  are highlighted (red: more expenses / less income, green: the opposite). Double click a cell to see its
+Income & Expenses and Budget
+----------------------------
+* **Income & Expenses**: monthly sums per category. Months that differ clearly from the median of the previous 12
+  months are highlighted (red: more expenses / less income, green: the opposite). Double click a cell to see its
   transactions.
-* **Summary Graph**: stacked basic and optional expenses compared with a share of your income. Drag tags between
-  the lists to change their category.
+* **Budget**: stacked needs and wants compared with a share of your income. Drag main categories between the
+  lists to change their budget group.
 
 
 Development
@@ -64,7 +64,7 @@ Structure of the package:
 
 | package                         | content                                                                    |
 |---------------------------------|----------------------------------------------------------------------------|
-| `mymoneyvisualizer.domain`      | pure logic on pandas tables: tagging, summary table, budget, models        |
+| `mymoneyvisualizer.domain`      | pure logic on pandas tables: categorization, income & expenses, budget     |
 | `mymoneyvisualizer.importing`   | CSV format detection, import profiles, duplicate detection                 |
 | `mymoneyvisualizer.storage`     | data directory (CSV + YAML), atomic writes, backups                        |
 | `mymoneyvisualizer.app`         | `AppModel`: state and use cases, emits `changed(topics)`; no Qt            |

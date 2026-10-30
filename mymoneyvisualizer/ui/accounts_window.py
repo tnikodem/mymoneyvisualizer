@@ -18,11 +18,11 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from mymoneyvisualizer.app import ACCOUNTS, TAGGERS, TRANSACTIONS
+from mymoneyvisualizer.app import ACCOUNTS, RULES, TRANSACTIONS
 from mymoneyvisualizer.domain.columns import Col
 from mymoneyvisualizer.storage.files import StorageError
 from mymoneyvisualizer.ui.common import Window
-from mymoneyvisualizer.ui.table_model import DATE, MONEY, NUMBER, TAG, Column, DataFrameModel, DataFrameView
+from mymoneyvisualizer.ui.table_model import CATEGORY, DATE, MONEY, NUMBER, Column, DataFrameModel, DataFrameView
 
 if TYPE_CHECKING:
     from mymoneyvisualizer.ui.main_window import MainWindow
@@ -34,7 +34,7 @@ TRANSACTION_COLUMNS = [
     Column(Col.description, "description", width=520),
     Column(Col.value, "value", MONEY, 100),
     Column(Col.recurring, "recurring", NUMBER, 70),
-    Column(Col.tag, "tag", TAG, 160),
+    Column(Col.category, "category", CATEGORY, 160),
 ]
 
 
@@ -62,7 +62,7 @@ class AccountTab(QWidget):
 
         self.name_edit.returnPressed.connect(self.rename)
         self.import_button.clicked.connect(self.import_data)
-        self.table.doubleClicked.connect(self.open_tagger)
+        self.table.doubleClicked.connect(self.open_rule)
 
     def refresh(self) -> None:
         self.dirty = False
@@ -78,13 +78,13 @@ class AccountTab(QWidget):
         if path:
             self.window_.navigator.open_import(path, self.account)
 
-    def open_tagger(self, index) -> None:
+    def open_rule(self, index) -> None:
         row = self.table.row_at(index.row())
-        self.window_.navigator.open_tagger(transaction_id=row[Col.transaction_id])
+        self.window_.navigator.open_rule(transaction_id=row[Col.transaction_id])
 
 
 class AccountsWindow(Window):
-    topics = frozenset({ACCOUNTS, TRANSACTIONS, TAGGERS})
+    topics = frozenset({ACCOUNTS, TRANSACTIONS, RULES})
 
     def __init__(self, model, bridge, navigator: MainWindow):
         super().__init__(model, bridge, navigator)
@@ -94,11 +94,11 @@ class AccountsWindow(Window):
 
         self.new_button = QPushButton("New Account", self)
         self.delete_button = QPushButton("Delete Account", self)
-        self.taggers_button = QPushButton("Taggers", self)
+        self.rules_button = QPushButton("Rules", self)
         self.load_button = QPushButton("Load Project", self)
         self.save_button = QPushButton("Save Project", self)
         controls = QHBoxLayout()
-        for button in (self.new_button, self.delete_button, self.taggers_button, self.load_button, self.save_button):
+        for button in (self.new_button, self.delete_button, self.rules_button, self.load_button, self.save_button):
             button.setMinimumWidth(150)
             controls.addWidget(button)
         controls.addStretch(1)
@@ -112,7 +112,7 @@ class AccountsWindow(Window):
 
         self.new_button.clicked.connect(self.create_account)
         self.delete_button.clicked.connect(self.delete_account)
-        self.taggers_button.clicked.connect(navigator.show_tagger_overview)
+        self.rules_button.clicked.connect(navigator.show_rules)
         self.load_button.clicked.connect(self.load_project)
         self.save_button.clicked.connect(self.save_project)
         self.tabs.currentChanged.connect(self._tab_shown)

@@ -1,7 +1,7 @@
 """Large synthetic data set for performance tests (all made up, deterministic).
 
 Sized above a typical household over many years: several accounts, ~5 transactions per day, mostly unique
-purposes (reference numbers, time stamps), hundreds of taggers created by double click and by hand.
+purposes (reference numbers, time stamps), hundreds of rules created by double click and by hand.
 """
 
 from __future__ import annotations
@@ -12,20 +12,20 @@ import re
 import numpy as np
 import pandas as pd
 
+from mymoneyvisualizer.domain.categorization import regex_for
 from mymoneyvisualizer.domain.columns import Col, new_transaction_ids, normalize_transactions
 from mymoneyvisualizer.domain.models import (
-    CATEGORY_BASIC,
-    CATEGORY_INCOME,
-    CATEGORY_OPTIONAL,
-    OneTimeTag,
+    GROUP_INCOME,
+    GROUP_NEEDS,
+    GROUP_WANTS,
+    GroupAssignment,
+    ManualCategory,
+    Rule,
     Settings,
-    TagCategory,
-    Tagger,
 )
-from mymoneyvisualizer.domain.tagging import regex_for
 from mymoneyvisualizer.storage.repository import State
 
-#: (merchant, base tag, sub tag, typical amount, monthly frequency per account)
+#: (merchant, main category, subcategory, typical amount, monthly frequency per account)
 MERCHANTS = [
     ("REWE Markt", "household", "food", -45, 6),
     ("EDEKA Center", "household", "food", -38, 4),
@@ -52,7 +52,7 @@ MERCHANTS = [
     ("Zahnarztpraxis Dr. Weiß", "health", "dentist", -65, 0.1),
     ("Fitnessstudio Sportwerk", "leisure", "sport", -39.9, 1),
 ]
-#: monthly fixed items: (recipient, purpose, base tag, sub tag, amount)
+#: monthly fixed items: (recipient, purpose, main category, subcategory, amount)
 FIXED = [
     ("Musterfirma GmbH", "Gehalt {m:02d}/{y} PersNr 4711", "income", "salary", 3245.67),
     ("Hausverwaltung Schröder & Söhne", "Miete {mon} {y} Whg. 3 OG links", "housing", "rent", -1050.0),
@@ -111,7 +111,7 @@ def _transactions(rng: random.Random, account: int, start: pd.Period, months: in
 
 
 def build_state(
-    accounts: int = 8, years: int = 12, per_month: float = 1.5, taggers: int = 700, one_time: int = 400, seed: int = 7
+    accounts: int = 8, years: int = 12, per_month: float = 1.5, rules: int = 700, manual: int = 400, seed: int = 7
 ) -> State:
     rng = random.Random(seed)
     start = pd.Period("2014-11", "M")
@@ -121,48 +121,48 @@ def build_state(
         state.accounts[name] = _transactions(rng, i, start, years * 12, per_month * (1.0 if i < 2 else 0.6))
     combined = pd.concat(state.accounts.values(), ignore_index=True)
 
-    tagger_list: list[Tagger] = []
+    rule_list: list[Rule] = []
     for recipient, _purpose, base, sub, _amount in FIXED:
-        tagger_list.append(Tagger(f"fixed {recipient}", tag=f"{base}.{sub}", regex_recipient=re.escape(recipient)))
-    tagger_list.append(Tagger("savings out", tag="Tagesgeld", regex_description="^Sparen ", regex_recipient="Max"))
-    tagger_list.append(Tagger("savings in", tag="Girokonto", regex_description="^Sparen ", regex_recipient="Max"))
+        rule_list.append(Rule(f"fixed {recipient}", category=f"{base}.{sub}", regex_recipient=re.escape(recipient)))
+    rule_list.append(Rule("savings out", category="Tagesgeld", regex_description="^Sparen ", regex_recipient="Max"))
+    rule_list.append(Rule("savings in", category="Girokonto", regex_description="^Sparen ", regex_recipient="Max"))
     kinds = ["merchant", "double click", "description", "alternation", "regex"]
     weights = [30, 40, 12, 12, 6]
-    while len(tagger_list) < taggers:
+    while len(rule_list) < rules:
         kind = rng.choices(kinds, weights)[0]
         merchant, base, sub, *_ = rng.choice(MERCHANTS)
-        tag = f"{base}.{sub}" if rng.random() < 0.8 else f"{base}.{sub}.{rng.randint(1, 5)}"
-        n = len(tagger_list)
+        category = f"{base}.{sub}" if rng.random() < 0.8 else f"{base}.{sub}.{rng.randint(1, 5)}"
+        n = len(rule_list)
         if kind == "merchant":
-            tagger = Tagger(f"t{n}", tag=tag, regex_recipient=f"{re.escape(merchant)} {rng.randint(1, 120)}$")
+            rule = Rule(f"t{n}", category=category, regex_recipient=f"{re.escape(merchant)} {rng.randint(1, 120)}$")
         elif kind == "double click":
             row = combined.iloc[rng.randrange(len(combined))]
-            tagger = Tagger(
+            rule = Rule(
                 f"t{n}",
-                tag=tag,
+                category=category,
                 regex_recipient=regex_for(row[Col.recipient]),
                 regex_description=regex_for(row[Col.description]),
             )
         elif kind == "description":
-            tagger = Tagger(f"t{n}", tag=tag, regex_description=re.escape(merchant.upper()))
+            rule = Rule(f"t{n}", category=category, regex_description=re.escape(merchant.upper()))
         elif kind == "alternation":
             others = rng.sample(MERCHANTS, 3)
-            tagger = Tagger(f"t{n}", tag=tag, regex_recipient="|".join(re.escape(o[0]) for o in others))
+            rule = Rule(f"t{n}", category=category, regex_recipient="|".join(re.escape(o[0]) for o in others))
         else:
-            tagger = Tagger(
-                f"t{n}", tag=tag, regex_description=rf"^{re.escape(merchant.upper()[:4])}.* \d{{8}}//20\d\d-"
+            rule = Rule(
+                f"t{n}", category=category, regex_description=rf"^{re.escape(merchant.upper()[:4])}.* \d{{8}}//20\d\d-"
             )
-        tagger_list.append(tagger)
-    state.taggers = tagger_list
+        rule_list.append(rule)
+    state.rules = rule_list
 
     ids = combined[Col.transaction_id].to_numpy()
-    for transaction_id in np.random.default_rng(seed).choice(ids, size=one_time, replace=False):
-        state.one_time_tags[str(transaction_id)] = OneTimeTag(str(transaction_id), "leisure.gift")
-    bases = sorted({t.tag.split(".")[0] for t in tagger_list} | {"leisure"})
-    state.categories = [
-        TagCategory(
+    for transaction_id in np.random.default_rng(seed).choice(ids, size=manual, replace=False):
+        state.manual_categories[str(transaction_id)] = ManualCategory(str(transaction_id), "leisure.gift")
+    bases = sorted({t.category.split(".")[0] for t in rule_list} | {"leisure"})
+    state.groups = [
+        GroupAssignment(
             b,
-            CATEGORY_INCOME if b == "income" else CATEGORY_OPTIONAL if b in ("leisure", "shopping") else CATEGORY_BASIC,
+            GROUP_INCOME if b == "income" else GROUP_WANTS if b in ("leisure", "shopping") else GROUP_NEEDS,
         )
         for b in bases
         if b not in state.accounts

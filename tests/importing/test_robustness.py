@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from mymoneyvisualizer.domain.tagging import regex_for
+from mymoneyvisualizer.domain.categorization import regex_for
 from mymoneyvisualizer.importing.profile import ImportProfile, column_candidates, fold, guess_mapping
 from mymoneyvisualizer.importing.reader import (
     parse_amounts,
@@ -224,7 +224,7 @@ def test_fold_and_candidates_handle_broken_and_account_columns():
     }
 
 
-# ------------------------------------------------------------------ taggers from broken text
+# ------------------------------------------------------------------ rules from broken text
 @pytest.mark.parametrize(
     ("text", "regex"),
     [

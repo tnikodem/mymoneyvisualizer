@@ -2,7 +2,7 @@ import pytest
 from PyQt6.QtWidgets import QMessageBox
 
 from mymoneyvisualizer.app import AppModel
-from mymoneyvisualizer.domain.models import Tagger
+from mymoneyvisualizer.domain.models import Rule
 from mymoneyvisualizer.ui.common import Window
 from mymoneyvisualizer.ui.main_window import MainWindow
 
@@ -64,16 +64,16 @@ def model(tmp_path):
     rows += [("2024-01-10", "REWE", "Einkauf", -450.0), ("2024-01-11", "Kiosk", "Zeitung", -2.5)]
     model.import_transactions("giro", transactions(*rows))
     model.import_transactions("spar", transactions(("2023-06-20", "Ich", "Sparen Eingang", 200.0)))
-    for tagger in (
-        Tagger("salary", tag="income.salary", regex_recipient="ACME"),
-        Tagger("rent", tag="household.rent", regex_description="Miete"),
-        Tagger("groceries", tag="household.food", regex_recipient="REWE"),
-        Tagger("fuel", tag="car.fuel", regex_recipient="Shell"),
-        Tagger("sharing", tag="carsharing", regex_recipient="ShareNow"),
-        Tagger("saving", tag="spar", regex_description="^Sparen$"),
+    for rule in (
+        Rule("salary", category="income.salary", regex_recipient="ACME"),
+        Rule("rent", category="household.rent", regex_description="Miete"),
+        Rule("groceries", category="household.food", regex_recipient="REWE"),
+        Rule("fuel", category="car.fuel", regex_recipient="Shell"),
+        Rule("sharing", category="carsharing", regex_recipient="ShareNow"),
+        Rule("saving", category="spar", regex_description="^Sparen$"),
     ):
-        model.save_tagger(tagger)
-    model.assign_categories({"income": ["income"], "basic": ["household", "car"], "optional": ["carsharing", ""]})
+        model.save_rule(rule)
+    model.assign_groups({"income": ["income"], "needs": ["household", "car"], "wants": ["carsharing", ""]})
     model.set_budget_period(2023, 2023)
     return model
 

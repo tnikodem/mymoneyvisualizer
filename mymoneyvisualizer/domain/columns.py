@@ -15,19 +15,19 @@ class Col:
     recipient = "recipient"
     description = "description"
     value = "value"
-    tag = "tag"
-    tagger_name = "tagger_name"
+    category = "category"
+    rule = "rule"
     recurring = "recurring"
 
 
-#: Columns that are imported from the bank and persisted. Tags are always derived.
+#: Columns that are imported from the bank and persisted. Categories are always derived.
 RAW_COLUMNS = (Col.transaction_id, Col.date, Col.recipient, Col.description, Col.value)
-TAG_COLUMNS = (Col.tag, Col.tagger_name, Col.recurring)
+CATEGORY_COLUMNS = (Col.category, Col.rule, Col.recurring)
 
-#: Tag of a transaction that no tagger matched.
-UNTAGGED = ""
-#: Tagger name shown for transactions that were tagged individually.
-ONE_TIME_TAGGER = "one_time_tag"
+#: Category of a transaction that no rule matched.
+UNCATEGORIZED = ""
+#: Rule name shown for transactions that were categorized individually.
+MANUAL_RULE = "(manual)"
 
 
 def new_transaction_ids(n: int) -> list[str]:

@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import QHBoxLayout, QLabel, QMainWindow, QMessageBox, QWidg
 from pyqt6_multiselect_combobox import MultiSelectComboBox
 
 from mymoneyvisualizer.app import AppModel
-from mymoneyvisualizer.domain.tags import display_tag
+from mymoneyvisualizer.domain.categories import display_category
 
 GREY = QColor(123, 123, 123)
 GREEN = QColor(203, 255, 179)
@@ -152,8 +152,8 @@ class Window(QMainWindow):
         QMessageBox.warning(self, title, text)
 
 
-class TagSelect(QWidget):
-    """Labelled multi select of tags; emits ``selection_changed(list[str])`` only for user changes."""
+class CategorySelect(QWidget):
+    """Labelled multi select of categories; emits ``selection_changed(list[str])`` only for user changes."""
 
     selection_changed = pyqtSignal(list)
 
@@ -170,14 +170,14 @@ class TagSelect(QWidget):
 
     def set_options(self, options: Iterable[str], selected: Sequence[str]) -> None:
         self._options = list(options)
-        for tag in selected:
-            if tag not in self._options:
-                self._options.append(tag)
+        for category in selected:
+            if category not in self._options:
+                self._options.append(category)
         self.combo.blockSignals(True)
         try:
             self.combo.clear()
-            for tag in self._options:
-                self.combo.addItem(display_tag(tag), tag)
+            for category in self._options:
+                self.combo.addItem(display_category(category), category)
             self.combo.setCurrentIndexes([self._options.index(t) for t in selected])
         finally:
             self.combo.blockSignals(False)
@@ -185,9 +185,9 @@ class TagSelect(QWidget):
     def selected(self) -> list[str]:
         return list(self.combo.currentData())
 
-    def set_selected(self, tags: Sequence[str]) -> None:
-        """Select ``tags`` as if the user did it."""
-        self.combo.setCurrentIndexes([self._options.index(t) for t in tags if t in self._options])
+    def set_selected(self, categories: Sequence[str]) -> None:
+        """Select ``categories`` as if the user did it."""
+        self.combo.setCurrentIndexes([self._options.index(t) for t in categories if t in self._options])
 
     def _emit(self, selected: list) -> None:
         self.selection_changed.emit(list(selected))

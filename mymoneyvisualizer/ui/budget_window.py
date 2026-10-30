@@ -1,4 +1,4 @@
-"""Budget graph: stacked expenses per category against a share of the income."""
+"""Budget graph: stacked expenses per group against a share of the income."""
 
 from __future__ import annotations
 
@@ -21,17 +21,17 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from mymoneyvisualizer.app import ACCOUNTS, CATEGORIES, SETTINGS, TAGGERS, TRANSACTIONS
+from mymoneyvisualizer.app import ACCOUNTS, GROUPS, RULES, SETTINGS, TRANSACTIONS
 from mymoneyvisualizer.domain.budget import BudgetReport, BudgetSeries, income_series, stacked_expenses
-from mymoneyvisualizer.domain.models import CATEGORIES as CATEGORY_NAMES
-from mymoneyvisualizer.domain.models import CATEGORY_BASIC, CATEGORY_OPTIONAL, EXPENSE_CATEGORIES
-from mymoneyvisualizer.domain.tags import display_tag
-from mymoneyvisualizer.ui.common import GREY, PLOT_COLORS, TagSelect, Window
+from mymoneyvisualizer.domain.categories import display_category
+from mymoneyvisualizer.domain.models import EXPENSE_GROUPS, GROUP_NEEDS, GROUP_WANTS
+from mymoneyvisualizer.domain.models import GROUPS as GROUP_NAMES
+from mymoneyvisualizer.ui.common import GREY, PLOT_COLORS, CategorySelect, Window
 from mymoneyvisualizer.ui.table_model import format_money
 
 pg.setConfigOptions(antialias=True)
 
-LIST_TITLES = {"income": "Income", CATEGORY_BASIC: "Expenses (basic)", CATEGORY_OPTIONAL: "Expenses (optional)"}
+LIST_TITLES = {"income": "Income", GROUP_NEEDS: "Needs", GROUP_WANTS: "Wants"}
 
 
 def euro(value: float) -> str:
@@ -44,7 +44,7 @@ def budget_html(report: BudgetReport) -> str:
         str(report.start_year) if report.start_year == report.end_year else f"{report.start_year}-{report.end_year}"
     )
     rows = [(f"<b>{'Total' if report.is_complete else 'Expected budget'}:</b>", euro(report.expected_total))]
-    rows += [(f"{html.escape(display_tag(tag))}:", euro(amount)) for tag, amount in report.consumed]
+    rows += [(f"{html.escape(display_category(category))}:", euro(amount)) for category, amount in report.consumed]
     rows.append(("<b>Consumed total:</b>", f"<b>{euro(report.total_consumed)}</b>"))
     if report.is_complete:
         rows.append(("Difference:", euro(report.balance)))
@@ -56,7 +56,7 @@ def budget_html(report: BudgetReport) -> str:
             rows.append(("Trend end of period:", euro(report.trend)))
     table = "".join(f"<tr><td>{label}</td><td align='right'>{value}</td></tr>" for label, value in rows)
     return (
-        f"<h3>{report.category.title()} budget {period}</h3>"
+        f"<h3>{report.group.title()} budget {period}</h3>"
         f"covered days: {report.covered_days}/{report.total_days} ({round(report.covered_percent)}%)<br/>"
         f"last transaction: {report.last_recorded_date:%d.%m.%Y}<br/>"
         f"remaining: {report.remaining_months:.1f} months<br/><table>{table}</table>"
@@ -68,12 +68,12 @@ def _timestamps(index) -> np.ndarray:
 
 
 class BudgetPlot(QWidget):
-    def __init__(self, category: str, parent: QWidget | None = None):
+    def __init__(self, group: str, parent: QWidget | None = None):
         super().__init__(parent)
-        self.category = category
-        self.factor_spin = QSpinBox(self)
-        self.factor_spin.setRange(0, 100)
-        self.factor_spin.setSuffix(" % of income")
+        self.group = group
+        self.share_spin = QSpinBox(self)
+        self.share_spin.setRange(0, 100)
+        self.share_spin.setSuffix(" % of income")
         self.plot = pg.PlotWidget(axisItems={"bottom": pg.DateAxisItem(orientation="bottom")})
         self.plot.setBackground("w")
         self.plot.addLegend()
@@ -81,8 +81,8 @@ class BudgetPlot(QWidget):
         self.report_view.setFixedWidth(280)
 
         header = QHBoxLayout()
-        header.addWidget(QLabel(f"<b>{LIST_TITLES[category]}</b> budget:", self))
-        header.addWidget(self.factor_spin)
+        header.addWidget(QLabel(f"<b>{LIST_TITLES[group]}</b> budget:", self))
+        header.addWidget(self.share_spin)
         header.addStretch(1)
         body = QHBoxLayout()
         body.addWidget(self.plot, 1)
@@ -94,8 +94,8 @@ class BudgetPlot(QWidget):
     def draw(
         self,
         series: BudgetSeries,
-        categories,
-        factor: float,
+        groups,
+        share: float,
         start_year: int,
         end_year: int,
         report: BudgetReport | None,
@@ -110,21 +110,21 @@ class BudgetPlot(QWidget):
         for position in (datetime.datetime(start_year, 1, 1), datetime.datetime(end_year, 12, 31)):
             self.plot.addItem(pg.InfiniteLine(pos=position.timestamp(), angle=90, movable=False, pen=pen))
 
-        budget_line = income_series(monthly, categories).to_numpy() * factor
+        budget_line = income_series(monthly, groups).to_numpy() * share
         self.plot.plot(x, budget_line, pen=pg.mkPen(color=(0, 0, 0), width=2), name="budget")
 
-        curves = stacked_expenses(monthly, categories, self.category)
+        curves = stacked_expenses(monthly, groups, self.group)
         previous = np.zeros(len(monthly))
         items = []
-        for i, (tag, level) in enumerate(curves):
+        for i, (category, level) in enumerate(curves):
             color = PLOT_COLORS[(i + 1) % len(PLOT_COLORS)]
             lower = pg.PlotDataItem(x, previous)
             upper = pg.PlotDataItem(x, level)
-            items.append((tag, level, color, pg.FillBetweenItem(lower, upper, brush=(*color, 100))))
+            items.append((category, level, color, pg.FillBetweenItem(lower, upper, brush=(*color, 100))))
             previous = level
-        for tag, level, color, fill in reversed(items):  # legend in stacking order from the top
+        for category, level, color, fill in reversed(items):  # legend in stacking order from the top
             self.plot.addItem(fill)
-            self.plot.plot(x, level, pen=pg.mkPen(color=color, width=2), name=display_tag(tag))
+            self.plot.plot(x, level, pen=pg.mkPen(color=color, width=2), name=display_category(category))
         if curves:
             self.plot.addItem(
                 pg.FillBetweenItem(pg.PlotDataItem(x, previous), pg.PlotDataItem(x, budget_line), brush=(0, 0, 0, 25))
@@ -134,8 +134,8 @@ class BudgetPlot(QWidget):
         self.plot.setXRange(x[1], x[-1], padding=0)  # the first month is usually incomplete
 
 
-class GraphWindow(Window):
-    topics = frozenset({TRANSACTIONS, TAGGERS, SETTINGS, CATEGORIES, ACCOUNTS})
+class BudgetWindow(Window):
+    topics = frozenset({TRANSACTIONS, RULES, SETTINGS, GROUPS, ACCOUNTS})
 
     def __init__(self, model, bridge, parent: QWidget | None = None):
         super().__init__(model, bridge, parent)
@@ -144,7 +144,7 @@ class GraphWindow(Window):
         self.series: BudgetSeries | None = None
         self._filling = False
 
-        self.exclude_select = TagSelect("Exclude:", self)
+        self.exclude_select = CategorySelect("Exclude:", self)
         self.exclude_select.setMinimumWidth(300)
         self.start_combo, self.end_combo = QComboBox(self), QComboBox(self)
         controls = QHBoxLayout()
@@ -157,7 +157,7 @@ class GraphWindow(Window):
 
         self.lists: dict[str, QListWidget] = {}
         lists = QVBoxLayout()
-        for category in CATEGORY_NAMES:
+        for group in GROUP_NAMES:
             widget = QListWidget(self)
             widget.setFixedWidth(170)
             widget.setDragDropMode(QAbstractItemView.DragDropMode.DragDrop)
@@ -165,11 +165,11 @@ class GraphWindow(Window):
             widget.model().rowsInserted.connect(self._lists_changed)
             widget.model().rowsRemoved.connect(self._lists_changed)
             widget.model().rowsMoved.connect(self._lists_changed)
-            lists.addWidget(QLabel(LIST_TITLES[category] + ":", self))
+            lists.addWidget(QLabel(LIST_TITLES[group] + ":", self))
             lists.addWidget(widget)
-            self.lists[category] = widget
+            self.lists[group] = widget
 
-        self.plots = {category: BudgetPlot(category, self) for category in EXPENSE_CATEGORIES}
+        self.plots = {group: BudgetPlot(group, self) for group in EXPENSE_GROUPS}
         plots = QVBoxLayout()
         for plot in self.plots.values():
             plots.addWidget(plot)
@@ -185,21 +185,23 @@ class GraphWindow(Window):
 
         self._sync_timer = QTimer(self)
         self._sync_timer.setSingleShot(True)
-        self._sync_timer.timeout.connect(self.save_categories)
-        self.exclude_select.selection_changed.connect(lambda tags: model.update_settings(excluded_tags=tags))
+        self._sync_timer.timeout.connect(self.save_groups)
+        self.exclude_select.selection_changed.connect(
+            lambda categories: model.update_settings(excluded_categories=categories)
+        )
         self.start_combo.currentTextChanged.connect(self._period_changed)
         self.end_combo.currentTextChanged.connect(self._period_changed)
-        for category, plot in self.plots.items():
-            plot.factor_spin.valueChanged.connect(lambda percent, c=category: self._factor_changed(c, percent))
+        for group, plot in self.plots.items():
+            plot.share_spin.valueChanged.connect(lambda percent, g=group: self._share_changed(g, percent))
 
     # ------------------------------------------------------------------ user input
     def _period_changed(self, _text: str) -> None:
         if not self._filling and self.start_combo.currentText() and self.end_combo.currentText():
             self.model.set_budget_period(int(self.start_combo.currentText()), int(self.end_combo.currentText()))
 
-    def _factor_changed(self, category: str, percent: int) -> None:
+    def _share_changed(self, group: str, percent: int) -> None:
         if not self._filling:
-            self.model.set_budget_factor(category, percent / 100)
+            self.model.set_budget_share(group, percent / 100)
 
     def _lists_changed(self, *_args) -> None:
         if not self._filling:
@@ -207,49 +209,49 @@ class GraphWindow(Window):
 
     def assignment(self) -> dict[str, list[str]]:
         return {
-            category: [widget.item(i).data(Qt.ItemDataRole.UserRole) for i in range(widget.count())]
-            for category, widget in self.lists.items()
+            group: [widget.item(i).data(Qt.ItemDataRole.UserRole) for i in range(widget.count())]
+            for group, widget in self.lists.items()
         }
 
-    def save_categories(self) -> None:
-        self.model.assign_categories(self.assignment())
+    def save_groups(self) -> None:
+        self.model.assign_groups(self.assignment())
 
     # ------------------------------------------------------------------ display
     def refresh(self) -> None:
         super().refresh()
         settings = self.model.settings
         self.series = self.model.budget_series()
-        categories = self.model.categories
+        groups = self.model.groups
         shown = set(self.series.monthly.columns)
 
         self._filling = True
         try:
-            self.exclude_select.set_options(self.model.unique_tags(), settings.excluded_tags)
+            self.exclude_select.set_options(self.model.unique_categories(), settings.excluded_categories)
             years = self._years(settings.budget_start, settings.budget_end)
             for combo, value in ((self.start_combo, settings.budget_start), (self.end_combo, settings.budget_end)):
                 combo.clear()
                 combo.addItems([str(y) for y in years])
                 combo.setCurrentText(str(value))
-            for category, widget in self.lists.items():
+            for group, widget in self.lists.items():
                 widget.clear()
-                for tag_category in categories:
-                    if tag_category.category == category and tag_category.name in shown:
-                        item = QListWidgetItem(display_tag(tag_category.name))
-                        item.setData(Qt.ItemDataRole.UserRole, tag_category.name)
+                for assignment in groups:
+                    if assignment.group == group and assignment.category in shown:
+                        item = QListWidgetItem(display_category(assignment.category))
+                        item.setData(Qt.ItemDataRole.UserRole, assignment.category)
                         widget.addItem(item)
-            for category, plot in self.plots.items():
-                plot.factor_spin.setValue(round(settings.budget_factors[category] * 100))
+            for group, plot in self.plots.items():
+                plot.share_spin.setValue(round(settings.budget_shares[group] * 100))
         finally:
             self._filling = False
 
-        for category, plot in self.plots.items():
+        for group, plot in self.plots.items():
             plot.draw(
                 self.series,
-                categories,
-                settings.budget_factors[category],
+                groups,
+                settings.budget_shares[group],
                 settings.budget_start,
                 settings.budget_end,
-                self.model.budget_report(category, self.series),
+                self.model.budget_report(group, self.series),
             )
 
     def _years(self, start: int, end: int) -> list[int]:

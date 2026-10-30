@@ -9,12 +9,12 @@ from PyQt6.QtWidgets import QLabel, QMainWindow, QPushButton, QVBoxLayout, QWidg
 
 from mymoneyvisualizer.app import AppModel
 from mymoneyvisualizer.ui.accounts_window import AccountsWindow
+from mymoneyvisualizer.ui.budget_window import BudgetWindow
 from mymoneyvisualizer.ui.common import ModelBridge
-from mymoneyvisualizer.ui.graph_window import GraphWindow
 from mymoneyvisualizer.ui.import_window import ImportWindow
-from mymoneyvisualizer.ui.summary_window import DetailWindow, SummaryWindow
-from mymoneyvisualizer.ui.tagger_overview_window import TaggerOverviewWindow
-from mymoneyvisualizer.ui.tagger_window import TaggerWindow
+from mymoneyvisualizer.ui.income_expenses_window import DetailWindow, IncomeExpensesWindow
+from mymoneyvisualizer.ui.rule_window import RuleWindow
+from mymoneyvisualizer.ui.rules_window import RulesWindow
 
 
 class MainWindow(QMainWindow):
@@ -25,11 +25,11 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("My Money Visualiser")
 
         self.accounts_button = QPushButton("Accounts", self)
-        self.summary_button = QPushButton("Summary Table", self)
-        self.graph_button = QPushButton("Summary Graph", self)
+        self.income_expenses_button = QPushButton("Income && Expenses", self)
+        self.budget_button = QPushButton("Budget", self)
         central = QWidget(self)
         layout = QVBoxLayout(central)
-        for button in (self.accounts_button, self.summary_button, self.graph_button):
+        for button in (self.accounts_button, self.income_expenses_button, self.budget_button):
             button.setMinimumSize(250, 32)
             layout.addWidget(button)
         location = QLabel(f"Data: {model.repository.data_dir}", self)
@@ -38,8 +38,8 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central)
 
         self.accounts_button.clicked.connect(self.show_accounts)
-        self.summary_button.clicked.connect(self.show_summary)
-        self.graph_button.clicked.connect(self.show_graph)
+        self.income_expenses_button.clicked.connect(self.show_income_expenses)
+        self.budget_button.clicked.connect(self.show_budget)
 
     def closeEvent(self, event) -> None:  # noqa: N802 (Qt API)
         self.bridge.detach()
@@ -51,20 +51,20 @@ class MainWindow(QMainWindow):
         return AccountsWindow(self.model, self.bridge, self)
 
     @cached_property
-    def summary_window(self) -> SummaryWindow:
-        return SummaryWindow(self.model, self.bridge, self)
+    def income_expenses_window(self) -> IncomeExpensesWindow:
+        return IncomeExpensesWindow(self.model, self.bridge, self)
 
     @cached_property
-    def graph_window(self) -> GraphWindow:
-        return GraphWindow(self.model, self.bridge, self)
+    def budget_window(self) -> BudgetWindow:
+        return BudgetWindow(self.model, self.bridge, self)
 
     @cached_property
-    def tagger_window(self) -> TaggerWindow:
-        return TaggerWindow(self.model, self.bridge, self)
+    def rule_window(self) -> RuleWindow:
+        return RuleWindow(self.model, self.bridge, self)
 
     @cached_property
-    def tagger_overview_window(self) -> TaggerOverviewWindow:
-        return TaggerOverviewWindow(self.model, self.bridge, self)
+    def rules_window(self) -> RulesWindow:
+        return RulesWindow(self.model, self.bridge, self)
 
     @cached_property
     def detail_window(self) -> DetailWindow:
@@ -84,25 +84,25 @@ class MainWindow(QMainWindow):
     def show_accounts(self) -> None:
         self._show(self.accounts_window)
 
-    def show_summary(self) -> None:
-        self._show(self.summary_window)
+    def show_income_expenses(self) -> None:
+        self._show(self.income_expenses_window)
 
-    def show_graph(self) -> None:
-        self._show(self.graph_window)
+    def show_budget(self) -> None:
+        self._show(self.budget_window)
 
-    def show_tagger_overview(self) -> None:
-        self._show(self.tagger_overview_window)
+    def show_rules(self) -> None:
+        self._show(self.rules_window)
 
-    def open_tagger(self, name: str | None = None, transaction_id: str | None = None) -> None:
+    def open_rule(self, name: str | None = None, transaction_id: str | None = None) -> None:
         if transaction_id is not None:
-            self.tagger_window.open_for_transaction(transaction_id)
+            self.rule_window.open_for_transaction(transaction_id)
         elif name is not None:
-            self.tagger_window.open_tagger(name)
+            self.rule_window.open_rule(name)
         else:
-            self.tagger_window.open_new()
+            self.rule_window.open_new()
 
-    def open_detail(self, month: str, tag: str | None, tag_filter: str = "") -> None:
-        self.detail_window.open_detail(month, tag, tag_filter)
+    def open_detail(self, month: str, category: str | None, category_filter: str = "") -> None:
+        self.detail_window.open_detail(month, category, category_filter)
 
     def open_import(self, path: str | Path, account: str) -> None:
         self.import_window.open_file(path, account)

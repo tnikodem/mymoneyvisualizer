@@ -8,7 +8,7 @@ import zipfile
 from pathlib import Path, PurePosixPath
 
 from mymoneyvisualizer.storage.files import StorageError, replace_path
-from mymoneyvisualizer.storage.repository import ACCOUNTS_DIR, ACCOUNTS_FILE, DATA_FILES, TAGGERS_FILE, Repository
+from mymoneyvisualizer.storage.repository import ACCOUNTS_DIR, ACCOUNTS_FILE, DATA_FILES, RULES_FILE, Repository
 
 
 def _is_data_member(name: str) -> bool:
@@ -47,7 +47,7 @@ def restore_backup(zip_path: str | Path, data_dir: str | Path) -> Path | None:
     try:
         with zipfile.ZipFile(zip_path) as archive:
             members = [m for m in archive.namelist() if _is_data_member(m)]
-            if not {ACCOUNTS_FILE, TAGGERS_FILE} & set(members):
+            if not {ACCOUNTS_FILE, RULES_FILE} & set(members):
                 raise StorageError(f"{zip_path} is not a MyMoneyVisualizer backup")
             if archive.testzip() is not None:
                 raise StorageError(f"{zip_path} is corrupt")
