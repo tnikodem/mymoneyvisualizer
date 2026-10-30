@@ -38,7 +38,7 @@ PREVIEW_COLUMNS = [
     Column(Col.date, "Datum", DATE, 90),
     Column(Col.recipient, "Empfänger", width=280),
     Column(Col.description, "Verwendungszweck", width=560),
-    Column(Col.value, "Betrag", MONEY, 100),
+    Column(Col.value, "Betrag", MONEY, 110),
 ]
 MAPPING_LABELS = {
     "col_date": "Datum",

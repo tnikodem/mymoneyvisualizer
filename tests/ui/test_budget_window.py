@@ -397,11 +397,11 @@ def test_double_click_lists_what_counts_in_the_period(main, window, model):
     assert "auch frühere" in detail.help_button.toolTip()
     frame = detail.table_model.frame
     december = frame.loc[frame[Col.date] == pd.Timestamp("2023-12-03")].iloc[0]
-    assert (december["in_period"], december["spread"]) == (-75.0, "1 Jahr")
-    assert december["amount_in_period"] == "-75,00 € (von insg. -900,00 €)"  # one month of twelve in 2023
+    # one month of twelve in 2023
+    assert (december["in_period"], december["spread"]) == (-75.0, "-900,00 € über 1 Jahr")
     assert detail.table_model.headerData(4, Qt.Orientation.Horizontal) == "Betrag im Zeitraum"
     food = frame.loc[frame[Col.recipient] == "REWE"].iloc[0]
-    assert (food["amount_in_period"], food["spread"]) == ("-100,00 €", "")  # paid and used in the period
+    assert (food["in_period"], food["spread"]) == (-100.0, "")  # paid and used in the period
     assert frame["in_period"].sum() == pytest.approx(-(900 * 78 / 12 + 1200))  # 1+2+...+12 rents of 75 €
     window.open_detail(_top(window, "Grundbedarf"))
     assert detail.label.text() == "Grundbedarf · 2023, periodengerecht"

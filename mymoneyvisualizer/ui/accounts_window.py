@@ -28,7 +28,7 @@ TRANSACTION_COLUMNS = [
     Column(Col.date, "Datum", DATE, 90),
     Column(Col.recipient, "Empfänger", width=280),
     Column(Col.description, "Verwendungszweck", width=500),
-    Column(Col.value, "Betrag", MONEY, 100),
+    Column(Col.value, "Betrag", MONEY, 110),
     Column(Col.category, "Kategorie", CATEGORY, 170, tooltip="Leer: noch ohne Kategorie. Doppelklick ändert sie."),
     Column(Col.spread_months, "Verteilt über", MONTHS, 90, tooltip="Im Budget über so viele Monate verteilt."),
     Column(Col.residual_percent, "Restwert", PERCENT, 70, tooltip="Erwarteter Wiederverkaufswert, z. B. beim Auto."),

@@ -10,7 +10,6 @@ from PyQt6.QtGui import QColor
 from mymoneyvisualizer.ui.table_model import (
     CATEGORY,
     DATE,
-    INCOMING,
     MONEY,
     MONEY0,
     NUMBER,
@@ -28,7 +27,7 @@ from mymoneyvisualizer.ui.table_model import (
 @pytest.mark.parametrize(
     ("value", "kind", "expected"),
     [
-        (-1234.567, MONEY, "-1.234,57"),
+        (-1234.567, MONEY, "-1.234,57 €"),
         (1234.5, MONEY0, "1.234"),
         (2.0, NUMBER, "2"),
         (2.5, NUMBER, "2.5"),
@@ -74,7 +73,7 @@ def test_model_roles(qtbot):
     model.set_frame(_frame())
     assert (model.rowCount(), model.columnCount()) == (4, 3)
     index = model.index(1, 1)
-    assert model.data(index) == "10,00"
+    assert model.data(index) == "10,00 €"
     assert model.data(index, SORT_ROLE) == 10.0
     assert model.data(index, Qt.ItemDataRole.TextAlignmentRole) & Qt.AlignmentFlag.AlignRight
     assert model.data(index, Qt.ItemDataRole.BackgroundRole) == QColor("red")
@@ -86,20 +85,6 @@ def test_model_roles(qtbot):
     assert model.headerData(1, Qt.Orientation.Vertical) is None
     assert model.row(3) == {"name": "c", "value": -5.0, "hidden": 4}
     assert model.rowCount(model.index(0, 0)) == 0 and model.columnCount(model.index(0, 0)) == 0
-
-
-def test_text_with_an_amount_behind_it():
-    """A text such as "-75 € (von insg. -900 €)" sorts, aligns and colors like the amount it shows."""
-    columns = [Column("text", "Betrag", amount="amount")]
-    model = DataFrameModel(columns)
-    model.set_frame(pd.DataFrame({"text": ["b", "a", "c"], "amount": [-75.0, 900.0, -1000.0]}))
-    index = model.index(1, 0)
-    assert model.data(index) == "a"
-    assert model.data(index, Qt.ItemDataRole.TextAlignmentRole) & Qt.AlignmentFlag.AlignRight
-    assert model.data(index, Qt.ItemDataRole.ForegroundRole) == INCOMING
-    assert model.data(model.index(0, 0), Qt.ItemDataRole.ForegroundRole) is None
-    model.sort(0, Qt.SortOrder.AscendingOrder)
-    assert list(model.frame["text"]) == ["c", "b", "a"]
 
 
 def test_model_missing_column_and_reset():

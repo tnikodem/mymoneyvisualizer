@@ -59,7 +59,7 @@ PREVIEW_COLUMNS = [
     Column(Col.date, "Datum", DATE, 90),
     Column(Col.recipient, "Empfänger", width=220),
     Column(Col.description, "Verwendungszweck", width=340),
-    Column(Col.value, "Betrag", MONEY, 90),
+    Column(Col.value, "Betrag", MONEY, 110),
     Column(Col.category, "Kategorie", CATEGORY, 150),
     Column(
         TAKEN,

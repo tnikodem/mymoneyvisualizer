@@ -42,7 +42,13 @@ SMOOTHING_MONTHS = 12
 #: Column of :func:`group_totals`: income minus needs and wants.
 SAVED = "saved"
 #: Columns of :func:`contributions`.
-IN_PERIOD, SPREAD_FROM, SPREAD_TO, SOLD = "in_period", "spread_from", "spread_to", "sold"
+IN_PERIOD, SPREAD_AMOUNT, SPREAD_FROM, SPREAD_TO, SOLD = (
+    "in_period",
+    "spread_amount",
+    "spread_from",
+    "spread_to",
+    "sold",
+)
 
 
 @dataclass
@@ -114,6 +120,7 @@ def contributions(
 
     That includes payments made before ``start`` and spread into the period, and of a payment spread beyond the
     period only its share. :data:`IN_PERIOD` is the amount the transaction contributes to the period,
+    :data:`SPREAD_AMOUNT` the whole amount that is spread (without the residual value or the proceeds of a sale),
     :data:`SPREAD_FROM` and :data:`SPREAD_TO` the months it is spread over, :data:`SOLD` marks a purchase whose sale is
     included (its sale has no row of its own). ``categories`` are main categories (``None``: all). Together the rows add
     up to the budget of the period.
@@ -127,6 +134,7 @@ def contributions(
     plan, overlap = plan.loc[overlap > 0], overlap[overlap > 0]
     rows = data.loc[plan.index].copy()
     rows[IN_PERIOD] = (plan[AMOUNT] * overlap).round(2)
+    rows[SPREAD_AMOUNT] = (plan[AMOUNT] * (plan[LAST] - plan[FIRST] + 1)).round(2)
     rows[SPREAD_FROM] = [to_period(int(m)) for m in plan[FIRST]]
     rows[SPREAD_TO] = [to_period(int(m)) for m in plan[LAST]]
     sold = data.index[list(linked_sales(data))]

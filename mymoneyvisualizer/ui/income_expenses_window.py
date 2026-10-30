@@ -25,7 +25,7 @@ from mymoneyvisualizer.domain.analysis import (
     ordered_month_range,
     summary_groups,
 )
-from mymoneyvisualizer.domain.budget import IN_PERIOD, SOLD, SPREAD_FROM, SPREAD_TO
+from mymoneyvisualizer.domain.budget import IN_PERIOD, SOLD, SPREAD_AMOUNT, SPREAD_FROM, SPREAD_TO
 from mymoneyvisualizer.domain.categories import display_category
 from mymoneyvisualizer.domain.columns import Col
 from mymoneyvisualizer.ui.budget_window import ACCRUAL_DETAILS
@@ -79,11 +79,13 @@ DETAIL_HELP = "Doppelklick auf eine Buchung ändert ihre Kategorie."
 BUDGET_DETAIL_HELP = (
     "<p>Alle Zahlungen, die periodengerecht in den Zeitraum zählen: auch frühere, die in den Zeitraum hineinverteilt"
     " sind, und von Zahlungen, die über den Zeitraum hinaus verteilt sind, nur ihr Anteil.</p>"
-    "<p><b>im Zeitraum</b> ist dieser Anteil; zusammen ergeben die Zeilen den Wert im Budget.</p>"
+    "<p><b>Betrag im Zeitraum</b> ist dieser Anteil; zusammen ergeben die Zeilen den Wert im Budget."
+    " <b>verteilt</b> nennt den ganzen verteilten Betrag und die Dauer; bei Anschaffungen mit Restwert oder Verkauf"
+    " ist das nur der Wertverlust.</p>"
     f"<p>{DETAIL_HELP}</p>"
 )
-#: columns of the budget detail: how long a transaction is spread, the amount that counts in the period as text
-SPREAD, AMOUNT = "spread", "amount_in_period"
+#: column of the budget detail: the amount a transaction spreads and over how long, as text
+SPREAD = "spread"
 SUMMARY_TIPS = {
     INCOME: "Alle Kategorien der Budgetgruppe Einkommen.",
     EXPENSES: "Alle Kategorien der Budgetgruppen Grundbedarf und Wünsche.",
@@ -97,7 +99,7 @@ DETAIL_COLUMNS = [
     Column(Col.date, "Datum", DATE, 90),
     Column(Col.recipient, "Empfänger", width=260),
     Column(Col.description, "Verwendungszweck", width=520),
-    Column(Col.value, "Betrag", MONEY, 100),
+    Column(Col.value, "Betrag", MONEY, 110),
     Column(Col.category, "Kategorie", CATEGORY, 160),
     Column(Col.spread_months, "Verteilt über", MONTHS, 90, tooltip="Im Budget über so viele Monate verteilt."),
 ]
@@ -108,18 +110,13 @@ BUDGET_DETAIL_COLUMNS = [
     Column(Col.date, "bezahlt am", DATE, 90),
     Column(Col.recipient, "Empfänger", width=220),
     Column(Col.description, "Verwendungszweck", width=320),
-    Column(
-        AMOUNT,
-        "Betrag im Zeitraum",
-        width=240,
-        amount=IN_PERIOD,
-        tooltip="So viel der Zahlung zählt im Zeitraum; in Klammern der ganze Betrag, wenn nur ein Teil hineinzählt",
-    ),
+    Column(IN_PERIOD, "Betrag im Zeitraum", MONEY, 150, tooltip="So viel der Zahlung zählt im Zeitraum"),
     Column(
         SPREAD,
-        "verteilt über",
-        width=120,
-        tooltip="Auf so viele Monate ist die Zahlung verteilt, ab dem Monat der Zahlung",
+        "verteilt",
+        width=220,
+        tooltip="Der ganze verteilte Betrag und über wie lange, ab dem Monat der Zahlung; bei Anschaffungen mit"
+        " Restwert oder Verkauf nur der Wertverlust",
     ),
     Column(Col.category, "Kategorie", CATEGORY, 160),
     Column(Col.account, "Konto", width=110),
@@ -127,17 +124,12 @@ BUDGET_DETAIL_COLUMNS = [
 
 
 def spread_text(row) -> str:
-    """``10 Jahre``; for a purchase whose sale is included the months until the sale; ``""`` if not spread."""
+    """``-900,00 € über 1 Jahr``; for a purchase whose sale is included until the sale; ``""`` if not spread."""
     months = (row[SPREAD_TO] - row[SPREAD_FROM]).n + 1
-    text = format_months(months) if months > 1 else ""
+    if months <= 1:
+        return ""
+    text = f"{format_money(float(row[SPREAD_AMOUNT]))} € über {format_months(months)}"
     return f"{text} (verkauft)" if row[SOLD] else text
-
-
-def amount_text(row) -> str:
-    """``-75,00 € (von insg. -900,00 €)`` if only a part of the payment counts in the period, else ``-900,00 €``."""
-    part, total = float(row[IN_PERIOD]), float(row[Col.value])
-    text = f"{format_money(part)} €"
-    return text if abs(part - total) < 0.005 else f"{text} (von insg. {format_money(total)} €)"
 
 
 def default_months(last_date=None, today: pd.Timestamp | None = None) -> tuple[str, str]:
@@ -502,9 +494,7 @@ class DetailWindow(Window):
             return
         start, end, months = self.budget
         frame = self.model.budget_contributions(start, end, self.categories)
-        rows = [row for _, row in frame.iterrows()]
-        frame[SPREAD] = [spread_text(row) for row in rows]
-        frame[AMOUNT] = [amount_text(row) for row in rows]
+        frame[SPREAD] = [spread_text(row) for _, row in frame.iterrows()]
         self.table_model.set_frame(frame, BUDGET_DETAIL_COLUMNS)
         total = float(frame[IN_PERIOD].sum())
         self.summary_label.setText(

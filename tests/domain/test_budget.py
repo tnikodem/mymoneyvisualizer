@@ -5,6 +5,7 @@ from mymoneyvisualizer.domain.budget import (
     IN_PERIOD,
     SAVED,
     SOLD,
+    SPREAD_AMOUNT,
     SPREAD_FROM,
     SPREAD_TO,
     BudgetSeries,
@@ -171,6 +172,7 @@ def test_contributions_of_a_period_include_spread_payments_made_before():
     rows = contributions(df, _month("2025-01"), _month("2025-12"), own_accounts=["spar"])
     assert list(rows[Col.recipient]) == ["Möbelhaus", "REWE", "HUK"]
     assert list(rows[IN_PERIOD]) == [-240.0, -10.0, -350.0]  # the insurance counts 7 of its 12 months
+    assert list(rows[SPREAD_AMOUNT]) == [-2400.0, -10.0, -600.0]
     assert (rows[SPREAD_FROM].iloc[0], rows[SPREAD_TO].iloc[0]) == (_month("2024-01"), _month("2033-12"))
     assert not rows[SOLD].any()
     only = contributions(df, _month("2025-01"), _month("2025-12"), categories=["home"])
@@ -191,5 +193,6 @@ def test_contributions_of_a_sold_purchase():
     rows = contributions(df, _month("2025-01"), _month("2025-12"))
     assert list(rows[Col.recipient]) == ["Autohaus"]
     assert rows[IN_PERIOD].iloc[0] == pytest.approx(-20000 / 18 * 6, abs=0.01)
+    assert rows[SPREAD_AMOUNT].iloc[0] == -20000.0  # the loss of value, not the price
     assert rows[SPREAD_TO].iloc[0] == _month("2025-06")
     assert rows[SOLD].iloc[0]

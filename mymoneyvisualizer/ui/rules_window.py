@@ -78,7 +78,7 @@ OVERVIEW_COLUMNS = [
         " oder einer Einzelzuordnung. Viele überschriebene und 0 Buchungen: Die Regel ist überflüssig oder steht an der"
         " falschen Stelle.",
     ),
-    Column("sum", "Summe", MONEY, 100, tooltip="Summe dieser Buchungen."),
+    Column("sum", "Summe", MONEY, 120, tooltip="Summe dieser Buchungen."),
 ]
 #: columns that are changed in the table; their keys are the names of the rule fields
 EDITABLE = (Col.category, Col.spread_months, Col.residual_percent)

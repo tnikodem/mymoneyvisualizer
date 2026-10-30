@@ -126,8 +126,8 @@ category with its share of the income and, for a period of 12 months, the change
 worse, green: better), so large cost factors and growing ones stand out. A click on a row shows its development in
 the chart next to it, another click (or Escape, or **Gesamt** in the path above the chart) the whole again. A double
 click lists everything that counts in the period: also payments made before and spread into it, and of payments
-spread beyond it only their share (**Betrag im Zeitraum**, with the whole amount in brackets) and how long they are
-spread; together they add up to the value in the budget.
+spread beyond it only their share (**Betrag im Zeitraum**); together they add up to the value in the budget.
+**verteilt** names the whole amount spread and for how long, e.g. `-900,00 € über 1 Jahr`.
 
 Drag a category in **Kategorien** to change its order (also in the chart) or, dropped into another group, its group;
 a drag selects nothing, so the chart stays as it is, also in the overall view.
