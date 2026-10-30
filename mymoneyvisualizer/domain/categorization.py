@@ -1,4 +1,4 @@
-"""Derive tag columns from tagger rules and one-time tags."""
+"""Derive the category columns from the rules and the manual categories."""
 
 from __future__ import annotations
 
@@ -11,8 +11,8 @@ from collections.abc import Iterable, Mapping
 import numpy as np
 import pandas as pd
 
-from mymoneyvisualizer.domain.columns import ONE_TIME_TAGGER, UNTAGGED, Col
-from mymoneyvisualizer.domain.models import OneTimeTag, Tagger, recurring_to_float
+from mymoneyvisualizer.domain.columns import MANUAL_RULE, UNCATEGORIZED, Col
+from mymoneyvisualizer.domain.models import ManualCategory, Rule
 
 logger = logging.getLogger(__name__)
 
@@ -39,35 +39,35 @@ def regex_error(pattern: str) -> str | None:
     return None
 
 
-def tagger_errors(tagger: Tagger) -> dict[str, str]:
+def rule_errors(rule: Rule) -> dict[str, str]:
     errors = {}
     for field_name in ("regex_recipient", "regex_description"):
-        error = regex_error(getattr(tagger, field_name))
+        error = regex_error(getattr(rule, field_name))
         if error is not None:
             errors[field_name] = error
     return errors
 
 
-def tagger_mask(df: pd.DataFrame, tagger: Tagger) -> pd.Series:
-    """Rows matched by ``tagger``. Empty regexes match everything; regexes are searched, not anchored."""
+def rule_mask(df: pd.DataFrame, rule: Rule) -> pd.Series:
+    """Rows matched by ``rule``. Empty regexes match everything; regexes are searched, not anchored."""
     mask = pd.Series(True, index=df.index)
-    for column, pattern in ((Col.recipient, tagger.regex_recipient), (Col.description, tagger.regex_description)):
+    for column, pattern in ((Col.recipient, rule.regex_recipient), (Col.description, rule.regex_description)):
         if not pattern:
             continue
         try:
             mask &= df[column].astype(str).str.contains(pattern, regex=True, na=False)
         except re.error as e:
-            logger.error("tagger %r has an invalid regex %r: %s", tagger.name, pattern, e)
+            logger.error("rule %r has an invalid regex %r: %s", rule.name, pattern, e)
             return pd.Series(False, index=df.index)
     return mask
 
 
-def tagger_matches(tagger: Tagger, recipient: str, description: str) -> tuple[bool, bool]:
-    """Whether the recipient and description regex of ``tagger`` match a single transaction."""
+def rule_matches(rule: Rule, recipient: str, description: str) -> tuple[bool, bool]:
+    """Whether the recipient and description regex of ``rule`` match a single transaction."""
     row = pd.DataFrame({Col.recipient: [recipient], Col.description: [description]})
-    recipient_only = Tagger(name=tagger.name, regex_recipient=tagger.regex_recipient)
-    description_only = Tagger(name=tagger.name, regex_description=tagger.regex_description)
-    return bool(tagger_mask(row, recipient_only).iloc[0]), bool(tagger_mask(row, description_only).iloc[0])
+    recipient_only = Rule(name=rule.name, regex_recipient=rule.regex_recipient)
+    description_only = Rule(name=rule.name, regex_description=rule.regex_description)
+    return bool(rule_mask(row, recipient_only).iloc[0]), bool(rule_mask(row, description_only).iloc[0])
 
 
 def anchored_literals(pattern: str) -> list[tuple[str, bool, bool]] | None:
@@ -167,11 +167,11 @@ class _DistinctTexts:
         return np.fromiter((search(v) is not None for v in self.values), dtype=bool, count=len(self.values))
 
 
-class TagMatcher:
-    """Finds the transactions a tagger matches, fast enough for tens of thousands of transactions.
+class RuleMatcher:
+    """Finds the transactions a rule matches, fast enough for tens of thousands of transactions.
 
     Every regex is evaluated once per *distinct* recipient / description and the result is cached, so a
-    changed tagger only costs the evaluation of its own patterns. Plain text patterns (e.g. taggers created by
+    changed rule only costs the evaluation of its own patterns. Plain text patterns (e.g. rules created by
     double click) are found by a substring search in one joined string instead of one regex call per value.
     """
 
@@ -198,52 +198,57 @@ class TagMatcher:
             self._cache[key] = found
         return found
 
-    def mask(self, tagger: Tagger) -> np.ndarray:
-        """Boolean array over the rows matched by ``tagger`` (both regexes; an empty regex matches everything)."""
+    def mask(self, rule: Rule) -> np.ndarray:
+        """Boolean array over the rows matched by ``rule`` (both regexes; an empty regex matches everything)."""
         mask = None
-        for column, pattern in ((Col.recipient, tagger.regex_recipient), (Col.description, tagger.regex_description)):
+        for column, pattern in ((Col.recipient, rule.regex_recipient), (Col.description, rule.regex_description)):
             if pattern:
                 rows = self.distinct_matches(column, pattern)[self._texts[column].codes]
                 mask = rows if mask is None else mask & rows
         return np.ones(self.size, dtype=bool) if mask is None else mask
 
 
-def apply_taggers(
+def apply_rules(
     transactions: pd.DataFrame,
-    taggers: Iterable[Tagger],
-    one_time_tags: Mapping[str, OneTimeTag] | None = None,
-    matcher: TagMatcher | None = None,
+    rules: Iterable[Rule],
+    manual_categories: Mapping[str, ManualCategory] | None = None,
+    matcher: RuleMatcher | None = None,
 ) -> pd.DataFrame:
-    """Return a copy of ``transactions`` with ``tag``, ``tagger_name`` and ``recurring`` columns.
+    """Return a copy of ``transactions`` with the :data:`~mymoneyvisualizer.domain.columns.CATEGORY_COLUMNS`.
 
-    Taggers are applied in order; a later tagger overwrites an earlier one. One-time tags win over all taggers.
-    Pass a :class:`TagMatcher` built from the same ``transactions`` to reuse its cached regex results.
+    Rules are applied in order; a later rule overwrites an earlier one. Manual categories win over all rules.
+    Pass a :class:`RuleMatcher` built from the same ``transactions`` to reuse its cached regex results.
     """
-    taggers = list(taggers)
+    rules = list(rules)
     if matcher is None:
-        matcher = TagMatcher(transactions)
+        matcher = RuleMatcher(transactions)
     if matcher.size != len(transactions):
         raise ValueError("the matcher was built for other transactions")
     winner = np.full(len(transactions), -1, dtype=np.int64)
-    for i, tagger in enumerate(taggers):
-        winner[matcher.mask(tagger)] = i
-    # index -1 (no tagger) picks the last element: untagged
-    tags = np.array([t.tag for t in taggers] + [UNTAGGED], dtype=object)
-    names = np.array([t.name for t in taggers] + [""], dtype=object)
-    recurring = np.array([recurring_to_float(t.recurring) for t in taggers] + [np.nan], dtype=float)
+    for i, rule in enumerate(rules):
+        winner[matcher.mask(rule)] = i
+    # index -1 (no rule) picks the last element: uncategorized, not spread
+    categories = np.array([r.category for r in rules] + [UNCATEGORIZED], dtype=object)
+    names = np.array([r.name for r in rules] + [""], dtype=object)
+    months = np.array([r.spread_months for r in rules] + [0], dtype=np.int64)
+    residual = np.array([r.residual_percent for r in rules] + [0], dtype=np.int64)
 
     df = transactions.copy()
-    df[Col.tag] = tags[winner]
-    df[Col.tagger_name] = names[winner]
-    df[Col.recurring] = recurring[winner]
-    if one_time_tags:
-        overrides = df[Col.transaction_id].map(one_time_tags)
+    df[Col.category] = categories[winner]
+    df[Col.rule] = names[winner]
+    df[Col.spread_months] = months[winner]
+    df[Col.residual_percent] = residual[winner]
+    df[Col.sale_of] = ""
+    if manual_categories:
+        overrides = df[Col.transaction_id].map(manual_categories)
         mask = overrides.notna().to_numpy()
         if mask.any():
-            chosen = overrides[mask]
-            df.loc[mask, Col.tag] = [t.tag for t in chosen]
-            df.loc[mask, Col.tagger_name] = ONE_TIME_TAGGER
-            df.loc[mask, Col.recurring] = [recurring_to_float(t.recurring) for t in chosen]
-    for column in (Col.tag, Col.tagger_name):
+            chosen = list(overrides[mask])
+            df.loc[mask, Col.category] = [m.category for m in chosen]
+            df.loc[mask, Col.rule] = MANUAL_RULE
+            df.loc[mask, Col.spread_months] = [m.spread_months for m in chosen]
+            df.loc[mask, Col.residual_percent] = [m.residual_percent for m in chosen]
+            df.loc[mask, Col.sale_of] = [m.sale_of for m in chosen]
+    for column in (Col.category, Col.rule, Col.sale_of):
         df[column] = df[column].astype(str)
     return df

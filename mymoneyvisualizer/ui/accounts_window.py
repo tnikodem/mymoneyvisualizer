@@ -2,27 +2,23 @@
 
 from __future__ import annotations
 
-import datetime
-from pathlib import Path
 from typing import TYPE_CHECKING
 
-from PyQt6.QtWidgets import (
-    QFileDialog,
-    QHBoxLayout,
-    QLabel,
-    QLineEdit,
-    QMessageBox,
-    QPushButton,
-    QTabWidget,
-    QVBoxLayout,
-    QWidget,
-)
+from PyQt6.QtWidgets import QFileDialog, QHBoxLayout, QLabel, QLineEdit, QPushButton, QTabWidget, QVBoxLayout, QWidget
 
-from mymoneyvisualizer.app import ACCOUNTS, TAGGERS, TRANSACTIONS
+from mymoneyvisualizer.app import ACCOUNTS, RULES, TRANSACTIONS
 from mymoneyvisualizer.domain.columns import Col
-from mymoneyvisualizer.storage.files import StorageError
 from mymoneyvisualizer.ui.common import Window
-from mymoneyvisualizer.ui.table_model import DATE, MONEY, NUMBER, TAG, Column, DataFrameModel, DataFrameView
+from mymoneyvisualizer.ui.table_model import (
+    CATEGORY,
+    DATE,
+    MONEY,
+    MONTHS,
+    PERCENT,
+    Column,
+    DataFrameModel,
+    DataFrameView,
+)
 
 if TYPE_CHECKING:
     from mymoneyvisualizer.ui.main_window import MainWindow
@@ -33,8 +29,9 @@ TRANSACTION_COLUMNS = [
     Column(Col.recipient, "recipient", width=280),
     Column(Col.description, "description", width=520),
     Column(Col.value, "value", MONEY, 100),
-    Column(Col.recurring, "recurring", NUMBER, 70),
-    Column(Col.tag, "tag", TAG, 160),
+    Column(Col.category, "category", CATEGORY, 160),
+    Column(Col.spread_months, "spread", MONTHS, 80),
+    Column(Col.residual_percent, "residual", PERCENT, 60),
 ]
 
 
@@ -62,7 +59,7 @@ class AccountTab(QWidget):
 
         self.name_edit.returnPressed.connect(self.rename)
         self.import_button.clicked.connect(self.import_data)
-        self.table.doubleClicked.connect(self.open_tagger)
+        self.table.doubleClicked.connect(self.open_rule)
 
     def refresh(self) -> None:
         self.dirty = False
@@ -78,13 +75,13 @@ class AccountTab(QWidget):
         if path:
             self.window_.navigator.open_import(path, self.account)
 
-    def open_tagger(self, index) -> None:
+    def open_rule(self, index) -> None:
         row = self.table.row_at(index.row())
-        self.window_.navigator.open_tagger(transaction_id=row[Col.transaction_id])
+        self.window_.navigator.open_rule(transaction_id=row[Col.transaction_id])
 
 
 class AccountsWindow(Window):
-    topics = frozenset({ACCOUNTS, TRANSACTIONS, TAGGERS})
+    topics = frozenset({ACCOUNTS, TRANSACTIONS, RULES})
 
     def __init__(self, model, bridge, navigator: MainWindow):
         super().__init__(model, bridge, navigator)
@@ -94,11 +91,8 @@ class AccountsWindow(Window):
 
         self.new_button = QPushButton("New Account", self)
         self.delete_button = QPushButton("Delete Account", self)
-        self.taggers_button = QPushButton("Taggers", self)
-        self.load_button = QPushButton("Load Project", self)
-        self.save_button = QPushButton("Save Project", self)
         controls = QHBoxLayout()
-        for button in (self.new_button, self.delete_button, self.taggers_button, self.load_button, self.save_button):
+        for button in (self.new_button, self.delete_button):
             button.setMinimumWidth(150)
             controls.addWidget(button)
         controls.addStretch(1)
@@ -112,9 +106,6 @@ class AccountsWindow(Window):
 
         self.new_button.clicked.connect(self.create_account)
         self.delete_button.clicked.connect(self.delete_account)
-        self.taggers_button.clicked.connect(navigator.show_tagger_overview)
-        self.load_button.clicked.connect(self.load_project)
-        self.save_button.clicked.connect(self.save_project)
         self.tabs.currentChanged.connect(self._tab_shown)
 
     @property
@@ -167,28 +158,3 @@ class AccountsWindow(Window):
             return
         if self.confirm("Delete account", f"Delete account {tab.account!r} and all its transactions?"):
             self.model.delete_account(tab.account)
-
-    def save_project(self, checked: bool = False, path: str | None = None) -> None:
-        if path is None:
-            proposal = f"mmv_backup_{datetime.datetime.now():%Y_%m_%d__%H_%M_%S}.zip"
-            path, _ = QFileDialog.getSaveFileName(self, "Save Project", proposal, "Zip files (*.zip)")
-        if path:
-            self.model.create_backup(path)
-
-    def load_project(self, checked: bool = False, path: str | None = None) -> None:
-        if path is None:
-            path, _ = QFileDialog.getOpenFileName(self, "Load Project", "", "Zip files (*.zip)")
-        if not path:
-            return
-        if not self.confirm(
-            "Load project",
-            "Replace all current data by the backup? The current data is kept in a folder next to the data directory.",
-        ):
-            return
-        try:
-            previous = self.model.restore_backup(Path(path))
-        except StorageError as e:
-            self.show_error("Load project", str(e))
-            return
-        if previous is not None:
-            QMessageBox.information(self, "Load project", f"Previous data moved to\n{previous}")

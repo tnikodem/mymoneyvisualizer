@@ -1,4 +1,4 @@
-"""GUI flow with exports of several banks: import window fields and tagging of broken text by double click."""
+"""GUI flow with exports of several banks: import window fields and categorization of broken text by double click."""
 
 from pathlib import Path
 
@@ -55,7 +55,7 @@ def test_debit_credit_mark_is_proposed_and_saved(window, model):
         ("volksbank_alt_soll_haben.csv", "Apotheke am Markt", "Kartenzahlung"),
     ],
 )
-def test_tag_broken_text_by_double_click_and_see_it_in_summary(main, window, model, name, recipient, description):
+def test_categorize_broken_text_by_double_click(main, window, model, name, recipient, description):
     window.open_file(DATA / name, "konto")
     window.import_transactions()
 
@@ -67,21 +67,21 @@ def test_tag_broken_text_by_double_click_and_see_it_in_summary(main, window, mod
     row = shown.index[(shown[Col.recipient] == recipient) & shown[Col.description].str.startswith(description)][0]
     tab.table.doubleClicked.emit(tab.table.model().index(int(row), 2))
 
-    tagger_window = main.tagger_window
-    assert tagger_window.isVisible()
-    assert tagger_window.ok_button.isEnabled()
-    tagger_window.tag_edit.setText("kaputt.test")
-    assert tagger_window.table_model.frame[Col.tag].iloc[0] == "kaputt.test"
-    tagger_window.ok_button.click()
+    rule_window = main.rule_window
+    assert rule_window.isVisible()
+    assert rule_window.ok_button.isEnabled()
+    rule_window.category_edit.setText("kaputt.test")
+    assert rule_window.table_model.frame[Col.category].iloc[0] == "kaputt.test"
+    rule_window.ok_button.click()
 
-    tagged = model.account_transactions("konto")
-    hits = tagged[tagged[Col.tag] == "kaputt.test"]
+    categorized = model.account_transactions("konto")
+    hits = categorized[categorized[Col.category] == "kaputt.test"]
     assert list(hits[Col.recipient]) == [recipient]
 
     month = hits[Col.date].iloc[0].strftime("%Y-%m")
-    main.show_summary()
-    main.summary_window.set_months(month, month)
-    table = main.summary_window.table_model.frame.set_index(Col.tag)
+    main.show_income_expenses()
+    main.income_expenses_window.set_months(month, month)
+    table = main.income_expenses_window.table_model.frame.set_index(Col.category)
     assert table.at["kaputt", month] == pytest.approx(hits[Col.value].sum())
 
 

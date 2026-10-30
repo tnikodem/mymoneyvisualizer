@@ -1,207 +1,193 @@
-"""Budget view: spread recurring transactions over time and compare expenses with income."""
+"""Budget by the 50/30/20 rule on the accrual basis.
+
+Needs, wants and savings are compared with shares of the net income (by default 50 %, 30 % and 20 %). The savings
+rate is what is left of the income after consumption (needs and wants); it should neither fall below its target,
+which would not keep up the standard of living, nor stay far above it, which would be a life not lived.
+"""
 
 from __future__ import annotations
 
-from collections.abc import Collection, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
 
+from mymoneyvisualizer.domain.accrual import accrue
 from mymoneyvisualizer.domain.analysis import filter_transactions
+from mymoneyvisualizer.domain.categories import category_at_level
 from mymoneyvisualizer.domain.columns import Col
-from mymoneyvisualizer.domain.models import CATEGORY_INCOME, TagCategory
+from mymoneyvisualizer.domain.models import (
+    CONSUMPTION_GROUPS,
+    GROUP_INCOME,
+    GROUP_NEEDS,
+    GROUP_SAVINGS,
+    GROUP_WANTS,
+    GROUPS,
+    GroupAssignment,
+)
 
-#: Recurring transactions of the last ``n`` years are projected this many years past the budget period.
-HORIZON_YEARS = 5
-#: Transactions recurring every 10 or more years are never projected into the future.
-MAX_PROJECTED_RECURRENCE = 9
-
-
-def _month_number(dates: pd.Series) -> np.ndarray:
-    return (dates.dt.year * 12 + dates.dt.month - 1).to_numpy()
-
-
-def _period(month_number: int) -> pd.Period:
-    return pd.Period(year=month_number // 12, month=month_number % 12 + 1, freq="M")
-
-
-def amortize_recurring(df: pd.DataFrame, horizon_end: pd.Period) -> pd.DataFrame:
-    """Monthly amounts per tag where a transaction recurring every ``r`` years is spread over ``12 * r`` months.
-
-    Recurring transactions of the most recent ``r`` years are expected to happen again and are continued
-    up to ``horizon_end``; older ones only cover their own ``12 * r`` months. ``df`` needs the columns
-    date, tag, value and recurring (NaN means every year). Returns months as rows and tags as columns.
-    """
-    if df.empty:
-        return pd.DataFrame(index=pd.PeriodIndex([], freq="M"))
-    recurring = df[Col.recurring].fillna(1).clip(lower=1).astype(int)
-    last_recorded = df[Col.date].max()
-    current = np.zeros(len(df), dtype=bool)
-    for years in range(1, MAX_PROJECTED_RECURRENCE + 1):
-        current |= ((recurring == years) & (df[Col.date] > last_recorded - pd.DateOffset(years=years))).to_numpy()
-
-    groups = (
-        pd.DataFrame(
-            {
-                Col.tag: df[Col.tag].to_numpy(),
-                "years": recurring.to_numpy(),
-                "month": _month_number(df[Col.date]),
-                "current": current,
-                Col.value: df[Col.value].to_numpy(),
-            }
-        )
-        .groupby([Col.tag, "years", "month", "current"], as_index=False)[Col.value]
-        .sum()
-    )
-    horizon = horizon_end.year * 12 + horizon_end.month - 1
-    start = groups["month"].to_numpy()
-    span_end = start + 12 * groups["years"].to_numpy() - 1
-    end = np.where(groups["current"].to_numpy(), horizon, np.minimum(span_end, horizon))
-    keep = start <= horizon
-    if not keep.any():
-        return pd.DataFrame(index=pd.PeriodIndex([], freq="M"))
-    groups, start, end = groups.loc[keep], start[keep], end[keep]
-    amount = (groups[Col.value] / (12 * groups["years"])).to_numpy()
-
-    tags = sorted(groups[Col.tag].unique())
-    tag_index = pd.Index(tags).get_indexer(groups[Col.tag])
-    first, last = int(start.min()), int(end.max())
-    steps = np.zeros((len(tags), last - first + 2))
-    np.add.at(steps, (tag_index, start - first), amount)
-    np.add.at(steps, (tag_index, end - first + 1), -amount)
-    values = np.cumsum(steps, axis=1)[:, :-1]
-    index = pd.period_range(_period(first), _period(last), freq="M")
-    return pd.DataFrame(values.T, index=index, columns=tags)
+#: Months of the moving average that smooths the budget graph.
+SMOOTHING_MONTHS = 12
+#: Column of :func:`group_totals`: income minus needs and wants.
+SAVED = "saved"
 
 
 @dataclass
 class BudgetSeries:
+    """Accrued monthly amounts per main category from the first to the last recorded month."""
+
     monthly: pd.DataFrame
-    last_recorded_date: pd.Timestamp | None
+    last_date: pd.Timestamp | None
 
 
 def budget_series(
-    tagged: pd.DataFrame,
+    categorized: pd.DataFrame,
     *,
-    budget_end_year: int,
-    transfer_accounts: Collection[str] = (),
-    excluded_tags: Collection[str] = (),
-    horizon_years: int = HORIZON_YEARS,
+    own_accounts: Collection[str] = (),
+    excluded_categories: Collection[str] = (),
 ) -> BudgetSeries:
-    """Amortized monthly amounts per base tag, ignoring transfers between own accounts."""
-    data = filter_transactions(tagged, excluded_tags=excluded_tags, transfer_accounts=transfer_accounts)
+    """Accrued monthly amounts per main category, without internal transfers and excluded categories.
+
+    The part of a spread payment after the last recorded transaction is not used yet and left out.
+    """
+    data = filter_transactions(categorized, excluded_categories=excluded_categories, own_accounts=own_accounts)
     if data.empty:
         return BudgetSeries(pd.DataFrame(index=pd.PeriodIndex([], freq="M")), None)
-    data = data.assign(**{Col.tag: data[Col.tag].astype(str).str.split(".", n=1).str[0]})
-    horizon = pd.Period(year=budget_end_year + horizon_years, month=12, freq="M")
-    return BudgetSeries(amortize_recurring(data, horizon), data[Col.date].max())
+    data = data.assign(**{Col.category: category_at_level(data[Col.category], 0)})
+    last_date = data[Col.date].max()
+    monthly = accrue(data)
+    return BudgetSeries(monthly.loc[: pd.Period(last_date, freq="M")], last_date)
 
 
-def income_series(monthly: pd.DataFrame, categories: Sequence[TagCategory]) -> pd.Series:
-    income = pd.Series(0.0, index=monthly.index)
-    for category in categories:
-        if category.category == CATEGORY_INCOME and category.name in monthly.columns:
-            income = income + monthly[category.name]
-    return income
+def smooth(monthly: pd.DataFrame) -> pd.DataFrame:
+    """Moving average over the last :data:`SMOOTHING_MONTHS` months, for a calm long-term view."""
+    return monthly.rolling(SMOOTHING_MONTHS, min_periods=1).mean()
 
 
-def stacked_expenses(
-    monthly: pd.DataFrame, categories: Sequence[TagCategory], category: str
+def _group_of(groups: Sequence[GroupAssignment]) -> dict[str, str]:
+    return {a.category: a.group for a in groups}
+
+
+def group_totals(monthly: pd.DataFrame, groups: Sequence[GroupAssignment]) -> pd.DataFrame:
+    """Per month: the income, the money used per budget group (positive) and :data:`SAVED`.
+
+    Main categories without a group count as needs.
+    """
+    group_of = _group_of(groups)
+    totals = pd.DataFrame(0.0, index=monthly.index, columns=[*GROUPS, SAVED])
+    for category in monthly.columns:
+        group = group_of.get(category, GROUP_NEEDS)
+        sign = 1.0 if group == GROUP_INCOME else -1.0
+        totals[group] += sign * monthly[category]
+    totals[SAVED] = totals[GROUP_INCOME] - totals[list(CONSUMPTION_GROUPS)].sum(axis=1)
+    return totals
+
+
+def stacked_curves(
+    monthly: pd.DataFrame, groups: Sequence[GroupAssignment], group: str
 ) -> list[tuple[str, np.ndarray]]:
-    """Cumulative expense curves (positive numbers) of one category, in reverse category order."""
+    """Cumulative curves of the money used per category of one group (positive), from the bottom up.
+
+    The bottom category is the last one of the group in ``groups``, so the order of ``groups`` is the stacking
+    order from the top.
+    """
     curves = []
     level = np.zeros(len(monthly))
-    for tag_category in reversed(categories):
-        if tag_category.category != category or tag_category.name not in monthly.columns:
+    for assignment in reversed(groups):
+        if assignment.group != group or assignment.category not in monthly.columns:
             continue
-        level = level - monthly[tag_category.name].to_numpy()
-        curves.append((tag_category.name, level))
+        level = level - monthly[assignment.category].to_numpy()
+        curves.append((assignment.category, level))
     return curves
 
 
 @dataclass
+class GroupReport:
+    group: str
+    #: target share of the income
+    target: float
+    #: money used in the months of the report (positive)
+    amount: float
+    #: (category, amount), largest first
+    categories: list[tuple[str, float]]
+
+
+@dataclass
 class BudgetReport:
-    category: str
     start_year: int
     end_year: int
-    factor: float
-    expected_total: float
-    consumed: list[tuple[str, float]]
-    total_consumed: float
-    total_days: int
-    covered_days: int
-    last_recorded_date: pd.Timestamp
+    #: months of the budget period with data
+    months: int
+    period_months: int
+    last_date: pd.Timestamp
+    income: float
+    needs: GroupReport
+    wants: GroupReport
+    #: transfers to savings and investments that are not tracked as an account
+    savings: GroupReport
 
     @property
     def is_complete(self) -> bool:
-        return self.covered_days >= self.total_days
+        return self.months >= self.period_months
 
     @property
-    def covered_percent(self) -> float:
-        return 100.0 * self.covered_days / self.total_days
+    def saved(self) -> float:
+        """Income minus consumption: transferred to savings, left on the accounts or kept as residual value."""
+        return self.income - self.needs.amount - self.wants.amount
+
+    def share(self, amount: float) -> float | None:
+        return amount / self.income if self.income > 0 else None
 
     @property
-    def remaining_months(self) -> float:
-        return (self.total_days - self.covered_days) / 30.0
+    def savings_rate(self) -> float | None:
+        return self.share(self.saved)
 
     @property
-    def balance(self) -> float:
-        """Difference between budget and consumption (positive means money left)."""
-        return self.expected_total - self.total_consumed
-
-    @property
-    def remaining_per_month(self) -> float | None:
-        if self.remaining_months <= 0:
+    def room_per_month(self) -> float | None:
+        """How much more could be spent per month while still reaching the savings target (negative: too much)."""
+        if self.months <= 0 or self.income <= 0:
             return None
-        return self.balance / self.remaining_months
+        return (self.saved - self.savings.target * self.income) / self.months
 
-    @property
-    def trend(self) -> float | None:
-        """Expected balance at the end of the period if spending continues at the current rate."""
-        if self.covered_days <= 0:
-            return None
-        return self.expected_total - self.total_consumed * self.total_days / self.covered_days
-
-
-def covered_days(start_year: int, end_year: int, last_recorded_date: pd.Timestamp) -> tuple[int, int]:
-    """``(covered, total)`` days of the budget period up to and including ``last_recorded_date``."""
-    first = pd.Timestamp(start_year, 1, 1)
-    total = (pd.Timestamp(end_year, 12, 31) - first).days + 1
-    covered = (pd.Timestamp(last_recorded_date).normalize() - first).days + 1
-    return int(min(max(covered, 0), total)), int(total)
+    def per_month(self, amount: float) -> float:
+        return amount / self.months if self.months else 0.0
 
 
 def budget_report(
     series: BudgetSeries,
-    categories: Sequence[TagCategory],
-    category: str,
+    groups: Sequence[GroupAssignment],
     start_year: int,
     end_year: int,
-    factor: float,
+    shares: Mapping[str, float],
 ) -> BudgetReport | None:
-    monthly = series.monthly
-    if monthly.empty or series.last_recorded_date is None:
-        return None
-    in_period = (monthly.index.year >= start_year) & (monthly.index.year <= end_year)
-    expected = float(income_series(monthly, categories)[in_period].sum() * factor)
+    """Income, needs, wants and savings in the budget period ``start_year``-``end_year`` (whole years).
 
-    consumed = [
-        (c.name, float(-monthly.loc[in_period, c.name].sum()))
-        for c in reversed(categories)
-        if c.category == category and c.name in monthly.columns
-    ]
-    consumed.sort(key=lambda item: item[1], reverse=True)
-    covered, total = covered_days(start_year, end_year, series.last_recorded_date)
+    ``shares`` are the target shares of needs and wants; the rest of the income is the savings target.
+    """
+    monthly = series.monthly
+    if monthly.empty or series.last_date is None:
+        return None
+    period = monthly.loc[(monthly.index.year >= start_year) & (monthly.index.year <= end_year)]
+    group_of = _group_of(groups)
+    totals = period.sum()
+
+    def report(group: str, target: float) -> GroupReport:
+        members = [c for c in period.columns if group_of.get(c, GROUP_NEEDS) == group]
+        used = [(c, float(-totals[c])) for c in members if abs(totals[c]) >= 0.005]  # without empty categories
+        used.sort(key=lambda item: item[1], reverse=True)
+        return GroupReport(group, target, float(sum(amount for _, amount in used)), used)
+
+    needs, wants = shares.get(GROUP_NEEDS, 0.0), shares.get(GROUP_WANTS, 0.0)
+    income = sum(float(totals[c]) for c in period.columns if group_of.get(c) == GROUP_INCOME)
     return BudgetReport(
-        category=category,
         start_year=start_year,
         end_year=end_year,
-        factor=factor,
-        expected_total=expected,
-        consumed=consumed,
-        total_consumed=float(sum(amount for _, amount in consumed)),
-        total_days=total,
-        covered_days=covered,
-        last_recorded_date=series.last_recorded_date,
+        months=len(period),
+        period_months=12 * (end_year - start_year + 1),
+        last_date=series.last_date,
+        income=income,
+        needs=report(GROUP_NEEDS, needs),
+        wants=report(GROUP_WANTS, wants),
+        savings=report(GROUP_SAVINGS, max(0.0, 1.0 - needs - wants)),
     )

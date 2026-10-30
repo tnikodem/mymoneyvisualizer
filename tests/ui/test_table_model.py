@@ -8,12 +8,12 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 
 from mymoneyvisualizer.ui.table_model import (
+    CATEGORY,
     DATE,
     MONEY,
     MONEY0,
     NUMBER,
     SORT_ROLE,
-    TAG,
     TEXT,
     Column,
     DataFrameModel,
@@ -35,8 +35,8 @@ from mymoneyvisualizer.ui.table_model import (
         (None, TEXT, ""),
         (pd.NaT, DATE, ""),
         (pd.Timestamp("2024-03-01"), DATE, "01.03.2024"),
-        ("", TAG, ""),
-        ("food", TAG, "food"),
+        ("", CATEGORY, ""),
+        ("food", CATEGORY, "food"),
         (5, TEXT, "5"),
     ],
 )

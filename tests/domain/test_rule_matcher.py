@@ -1,40 +1,38 @@
-"""The fast tagging engine must give exactly the same, deterministic result as plain ``re.search`` per row."""
+"""The fast categorization engine must give exactly the same, deterministic result as plain ``re.search`` per row."""
 
 import random
 import re
 
-import numpy as np
 import pandas as pd
 import pytest
 
-from mymoneyvisualizer.domain.columns import Col
-from mymoneyvisualizer.domain.models import OneTimeTag, Tagger
-from mymoneyvisualizer.domain.tagging import (
-    TagMatcher,
+from mymoneyvisualizer.domain.categorization import (
+    RuleMatcher,
     _DistinctTexts,
     anchored_literals,
-    apply_taggers,
+    apply_rules,
     literal_alternatives,
-    recurring_to_float,
-    tagger_mask,
+    rule_mask,
 )
+from mymoneyvisualizer.domain.columns import CATEGORY_COLUMNS, MANUAL_RULE, Col
+from mymoneyvisualizer.domain.models import ManualCategory, Rule
 
 from ..helpers import transactions
 
 
-def reference_tagging(df, taggers, one_time_tags=None):
-    """The straightforward algorithm: every tagger on every row, in order, then one-time tags."""
+def reference_categorization(df, rules, manual_categories=None):
+    """The straightforward algorithm: every rule on every row, in order, then manual categories."""
     out = df.copy()
-    out[Col.tag], out[Col.tagger_name], out[Col.recurring] = "", "", np.nan
-    for tagger in taggers:
-        mask = tagger_mask(out, tagger)
-        out.loc[mask, Col.tag] = tagger.tag
-        out.loc[mask, Col.tagger_name] = tagger.name
-        out.loc[mask, Col.recurring] = recurring_to_float(tagger.recurring)
-    for transaction_id, tag in (one_time_tags or {}).items():
+    out[Col.category], out[Col.rule], out[Col.sale_of] = "", "", ""
+    out[Col.spread_months] = out[Col.residual_percent] = 0
+    for rule in rules:
+        mask = rule_mask(out, rule)
+        out.loc[mask, [Col.category, Col.rule]] = [rule.category, rule.name]
+        out.loc[mask, [Col.spread_months, Col.residual_percent]] = [rule.spread_months, rule.residual_percent]
+    for transaction_id, manual in (manual_categories or {}).items():
         mask = out[Col.transaction_id] == transaction_id
-        out.loc[mask, [Col.tag, Col.tagger_name]] = [tag.tag, "one_time_tag"]
-        out.loc[mask, Col.recurring] = recurring_to_float(tag.recurring)
+        out.loc[mask, [Col.category, Col.rule, Col.sale_of]] = [manual.category, MANUAL_RULE, manual.sale_of]
+        out.loc[mask, [Col.spread_months, Col.residual_percent]] = [manual.spread_months, manual.residual_percent]
     return out
 
 
@@ -144,35 +142,34 @@ def test_fast_search_equals_re_search(with_separator):
 
 def test_matcher_caches_and_handles_invalid_regex(caplog):
     df = transactions(("2024-01-01", "REWE", "x", -1.0), ("2024-01-02", "EDEKA", "y", -2.0))
-    matcher = TagMatcher(df)
+    matcher = RuleMatcher(df)
     first = matcher.distinct_matches(Col.recipient, "RE")
     assert matcher.distinct_matches(Col.recipient, "RE") is first
-    assert not matcher.mask(Tagger("bad", regex_recipient="([")).any()
+    assert not matcher.mask(Rule("bad", regex_recipient="([")).any()
     assert "invalid regex" in caplog.text
-    assert matcher.mask(Tagger("all")).all()
+    assert matcher.mask(Rule("all")).all()
     matcher.CACHE_LIMIT = 1
     matcher.distinct_matches(Col.description, "x")
     assert len(matcher._cache) == 1
     with pytest.raises(ValueError):
-        apply_taggers(df.iloc[:1], [], matcher=matcher)
+        apply_rules(df.iloc[:1], [], matcher=matcher)
 
 
 def test_engine_equals_reference_on_large_data():
     from ..perf.dataset import build_state
 
-    state = build_state(accounts=3, years=3, taggers=400, one_time=60)
+    state = build_state(accounts=3, years=3, rules=400, manual=60)
     df = pd.concat(state.accounts.values(), ignore_index=True)
-    fast = apply_taggers(df, state.taggers, state.one_time_tags)
-    slow = reference_tagging(df, state.taggers, state.one_time_tags)
-    for column in (Col.tag, Col.tagger_name):
-        assert list(fast[column]) == list(slow[column])
-    np.testing.assert_array_equal(fast[Col.recurring].to_numpy(), slow[Col.recurring].to_numpy())
+    fast = apply_rules(df, state.rules, state.manual_categories)
+    slow = reference_categorization(df, state.rules, state.manual_categories)
+    for column in CATEGORY_COLUMNS:
+        assert list(fast[column]) == list(slow[column]), column
 
 
-def test_engine_equals_reference_with_tricky_taggers():
+def test_engine_equals_reference_with_tricky_rules():
     df = transactions(*[(f"2024-01-{i % 28 + 1:02d}", text, text[::-1], -1.0) for i, text in enumerate(TEXTS)])
-    taggers = [
-        Tagger(f"t{i}", tag=f"tag{i}", regex_recipient=p, regex_description=q, recurring=i % 3 or None)
+    rules = [
+        Rule(f"t{i}", category=f"category{i}", regex_recipient=p, regex_description=q, spread_months=12 * (i % 3))
         for i, (p, q) in enumerate(
             [
                 ("REWE", ""),
@@ -187,11 +184,12 @@ def test_engine_equals_reference_with_tricky_taggers():
             ]
         )
     ]
-    one_time = {df[Col.transaction_id].iloc[3]: OneTimeTag(df[Col.transaction_id].iloc[3], "once", 2)}
-    fast = apply_taggers(df, taggers, one_time)
-    slow = reference_tagging(df, taggers, one_time)
-    assert list(fast[Col.tag]) == list(slow[Col.tag])
-    assert list(fast[Col.tagger_name]) == list(slow[Col.tagger_name])
+    once = df[Col.transaction_id].iloc[3]
+    manual = {once: ManualCategory(once, "once", spread_months=24, residual_percent=10)}
+    fast = apply_rules(df, rules, manual)
+    slow = reference_categorization(df, rules, manual)
+    for column in CATEGORY_COLUMNS:
+        assert list(fast[column]) == list(slow[column]), column
 
 
 def test_result_is_identical_after_restart(tmp_path):
@@ -201,21 +199,21 @@ def test_result_is_identical_after_restart(tmp_path):
 
     from ..perf.dataset import build_state
 
-    Repository(tmp_path / "data").save_all(build_state(accounts=3, years=3, taggers=300, one_time=40))
+    Repository(tmp_path / "data").save_all(build_state(accounts=3, years=3, rules=300, manual=40))
     model = AppModel.open(tmp_path / "data")
     model.transactions()  # fill the caches
-    first = model.taggers[10]
-    model.save_tagger(Tagger("new", tag="x.new", regex_recipient="REWE Markt 1"))
-    model.save_tagger(Tagger(first.name, tag="y.changed", regex_description="SAGT DANKE"), original_name=first.name)
-    model.delete_taggers([model.taggers[20].name])
+    first = model.rules[10]
+    model.save_rule(Rule("new", category="x.new", regex_recipient="REWE Markt 1"))
+    model.save_rule(Rule(first.name, category="y.changed", regex_description="SAGT DANKE"), original_name=first.name)
+    model.delete_rules([model.rules[20].name])
     some_id = model.transactions()[Col.transaction_id].iloc[100]
-    model.set_one_time_tag(some_id, "z.once", 3)
-    model.remove_one_time_tag(next(iter(model.one_time_tags)))
-    model.preview_tagger(Tagger("draft", regex_recipient="Shell"), first.name, some_id)
+    model.save_manual_category(ManualCategory(some_id, "z.once", spread_months=36))
+    model.remove_manual_category(next(iter(model.manual_categories)))
+    model.preview_rule(Rule("draft", regex_recipient="Shell"), first.name, some_id)
     model.import_transactions("Girokonto", transactions(("2026-10-01", "REWE Markt 1", "Einkauf", -5.0)))
 
     restarted = AppModel.open(tmp_path / "data")
-    columns = [Col.transaction_id, Col.account, Col.tag, Col.tagger_name, Col.recurring]
+    columns = [Col.transaction_id, Col.account, *CATEGORY_COLUMNS]
     pd.testing.assert_frame_equal(model.transactions()[columns], restarted.transactions()[columns])
-    fresh = apply_taggers(restarted._combined_raw(), restarted.taggers, restarted.one_time_tags)
+    fresh = apply_rules(restarted._combined_raw(), restarted.rules, restarted.manual_categories)
     pd.testing.assert_frame_equal(restarted.transactions()[columns], fresh[columns])

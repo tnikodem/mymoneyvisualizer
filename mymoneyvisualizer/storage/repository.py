@@ -2,13 +2,13 @@
 
 Layout of the data directory::
 
-    accounts.yaml          list of {name, file}
-    accounts/<name>.csv    transaction_id, date, recipient, description, value
-    taggers.yaml           tagger rules, applied in this order
-    one_time_tags.yaml     tags of single transactions
-    tag_categories.yaml    category of every base tag
-    importers.yaml         import profiles
-    configuration.yaml     settings
+    accounts.yaml           list of {name, file}
+    accounts/<name>.csv     transaction_id, date, recipient, description, value
+    rules.yaml              categorization rules, applied in this order
+    manual_categories.yaml  categories of single transactions, win over the rules
+    budget_groups.yaml      budget group of every main category
+    importers.yaml          import profiles
+    configuration.yaml      settings
 """
 
 from __future__ import annotations
@@ -21,18 +21,18 @@ from pathlib import Path
 import pandas as pd
 
 from mymoneyvisualizer.domain.columns import RAW_COLUMNS, normalize_transactions
-from mymoneyvisualizer.domain.models import OneTimeTag, Settings, TagCategory, Tagger
+from mymoneyvisualizer.domain.models import GroupAssignment, ManualCategory, Rule, Settings
 from mymoneyvisualizer.importing.profile import ImportProfile
 from mymoneyvisualizer.storage.files import StorageError, read_csv, read_yaml, write_csv, write_yaml
 
 ACCOUNTS_FILE = "accounts.yaml"
 ACCOUNTS_DIR = "accounts"
-TAGGERS_FILE = "taggers.yaml"
-ONE_TIME_TAGS_FILE = "one_time_tags.yaml"
-CATEGORIES_FILE = "tag_categories.yaml"
+RULES_FILE = "rules.yaml"
+MANUAL_CATEGORIES_FILE = "manual_categories.yaml"
+GROUPS_FILE = "budget_groups.yaml"
 PROFILES_FILE = "importers.yaml"
 SETTINGS_FILE = "configuration.yaml"
-DATA_FILES = (ACCOUNTS_FILE, TAGGERS_FILE, ONE_TIME_TAGS_FILE, CATEGORIES_FILE, PROFILES_FILE, SETTINGS_FILE)
+DATA_FILES = (ACCOUNTS_FILE, RULES_FILE, MANUAL_CATEGORIES_FILE, GROUPS_FILE, PROFILES_FILE, SETTINGS_FILE)
 
 _INVALID_FILENAME = re.compile(r'[<>:"/\\|?*\x00-\x1f\s]+')
 
@@ -40,9 +40,9 @@ _INVALID_FILENAME = re.compile(r'[<>:"/\\|?*\x00-\x1f\s]+')
 @dataclass
 class State:
     accounts: dict[str, pd.DataFrame] = field(default_factory=dict)
-    taggers: list[Tagger] = field(default_factory=list)
-    one_time_tags: dict[str, OneTimeTag] = field(default_factory=dict)
-    categories: list[TagCategory] = field(default_factory=list)
+    rules: list[Rule] = field(default_factory=list)
+    manual_categories: dict[str, ManualCategory] = field(default_factory=dict)
+    groups: list[GroupAssignment] = field(default_factory=list)
     profiles: list[ImportProfile] = field(default_factory=list)
     settings: Settings = field(default_factory=Settings)
 
@@ -77,13 +77,13 @@ class Repository:
     def load(self) -> State:
         state = State(
             settings=Settings.from_dict(read_yaml(self.path(SETTINGS_FILE))),
-            taggers=[Tagger.from_dict(d) for d in _as_list(read_yaml(self.path(TAGGERS_FILE)), TAGGERS_FILE)],
-            categories=self._load_categories(),
+            rules=[Rule.from_dict(d) for d in _as_list(read_yaml(self.path(RULES_FILE)), RULES_FILE)],
+            groups=self._load_groups(),
             profiles=[ImportProfile.from_dict(d) for d in _as_list(read_yaml(self.path(PROFILES_FILE)), PROFILES_FILE)],
         )
-        for entry in _as_list(read_yaml(self.path(ONE_TIME_TAGS_FILE)), ONE_TIME_TAGS_FILE):
-            tag = OneTimeTag.from_dict(entry)
-            state.one_time_tags[tag.transaction_id] = tag
+        for entry in _as_list(read_yaml(self.path(MANUAL_CATEGORIES_FILE)), MANUAL_CATEGORIES_FILE):
+            manual = ManualCategory.from_dict(entry)
+            state.manual_categories[manual.transaction_id] = manual
 
         self._account_files = {}
         for entry in _as_list(read_yaml(self.path(ACCOUNTS_FILE)), ACCOUNTS_FILE):
@@ -94,12 +94,12 @@ class Repository:
             state.accounts[str(name)] = self._load_account_file(self.path(str(relative)))
         return state
 
-    def _load_categories(self) -> list[TagCategory]:
-        categories: dict[str, TagCategory] = {}
-        for entry in _as_list(read_yaml(self.path(CATEGORIES_FILE)), CATEGORIES_FILE):
-            category = TagCategory.from_dict(entry)
-            categories.setdefault(category.name, category)
-        return list(categories.values())
+    def _load_groups(self) -> list[GroupAssignment]:
+        groups: dict[str, GroupAssignment] = {}
+        for entry in _as_list(read_yaml(self.path(GROUPS_FILE)), GROUPS_FILE):
+            assignment = GroupAssignment.from_dict(entry)
+            groups.setdefault(assignment.category, assignment)
+        return list(groups.values())
 
     @staticmethod
     def _load_account_file(path: Path) -> pd.DataFrame:
@@ -138,14 +138,14 @@ class Repository:
         if relative is not None:
             self.path(relative).unlink(missing_ok=True)
 
-    def save_taggers(self, taggers: Iterable[Tagger]) -> None:
-        write_yaml(self.path(TAGGERS_FILE), [t.to_dict() for t in taggers])
+    def save_rules(self, rules: Iterable[Rule]) -> None:
+        write_yaml(self.path(RULES_FILE), [r.to_dict() for r in rules])
 
-    def save_one_time_tags(self, tags: Iterable[OneTimeTag]) -> None:
-        write_yaml(self.path(ONE_TIME_TAGS_FILE), [t.to_dict() for t in tags])
+    def save_manual_categories(self, manual_categories: Iterable[ManualCategory]) -> None:
+        write_yaml(self.path(MANUAL_CATEGORIES_FILE), [m.to_dict() for m in manual_categories])
 
-    def save_categories(self, categories: Iterable[TagCategory]) -> None:
-        write_yaml(self.path(CATEGORIES_FILE), [c.to_dict() for c in categories])
+    def save_groups(self, groups: Iterable[GroupAssignment]) -> None:
+        write_yaml(self.path(GROUPS_FILE), [a.to_dict() for a in groups])
 
     def save_profiles(self, profiles: Iterable[ImportProfile]) -> None:
         write_yaml(self.path(PROFILES_FILE), [p.to_dict() for p in profiles])
@@ -157,8 +157,8 @@ class Repository:
         for name, df in state.accounts.items():
             self.save_account(name, df)
         self.save_account_index(state.accounts)
-        self.save_taggers(state.taggers)
-        self.save_one_time_tags(state.one_time_tags.values())
-        self.save_categories(state.categories)
+        self.save_rules(state.rules)
+        self.save_manual_categories(state.manual_categories.values())
+        self.save_groups(state.groups)
         self.save_profiles(state.profiles)
         self.save_settings(state.settings)

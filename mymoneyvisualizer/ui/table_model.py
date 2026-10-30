@@ -15,8 +15,10 @@ from PyQt6.QtWidgets import QAbstractItemView, QHeaderView, QTableView, QWidget
 
 SORT_ROLE = Qt.ItemDataRole.UserRole + 1
 
-TEXT, TAG, DATE, MONEY, MONEY0, NUMBER = "text", "tag", "date", "money", "money0", "number"
-NUMERIC = (MONEY, MONEY0, NUMBER)
+TEXT, CATEGORY, DATE, MONEY, MONEY0, NUMBER = "text", "category", "date", "money", "money0", "number"
+#: spread in months and residual value in percent; 0 (not spread) stays empty
+MONTHS, PERCENT = "months", "percent"
+NUMERIC = (MONEY, MONEY0, NUMBER, MONTHS, PERCENT)
 
 
 @dataclass(frozen=True)
@@ -38,9 +40,23 @@ def format_money(value: float, decimals: int = 2) -> str:
     return text.replace(",", "\x00").replace(".", ",").replace("\x00", ".")
 
 
+def format_months(months: int) -> str:
+    """``60`` -> ``5 years``, ``18`` -> ``18 months``, ``0`` -> ``""``."""
+    if months <= 0:
+        return ""
+    if months % 12 == 0:
+        years = months // 12
+        return f"{years} year" if years == 1 else f"{years} years"
+    return f"{months} month" if months == 1 else f"{months} months"
+
+
 def format_value(value: Any, kind: str) -> str:
     if _is_missing(value):
         return ""
+    if kind == MONTHS:
+        return format_months(int(value))
+    if kind == PERCENT:
+        return f"{int(value)} %" if value else ""
     if kind == DATE:
         return pd.Timestamp(value).strftime("%d.%m.%Y")
     if kind == MONEY:
@@ -50,7 +66,7 @@ def format_value(value: Any, kind: str) -> str:
     if kind == NUMBER:
         number = float(value)
         return str(int(number)) if number.is_integer() else str(number)
-    return str(value)  # an empty tag stays empty, so missing tags stand out
+    return str(value)  # an empty category stays empty, so missing categories stand out
 
 
 def sort_key(value: Any, kind: str) -> Any:
@@ -115,6 +131,11 @@ class DataFrameModel(QAbstractTableModel):
         self._arrays = [self._frame[c.key].to_numpy() if c.key in self._frame else None for c in self.columns]
 
     def _sorted(self, frame: pd.DataFrame) -> pd.DataFrame:
+        """Sorted rows; pinned rows follow at the bottom in their own order."""
+        pinned = frame.iloc[0:0]
+        if self.pinned is not None and not frame.empty:
+            mask = np.asarray(self.pinned(frame), dtype=bool)
+            frame, pinned = frame.loc[~mask], frame.loc[mask]
         if self.sorting is not None and not frame.empty:
             key, order = self.sorting
             column = next((c for c in self.columns if c.key == key), None)
@@ -123,10 +144,8 @@ class DataFrameModel(QAbstractTableModel):
                 frame = frame.iloc[np.argsort(keys.to_numpy(), kind="stable")]
                 if order == Qt.SortOrder.DescendingOrder:
                     frame = frame.iloc[::-1]
-        if self.pinned is not None and not frame.empty:
-            pinned = np.asarray(self.pinned(frame), dtype=bool)
-            if pinned.any():
-                frame = pd.concat([frame.loc[~pinned], frame.loc[pinned]])
+        if not pinned.empty:
+            frame = pd.concat([frame, pinned])
         return frame.reset_index(drop=True)
 
     def sort(self, column: int, order: Qt.SortOrder = Qt.SortOrder.AscendingOrder) -> None:

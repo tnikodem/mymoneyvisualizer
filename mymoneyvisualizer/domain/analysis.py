@@ -1,19 +1,24 @@
-"""Aggregations for the summary table, the detail view and the tagger overview."""
+"""Aggregations for the income & expenses table, the transaction list and the rule overview."""
 
 from __future__ import annotations
 
-from collections.abc import Collection, Iterable
+from collections.abc import Collection, Iterable, Mapping, Sequence
 from typing import Literal
 
 import numpy as np
 import pandas as pd
 
+from mymoneyvisualizer.domain.categories import category_at_level, matches_category
 from mymoneyvisualizer.domain.columns import Col
-from mymoneyvisualizer.domain.models import Tagger
-from mymoneyvisualizer.domain.tags import matches_tag, tag_at_level
+from mymoneyvisualizer.domain.models import CONSUMPTION_GROUPS, GROUP_INCOME, GROUP_SAVINGS, Rule
 
 TOTAL = "total"
 MONTHLY_AVERAGE = "monthly average"
+
+#: Column of the income & expenses table that marks the summary rows below the categories ("" for categories).
+SUMMARY = "summary"
+INCOME, EXPENSES, SAVINGS, NET = "income", "expenses", "savings", "net"
+SUMMARY_LABELS = {INCOME: "Income", EXPENSES: "Expenses", SAVINGS: "Savings", NET: "Net"}
 
 MonthLike = str | pd.Period | pd.Timestamp
 
@@ -45,22 +50,27 @@ def ordered_month_range(start: MonthLike, end: MonthLike, changed: Literal["star
 def filter_transactions(
     df: pd.DataFrame,
     *,
-    excluded_tags: Collection[str] = (),
-    transfer_accounts: Collection[str] = (),
-    tag_filter: str = "",
+    excluded_categories: Collection[str] = (),
+    own_accounts: Collection[str] = (),
+    category_filter: str = "",
 ) -> pd.DataFrame:
-    """Drop excluded tags and transfers between own accounts (tagged with an account name).
+    """Drop excluded categories and internal transfers (categorized with the name of an own account).
 
-    ``tag_filter`` is a free text prefix filter, so ``car`` keeps ``carsharing`` as well.
+    ``category_filter`` is a free text prefix filter, so ``car`` keeps ``carsharing`` as well.
     """
     mask = pd.Series(True, index=df.index)
-    if transfer_accounts:
-        mask &= ~df[Col.tag].isin(list(transfer_accounts))
-    if excluded_tags:
-        mask &= ~df[Col.tag].isin(list(excluded_tags))
-    if tag_filter:
-        mask &= df[Col.tag].astype(str).str.startswith(tag_filter)
+    if own_accounts:
+        mask &= ~df[Col.category].isin(list(own_accounts))
+    if excluded_categories:
+        mask &= ~df[Col.category].isin(list(excluded_categories))
+    if category_filter:
+        mask &= df[Col.category].astype(str).str.startswith(category_filter)
     return df.loc[mask]
+
+
+def summary_groups(kind: str) -> tuple[str, ...] | None:
+    """Budget groups added up in a summary row; ``None`` for the net row, which adds up everything."""
+    return {INCOME: (GROUP_INCOME,), EXPENSES: CONSUMPTION_GROUPS, SAVINGS: (GROUP_SAVINGS,)}.get(kind)
 
 
 def in_months(df: pd.DataFrame, start: MonthLike, end: MonthLike) -> pd.DataFrame:
@@ -68,65 +78,78 @@ def in_months(df: pd.DataFrame, start: MonthLike, end: MonthLike) -> pd.DataFram
     return df.loc[(months >= to_month(start)) & (months <= to_month(end))]
 
 
-def _pivot(df: pd.DataFrame, tag_level: int, months: list[str]) -> pd.DataFrame:
-    tags = tag_at_level(df[Col.tag], tag_level).rename(Col.tag)
+def _pivot(df: pd.DataFrame, level: int, months: list[str]) -> pd.DataFrame:
+    categories = category_at_level(df[Col.category], level).rename(Col.category)
     keys = df[Col.date].dt.strftime("%Y-%m").rename(Col.date)
-    pivot = df[Col.value].groupby([tags, keys]).sum().unstack(fill_value=0.0)
+    pivot = df[Col.value].groupby([categories, keys]).sum().unstack(fill_value=0.0)
     return pivot.reindex(columns=months, fill_value=0.0).astype(float).rename_axis(columns=None)
 
 
-def summary_table(
+def income_expenses_table(
     df: pd.DataFrame,
     start: MonthLike,
     end: MonthLike,
     *,
-    tag_level: int = 0,
-    tag_filter: str = "",
-    excluded_tags: Collection[str] = (),
-    transfer_accounts: Collection[str] = (),
+    level: int = 0,
+    category_filter: str = "",
+    excluded_categories: Collection[str] = (),
+    own_accounts: Collection[str] = (),
+    groups: Mapping[str, str] | None = None,
 ) -> pd.DataFrame | None:
-    """Monthly sums per tag plus ``total`` and ``monthly average`` columns and a final ``total`` row.
+    """Monthly sums per category plus ``total`` and ``monthly average`` columns, as paid (cash basis).
 
-    Rows are sorted by total (largest expense first). Returns ``None`` if there is nothing to show.
+    Categories are sorted by total (largest expense first). Below them follow summary rows, marked in the column
+    :data:`SUMMARY`: income, expenses (needs and wants), savings (only if there are savings categories) and the net
+    change of the accounts. ``groups`` maps main categories to their budget group; categories without a group, e.g.
+    internal transfers, only count in the net row. Returns ``None`` if there is nothing to show.
     """
     data = filter_transactions(
-        df, excluded_tags=excluded_tags, transfer_accounts=transfer_accounts, tag_filter=tag_filter
+        df, excluded_categories=excluded_categories, own_accounts=own_accounts, category_filter=category_filter
     )
     data = in_months(data, start, end)
     if data.empty:
         return None
     months = month_range(start, end)
-    table = _pivot(data, tag_level, months)
+    table = _pivot(data, level, months)
     table[TOTAL] = table[months].sum(axis=1)
     table[MONTHLY_AVERAGE] = table[TOTAL] / len(months)
     table = table.sort_values(TOTAL, kind="stable").reset_index()
+    table[SUMMARY] = ""
 
-    total_row = table.drop(columns=Col.tag).sum().to_frame().T
-    total_row.insert(0, Col.tag, TOTAL)
-    return pd.concat([table, total_row], ignore_index=True)
+    values = [*months, TOTAL, MONTHLY_AVERAGE]
+    group = category_at_level(table[Col.category], 0).map(groups or {})
+    rows = []
+    for kind in (INCOME, EXPENSES, SAVINGS, NET):
+        members = summary_groups(kind)
+        selected = pd.Series(True, index=table.index) if members is None else group.isin(members)
+        if kind == SAVINGS and not selected.any():
+            continue
+        row = table.loc[selected, values].sum()
+        rows.append({Col.category: SUMMARY_LABELS[kind], **row.to_dict(), SUMMARY: kind})
+    return pd.concat([table, pd.DataFrame(rows)], ignore_index=True)
 
 
-def summary_deviations(
+def income_expenses_deviations(
     df: pd.DataFrame,
     start: MonthLike,
     end: MonthLike,
     *,
-    tag_level: int = 0,
-    tag_filter: str = "",
-    excluded_tags: Collection[str] = (),
-    transfer_accounts: Collection[str] = (),
+    level: int = 0,
+    category_filter: str = "",
+    excluded_categories: Collection[str] = (),
+    own_accounts: Collection[str] = (),
     window: int = 12,
     min_periods: int = 6,
     threshold: float = 3.0,
     min_abs: float = 50.0,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Unusual months of the summary table, judged against the complete history of each tag.
+    """Unusual months of the income & expenses table, judged against the complete history of each category.
 
-    Returns ``(deviation, baseline)`` indexed by tag with ``YYYY-MM`` columns for ``start..end``.
+    Returns ``(deviation, baseline)`` indexed by category with ``YYYY-MM`` columns for ``start..end``.
     ``deviation`` is ``value - baseline`` for flagged cells and NaN otherwise.
     """
     data = filter_transactions(
-        df, excluded_tags=excluded_tags, transfer_accounts=transfer_accounts, tag_filter=tag_filter
+        df, excluded_categories=excluded_categories, own_accounts=own_accounts, category_filter=category_filter
     )
     months = month_range(start, end)
     if data.empty:
@@ -135,7 +158,7 @@ def summary_deviations(
     history = month_range(
         min(to_month(data[Col.date].min()), to_month(start)), max(to_month(data[Col.date].max()), to_month(end))
     )
-    monthly = _pivot(data, tag_level, history)
+    monthly = _pivot(data, level, history)
     deviation, baseline = monthly_deviations(
         monthly, window=window, min_periods=min_periods, threshold=threshold, min_abs=min_abs
     )
@@ -157,7 +180,7 @@ def monthly_deviations(
     """Flag months that differ from the median of the preceding ``window`` months.
 
     A month is flagged if it differs by more than ``min_abs`` and more than ``threshold`` robust
-    standard deviations (scaled median absolute deviation). ``monthly`` has tags as rows and
+    standard deviations (scaled median absolute deviation). ``monthly`` has categories as rows and
     consecutive months as columns.
     """
     by_month = monthly.T.astype(float)
@@ -172,36 +195,45 @@ def monthly_deviations(
 
 def detail_transactions(
     df: pd.DataFrame,
-    month: MonthLike,
-    tag: str | None = None,
+    month: MonthLike | None,
+    categories: Sequence[str] | None = None,
     *,
-    excluded_tags: Collection[str] = (),
-    transfer_accounts: Collection[str] = (),
-    tag_filter: str = "",
+    excluded_categories: Collection[str] = (),
+    own_accounts: Collection[str] = (),
+    category_filter: str = "",
 ) -> pd.DataFrame:
-    """Transactions behind one cell of the summary table. ``tag=None`` means the total row."""
+    """Transactions of ``categories`` (with their subcategories) in ``month``, oldest first.
+
+    ``categories=None`` means all categories, ``month=None`` all months.
+    """
     data = filter_transactions(
-        df, excluded_tags=excluded_tags, transfer_accounts=transfer_accounts, tag_filter=tag_filter
+        df, excluded_categories=excluded_categories, own_accounts=own_accounts, category_filter=category_filter
     )
-    data = in_months(data, month, month)
-    if tag is not None:
-        data = data.loc[matches_tag(data[Col.tag], tag)]
+    if month is not None:
+        data = in_months(data, month, month)
+    if categories is not None:
+        mask = pd.Series(False, index=data.index)
+        for category in categories:
+            mask |= matches_category(data[Col.category], category)
+        data = data.loc[mask]
     return data.sort_values(Col.date, kind="stable").reset_index(drop=True)
 
 
-def tagger_overview(tagged: pd.DataFrame, taggers: Iterable[Tagger]) -> pd.DataFrame:
-    """Number of transactions and their sum per tagger."""
-    groups = tagged.groupby(Col.tagger_name)[Col.value].agg(["count", "sum"])
+def rule_overview(categorized: pd.DataFrame, rules: Iterable[Rule]) -> pd.DataFrame:
+    """Number of transactions and their sum per rule."""
+    groups = categorized.groupby(Col.rule)[Col.value].agg(["count", "sum"])
     rows = []
-    for tagger in taggers:
-        count, total = groups.loc[tagger.name] if tagger.name in groups.index else (0, 0.0)
+    for rule in rules:
+        count, total = groups.loc[rule.name] if rule.name in groups.index else (0, 0.0)
         rows.append(
             {
-                "name": tagger.name,
-                "tag": tagger.tag,
-                "recurring": np.nan if tagger.recurring is None else float(tagger.recurring),
+                "name": rule.name,
+                Col.category: rule.category,
+                Col.spread_months: rule.spread_months,
+                Col.residual_percent: rule.residual_percent,
                 "count": int(count),
                 "sum": round(float(total), 2),
             }
         )
-    return pd.DataFrame(rows, columns=["name", "tag", "recurring", "count", "sum"])
+    columns = ["name", Col.category, Col.spread_months, Col.residual_percent, "count", "sum"]
+    return pd.DataFrame(rows, columns=columns)

@@ -2,8 +2,8 @@
 
 import pandas as pd
 
+from mymoneyvisualizer.domain.categorization import apply_rules
 from mymoneyvisualizer.domain.columns import Col, normalize_transactions
-from mymoneyvisualizer.domain.tagging import apply_taggers
 
 
 def transactions(*rows, account=None):
@@ -15,10 +15,15 @@ def transactions(*rows, account=None):
     return df
 
 
-def tagged(*rows, tags, account="giro", recurring=None):
-    """Transactions with explicit tags (one per row), as produced by :func:`apply_taggers`."""
-    df = apply_taggers(transactions(*rows, account=account), [])
-    df[Col.tag] = list(tags)
-    if recurring is not None:
-        df[Col.recurring] = [float("nan") if r is None else float(r) for r in recurring]
+def categorized(*rows, categories, account="giro", spread_months=None, residual_percent=None, sale_of=None):
+    """Transactions with explicit categories and spreads (one per row), as produced by :func:`apply_rules`."""
+    df = apply_rules(transactions(*rows, account=account), [])
+    df[Col.category] = list(categories)
+    for column, values in (
+        (Col.spread_months, spread_months),
+        (Col.residual_percent, residual_percent),
+        (Col.sale_of, sale_of),
+    ):
+        if values is not None:
+            df[column] = list(values)
     return df

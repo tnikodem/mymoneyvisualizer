@@ -2,7 +2,7 @@ import zipfile
 
 import pytest
 
-from mymoneyvisualizer.domain.models import TagCategory, Tagger
+from mymoneyvisualizer.domain.models import GroupAssignment, Rule
 from mymoneyvisualizer.storage.backup import create_backup, restore_backup
 from mymoneyvisualizer.storage.files import StorageError
 from mymoneyvisualizer.storage.repository import Repository, State
@@ -13,8 +13,8 @@ from ..helpers import transactions
 def _state():
     return State(
         accounts={"giro": transactions(("2024-01-02", "a", "b", -1.0))},
-        taggers=[Tagger("t", tag="x")],
-        categories=[TagCategory("x", "optional")],
+        rules=[Rule("t", category="x")],
+        groups=[GroupAssignment("x", "wants")],
     )
 
 
@@ -22,7 +22,7 @@ def test_backup_and_restore_roundtrip(tmp_path):
     data = tmp_path / "data"
     Repository(data).save_all(_state())
     members = create_backup(data, tmp_path / "backup.zip")
-    assert "tag_categories.yaml" in members
+    assert "budget_groups.yaml" in members
     assert "accounts/giro.csv" in members
 
     Repository(data).save_all(State(accounts={"other": transactions()}))
@@ -30,7 +30,7 @@ def test_backup_and_restore_roundtrip(tmp_path):
 
     restored = Repository(data).load()
     assert list(restored.accounts) == ["giro"]
-    assert restored.categories == [TagCategory("x", "optional")]  # regression: categories were never restored
+    assert restored.groups == [GroupAssignment("x", "wants")]  # regression: groups were never restored
     assert previous is not None and (previous / "accounts" / "other.csv").is_file()
 
 
@@ -55,7 +55,7 @@ def test_invalid_backup_leaves_data_untouched(tmp_path, kind):
             if kind == "foreign-zip":
                 z.writestr("readme.txt", "x")
             else:
-                z.writestr("taggers.yaml", "name: [unclosed")
+                z.writestr("rules.yaml", "name: [unclosed")
     with pytest.raises(StorageError):
         restore_backup(archive, data)
     assert sorted(p.relative_to(data) for p in data.rglob("*")) == before
@@ -65,12 +65,12 @@ def test_invalid_backup_leaves_data_untouched(tmp_path, kind):
 def test_restore_ignores_unsafe_members(tmp_path):
     archive = tmp_path / "evil.zip"
     with zipfile.ZipFile(archive, "w") as z:
-        z.writestr("taggers.yaml", "[]")
+        z.writestr("rules.yaml", "[]")
         z.writestr("../escape.yaml", "x")
         z.writestr("/abs.yaml", "x")
         z.writestr("accounts/../../x.csv", "x")
         z.writestr("accounts/nested/y.csv", "x")
         z.writestr("other.txt", "x")
     restore_backup(archive, tmp_path / "data")
-    assert sorted(p.name for p in (tmp_path / "data").rglob("*")) == ["taggers.yaml"]
+    assert sorted(p.name for p in (tmp_path / "data").rglob("*")) == ["rules.yaml"]
     assert not (tmp_path / "escape.yaml").exists()

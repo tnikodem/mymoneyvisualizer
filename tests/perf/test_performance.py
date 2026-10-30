@@ -1,7 +1,7 @@
-"""Time budgets on a large synthetic data set (~58,000 transactions, 700 taggers, 400 one-time tags).
+"""Time budgets on a large synthetic data set (~58,000 transactions, 700 rules, 400 manual categories).
 
 Measured on a laptop the operations take a tenth of their budget or less; the budgets only catch
-regressions like evaluating every tagger on every row again (seconds per key press).
+regressions like evaluating every rule on every row again (seconds per key press).
 """
 
 import time
@@ -11,7 +11,7 @@ from PyQt6.QtCore import Qt
 
 from mymoneyvisualizer.app import AppModel
 from mymoneyvisualizer.domain.columns import Col
-from mymoneyvisualizer.domain.models import Tagger
+from mymoneyvisualizer.domain.models import ManualCategory, Rule
 from mymoneyvisualizer.storage.repository import Repository
 
 from .dataset import build_state
@@ -43,7 +43,7 @@ class Budget:
 
 def test_data_set_is_large(model):
     assert len(model.transactions()) > 50_000
-    assert len(model.taggers) == 700
+    assert len(model.rules) == 700
 
 
 def test_startup(data_dir):
@@ -51,29 +51,27 @@ def test_startup(data_dir):
         AppModel.open(data_dir).transactions()
 
 
-def test_editing_taggers(model):
+def test_editing_rules(model):
     some = model.transactions().iloc[5000]
-    with Budget(1.5):  # 10 key presses in the tagger window, new and existing tagger
+    with Budget(1.5):  # 10 key presses in the rule window, new and existing rule
         for i in range(5):
-            model.preview_tagger(
-                Tagger("draft", regex_recipient="REWE Markt 1"[: 4 + i]), None, some[Col.transaction_id]
-            )
-            model.preview_tagger(Tagger("t100", regex_description="SAGT DANKE"[: 3 + i]), "t100")
+            model.preview_rule(Rule("draft", regex_recipient="REWE Markt 1"[: 4 + i]), None, some[Col.transaction_id])
+            model.preview_rule(Rule("t100", regex_description="SAGT DANKE"[: 3 + i]), "t100")
     with Budget(1.5):
-        model.save_tagger(Tagger("perf", tag="perf.x", regex_recipient="Shell 12$"))
+        model.save_rule(Rule("perf", category="perf.x", regex_recipient="Shell 12$"))
     with Budget(1.5):
-        model.set_one_time_tag(some[Col.transaction_id], "perf.once")
+        model.save_manual_category(ManualCategory(some[Col.transaction_id], "perf.once", spread_months=12))
     with Budget(1.5):
-        model.delete_taggers(["perf"])
+        model.delete_rules(["perf"])
 
 
 def test_analysis(model):
     with Budget(2.0):
-        model.summary("2025-11", "2026-10", tag_level=1)
-        model.summary_deviations("2025-11", "2026-10", tag_level=1)
+        model.income_expenses("2025-11", "2026-10", level=1)
+        model.income_expenses_deviations("2025-11", "2026-10", level=1)
         series = model.budget_series()
-        model.budget_report("basic", series)
-        model.tagger_overview()
+        model.budget_report(series)
+        model.rule_overview()
         model.detail("2026-03", "household")
         for name in model.account_names:
             model.account_transactions(name)
@@ -86,9 +84,9 @@ def test_windows(qtbot, model):
     qtbot.addWidget(main)
     with Budget(3.0):
         main.show_accounts()
-        main.show_summary()
-        main.show_graph()
-        main.show_tagger_overview()
+        main.show_income_expenses()
+        main.show_budget()
+        main.show_rules()
     tab = main.accounts_window.tab("Girokonto")
     assert tab.table_model.rowCount() > 10_000
     with Budget(1.0):
@@ -96,12 +94,12 @@ def test_windows(qtbot, model):
         tab.table.sortByColumn(2, Qt.SortOrder.AscendingOrder)
     some = model.transactions().iloc[2000]
     with Budget(2.0):
-        main.open_tagger(transaction_id=some[Col.transaction_id])
+        main.open_rule(transaction_id=some[Col.transaction_id])
         for ch in "abcdefghij":
-            main.tagger_window.recipient_edit.setText(main.tagger_window.recipient_edit.text()[:3] + ch)
-            main.tagger_window.flush()
+            main.rule_window.recipient_edit.setText(main.rule_window.recipient_edit.text()[:3] + ch)
+            main.rule_window.flush()
     with Budget(2.0):
-        main.tagger_window.accept()
-        for window in (main.accounts_window, main.summary_window, main.graph_window, main.tagger_overview_window):
+        main.rule_window.accept()
+        for window in (main.accounts_window, main.income_expenses_window, main.budget_window, main.rules_window):
             window.flush()
     main.close()
