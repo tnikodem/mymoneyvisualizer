@@ -9,12 +9,15 @@ import numpy as np
 import pandas as pd
 
 from mymoneyvisualizer.domain.categories import category_at_level, matches_category
-from mymoneyvisualizer.domain.categorization import readable_pattern
+from mymoneyvisualizer.domain.categorization import RuleMatcher, readable_pattern
 from mymoneyvisualizer.domain.columns import Col
 from mymoneyvisualizer.domain.models import CONSUMPTION_GROUPS, GROUP_INCOME, GROUP_SAVINGS, Rule
 
 TOTAL = "total"
 MONTHLY_AVERAGE = "monthly average"
+#: Column of the rule overview (a number) and the rule preview (the id of the winning rule or manual category):
+#: transactions a rule matches that get their category elsewhere.
+OVERRIDDEN = "overridden"
 
 #: Column of the income & expenses table that marks the summary rows below the categories ("" for categories).
 SUMMARY = "summary"
@@ -227,16 +230,20 @@ def detail_transactions(
     return data.sort_values(Col.date, kind="stable").reset_index(drop=True)
 
 
-def rule_overview(categorized: pd.DataFrame, rules: Iterable[Rule]) -> pd.DataFrame:
+def rule_overview(categorized: pd.DataFrame, rules: Iterable[Rule], matcher: RuleMatcher | None = None) -> pd.DataFrame:
     """One row per rule in the order they are applied: what it matches, what it sets and what it categorizes.
 
     ``position`` counts from 1, ``recipient`` and ``description`` are the regexes for reading, ``count`` and ``sum``
-    cover the transactions the rule categorizes (not those a later rule or a manual category takes).
+    cover the transactions the rule categorizes. :data:`OVERRIDDEN` counts the transactions it matches that get their
+    category from a later rule or a manual category instead. Pass the :class:`RuleMatcher` of ``categorized`` to reuse
+    its cached results.
     """
+    matcher = matcher if matcher is not None else RuleMatcher(categorized)
     groups = categorized.groupby(Col.rule)[Col.value].agg(["count", "sum"])
     rows = []
     for position, rule in enumerate(rules, start=1):
         count, total = groups.loc[rule.id] if rule.id in groups.index else (0, 0.0)
+        matches = int(matcher.mask(rule).sum())
         rows.append(
             {
                 "id": rule.id,
@@ -247,6 +254,7 @@ def rule_overview(categorized: pd.DataFrame, rules: Iterable[Rule]) -> pd.DataFr
                 Col.spread_months: rule.spread_months,
                 Col.residual_percent: rule.residual_percent,
                 "count": int(count),
+                OVERRIDDEN: matches - int(count),
                 "sum": round(float(total), 2),
             }
         )
@@ -259,6 +267,7 @@ def rule_overview(categorized: pd.DataFrame, rules: Iterable[Rule]) -> pd.DataFr
         Col.spread_months,
         Col.residual_percent,
         "count",
+        OVERRIDDEN,
         "sum",
     ]
     return pd.DataFrame(rows, columns=columns)

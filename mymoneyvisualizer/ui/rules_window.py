@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 import pandas as pd
 from PyQt6.QtCore import QModelIndex, Qt
+from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
     QAbstractItemView,
     QHBoxLayout,
@@ -22,9 +23,11 @@ from PyQt6.QtWidgets import (
 )
 
 from mymoneyvisualizer.app import RULES, TRANSACTIONS
+from mymoneyvisualizer.domain.analysis import OVERRIDDEN
 from mymoneyvisualizer.domain.columns import Col
 from mymoneyvisualizer.domain.models import MAX_SPREAD_MONTHS
 from mymoneyvisualizer.ui.common import HelpButton, Window, category_completer, make_button
+from mymoneyvisualizer.ui.style import WARNING
 from mymoneyvisualizer.ui.table_model import (
     CATEGORY,
     MONEY,
@@ -66,6 +69,15 @@ OVERVIEW_COLUMNS = [
         tooltip="Erwarteter Wiederverkaufswert in Prozent des Preises, z. B. beim Auto; zählt nicht als Verbrauch.",
     ),
     Column("count", "Buchungen", NUMBER, 95, tooltip="So viele Buchungen bekommen ihre Kategorie von dieser Regel."),
+    Column(
+        OVERRIDDEN,
+        "überschrieben",
+        NUMBER,
+        115,
+        tooltip="So viele Buchungen passen zwar auf die Regel, bekommen ihre Kategorie aber von einer späteren Regel"
+        " oder einer Einzelzuordnung. Viele überschriebene und 0 Buchungen: Die Regel ist überflüssig oder steht an der"
+        " falschen Stelle.",
+    ),
     Column("sum", "Summe", MONEY, 100, tooltip="Summe dieser Buchungen."),
 ]
 #: columns that are changed in the table; their keys are the names of the rule fields
@@ -74,6 +86,8 @@ EDITABLE = (Col.category, Col.spread_months, Col.residual_percent)
 FILTERED = ("recipient", "description", Col.category)
 HELP = (
     "<p>Regeln werden in der Reihenfolge <b>#</b> angewendet; passen mehrere, gewinnt die spätere.</p>"
+    "<p><b>Buchungen:</b> so viele bekommen ihre Kategorie von der Regel. <b>überschrieben:</b> so viele passen auch,"
+    " bekommen ihre Kategorie aber von einer späteren Regel oder einer Einzelzuordnung.</p>"
     "<p>Kategorie, Verteilung und Restwert änderst du direkt in der Tabelle: Zelle anklicken und lostippen.</p>"
     "<p>Doppelklick öffnet die Regel mit allen ihren Buchungen. Eine neue Regel entsteht am schnellsten mit"
     " Doppelklick auf eine Buchung.</p>"
@@ -103,6 +117,19 @@ class RuleTableModel(DataFrameModel):
         return flags
 
     def data(self, index: QModelIndex, role=Qt.ItemDataRole.DisplayRole):
+        if (
+            index.isValid()
+            and self.key(index) == OVERRIDDEN
+            and role
+            in (
+                Qt.ItemDataRole.DisplayRole,
+                Qt.ItemDataRole.ForegroundRole,
+            )
+        ):
+            count = int(self.frame[OVERRIDDEN].iat[index.row()])
+            if role == Qt.ItemDataRole.ForegroundRole:
+                return QColor(WARNING) if count else None
+            return str(count) if count else ""
         if role == Qt.ItemDataRole.EditRole and index.isValid() and self.editable(index):
             value = self.frame[self.key(index)].iloc[index.row()]
             return str(value) if self.key(index) == Col.category else int(value)

@@ -21,6 +21,7 @@ from PyQt6.QtWidgets import (
 )
 
 from mymoneyvisualizer.app import RULES, TRANSACTIONS, InvalidRuleError
+from mymoneyvisualizer.domain.analysis import OVERRIDDEN
 from mymoneyvisualizer.domain.categorization import readable_pattern, regex_error, regex_for, rule_matches
 from mymoneyvisualizer.domain.columns import MANUAL_RULE, Col
 from mymoneyvisualizer.domain.models import MAX_SPREAD_MONTHS, ManualCategory, Rule, new_rule_id
@@ -28,6 +29,7 @@ from mymoneyvisualizer.ui.common import (
     GREEN,
     GREY,
     RED,
+    TOTAL_BACKGROUND,
     Card,
     HelpButton,
     Window,
@@ -50,13 +52,22 @@ from mymoneyvisualizer.ui.table_model import (
     format_months,
 )
 
+#: column of the preview: who takes a matched transaction from the rule
+TAKEN = "taken"
 PREVIEW_COLUMNS = [
     Column(Col.account, "Konto", width=110),
     Column(Col.date, "Datum", DATE, 90),
-    Column(Col.recipient, "Empfänger", width=260),
-    Column(Col.description, "Verwendungszweck", width=440),
+    Column(Col.recipient, "Empfänger", width=220),
+    Column(Col.description, "Verwendungszweck", width=340),
     Column(Col.value, "Betrag", MONEY, 90),
     Column(Col.category, "Kategorie", CATEGORY, 150),
+    Column(
+        TAKEN,
+        "überschrieben von",
+        width=130,
+        tooltip="Die Regel passt, aber die Buchung bekommt ihre Kategorie von einer späteren Regel oder einer"
+        " Einzelzuordnung.",
+    ),
     Column(Col.spread_months, "Verteilt über", MONTHS, 90),
     Column(Col.residual_percent, "Restwert", PERCENT, 70),
 ]
@@ -84,7 +95,9 @@ HELP = (
     "<p><b>Regel:</b> gibt allen Buchungen die Kategorie, deren Empfänger und Verwendungszweck die Texte enthalten,"
     " auch künftig importierten. <b>Nur diese Buchung</b> gilt vor allen Regeln.</p>"
     "<p><b>Vorschau:</b> oben die Buchung, von der du kommst: grün, wenn die Regel sie erfasst, rot, wenn nicht. Ebenso"
-    " färben sich die Felder Empfänger und Verwendungszweck.</p>"
+    " färben sich die Felder Empfänger und Verwendungszweck. Grau sind Buchungen, auf die die Regel passt, die ihre"
+    " Kategorie aber von einer späteren Regel (passen mehrere, gewinnt die spätere) oder einer Einzelzuordnung"
+    " bekommen.</p>"
     "<p><b>Verteilen über:</b> verteilt jede Zahlung im Budget auf ihre Laufzeit oder Nutzungsdauer, z. B."
     " Jahresversicherung 12 Monate, Sofa 10 Jahre. <b>Restwert:</b> der erwartete Wiederverkaufswert, z. B. beim"
     " Auto.</p>"
@@ -407,7 +420,11 @@ class RuleWindow(Window):
         if self.mode == Mode.MANUAL:
             return "Vorschau: nur diese Buchung"
         count = int((frame[Col.rule] == self._draft_id).sum()) if not frame.empty else 0
-        return f"Vorschau: {count} {'Buchung' if count == 1 else 'Buchungen'} erfasst"
+        text = f"Vorschau: {count} {'Buchung' if count == 1 else 'Buchungen'} erfasst"
+        taken = int((frame[TAKEN] != "").sum()) if TAKEN in frame else 0
+        if taken:
+            text += f" · {taken} weitere überschrieben (grau)"
+        return text
 
     def update_state(self) -> None:
         """Title, regex colors, hints and the OK button; cheap enough for every key press."""
@@ -465,7 +482,13 @@ class RuleWindow(Window):
             df[Col.spread_months] = draft.spread_months
             df[Col.residual_percent] = draft.residual_percent
             return df
-        return self.model.preview_rule(self.draft(), self.original_id, self.transaction_id)
+        frame = self.model.preview_rule(self.draft(), self.original_id, self.transaction_id)
+        positions = {rule.id: i for i, rule in enumerate(self.model.rules, start=1)}
+        frame[TAKEN] = [
+            "" if not winner else "Einzelzuordnung" if winner == MANUAL_RULE else f"Regel #{positions.get(winner, '?')}"
+            for winner in frame[OVERRIDDEN]
+        ]
+        return frame
 
     def selected_matches(self, errors: dict[str, str] | None = None) -> tuple[bool, bool] | None:
         """Whether the regexes match the transaction the window was opened for."""
@@ -484,11 +507,10 @@ class RuleWindow(Window):
         return GREEN if self._matches[0 if field == "regex_recipient" else 1] else RED
 
     def _background(self, row: int, key: str):
-        if row != 0 or self.transaction_id is None:
-            return None
         frame = self.table_model.frame
-        if frame.empty or frame[Col.transaction_id].iloc[0] != self.transaction_id:
-            return None
+        if row != 0 or self.transaction_id is None or frame[Col.transaction_id].iloc[0] != self.transaction_id:
+            # a transaction the rule matches that another rule or a manual category takes
+            return TOTAL_BACKGROUND if TAKEN in frame and frame[TAKEN].iat[row] else None
         if self.mode == Mode.MANUAL:
             return GREY
         return GREY if self._matches is None else (GREEN if all(self._matches) else RED)

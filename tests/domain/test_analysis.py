@@ -217,6 +217,7 @@ def test_rule_overview_says_what_each_rule_does():
             "spread_months": 12,
             "residual_percent": 0,
             "count": 2,
+            "overridden": 0,
             "sum": -80.0,
         },
         {
@@ -228,6 +229,7 @@ def test_rule_overview_says_what_each_rule_does():
             "spread_months": 0,
             "residual_percent": 0,
             "count": 0,
+            "overridden": 1,  # Shell matches, but no rule id says so
             "sum": 0.0,
         },
     ]

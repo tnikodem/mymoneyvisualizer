@@ -13,6 +13,7 @@ from mymoneyvisualizer.app import (
     Event,
     InvalidRuleError,
 )
+from mymoneyvisualizer.domain.analysis import OVERRIDDEN
 from mymoneyvisualizer.domain.columns import MANUAL_RULE, Col
 from mymoneyvisualizer.domain.models import LAST_12_MONTHS, ManualCategory, Rule
 from mymoneyvisualizer.importing.profile import ImportProfile
@@ -225,7 +226,26 @@ def test_preview_does_not_override_manual_categories(filled):
     target = filled.account_transactions("giro").iloc[-1][Col.transaction_id]  # REWE
     filled.save_manual_category(ManualCategory(target, "gift"))
     preview = filled.preview_rule(Rule(category="shop", regex_recipient="REWE"))
-    assert preview.empty
+    assert list(preview[Col.category]) == ["gift"]  # the manual category stays
+    assert list(preview[OVERRIDDEN]) == [MANUAL_RULE]
+
+
+def test_later_rules_win_in_the_preview_and_the_overview(filled):
+    """Regression: the overview said 0 transactions while the rule window listed many, those of a later rule."""
+    filled.save_rule(Rule(category="household.bio", regex_description="Bio"))
+    groceries = rule_of(filled, "household.food")  # REWE and EDEKA; EDEKA's "Bio Einkauf" goes to the later rule
+    preview = filled.preview_rule(groceries, groceries.id)
+    by_recipient = preview.set_index(Col.recipient)
+    assert by_recipient.loc["REWE", Col.category] == "household.food"
+    assert by_recipient.loc["REWE", OVERRIDDEN] == ""
+    assert by_recipient.loc["EDEKA", Col.category] == "household.bio"
+    assert by_recipient.loc["EDEKA", OVERRIDDEN] == filled.rules[-1].id
+    overview = filled.rule_overview().set_index(Col.category)
+    assert (overview.loc["household.food", "count"], overview.loc["household.food", OVERRIDDEN]) == (1, 1)
+    assert (overview.loc["household.bio", "count"], overview.loc["household.bio", OVERRIDDEN]) == (1, 0)
+    # a new rule comes last: no other rule wins over it
+    draft = filled.preview_rule(Rule(category="x", regex_recipient="EDEKA"))
+    assert list(draft[OVERRIDDEN]) == [""]
 
 
 def test_save_profile(model, events):

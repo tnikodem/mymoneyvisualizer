@@ -116,6 +116,7 @@ class AppModel:
         self._categorized: pd.DataFrame | None = None
         self._positions: dict[str, int] | None = None
         self._without: tuple[str, pd.DataFrame] | None = None
+        self._later: tuple[str | None, np.ndarray] | None = None
         if raw:
             self._raw: pd.DataFrame | None = None
             self._matcher: RuleMatcher | None = None
@@ -350,20 +351,38 @@ class AppModel:
             self._without = (rule_id, self._apply([r for r in self._rules if r.id != rule_id]))
         return self._without[1]
 
+    def _later_rules_mask(self, rule_id: str | None) -> np.ndarray:
+        """Transactions a rule after ``rule_id`` matches: those rules win over it. Nothing comes after a new rule.
+
+        Cached while the rule is edited in the rule window.
+        """
+        if self._later is None or self._later[0] != rule_id:
+            ids = [r.id for r in self._rules]
+            mask = np.zeros(len(self._combined_raw()), dtype=bool)
+            if rule_id in ids:
+                matcher = self._get_matcher()
+                for later in self._rules[ids.index(rule_id) + 1 :]:
+                    mask |= matcher.mask(later)
+            self._later = (rule_id, mask)
+        return self._later[1]
+
     def preview_rule(
         self, rule: Rule, original_id: str | None = None, transaction_id: str | None = None
     ) -> pd.DataFrame:
-        """Transactions ``rule`` would categorize (shown with its category), the transaction ``transaction_id`` first.
+        """Transactions ``rule`` matches, the transaction ``transaction_id`` first.
 
-        The saved version ``original_id`` is ignored, so the preview shows exactly what the edited rule does.
-        Only the patterns of ``rule`` are evaluated, the rest comes from caches: fast enough per key press.
+        Those the rule categorizes are shown with its category. Those that get their category from a later rule or a
+        manual category keep it and name the winner in the column :data:`~analysis.OVERRIDDEN`. The saved version
+        ``original_id`` is ignored, so the preview shows exactly what the edited rule does at its position; a new rule
+        comes last. Only the patterns of ``rule`` are evaluated, the rest comes from caches: fast enough per key press.
         """
         ids = {r.id for r in self._rules}
-        base = self._categorized_without(original_id) if original_id in ids else self.transactions()
-        if rule_errors(rule):
-            matched = np.zeros(len(base), dtype=bool)
-        else:
-            matched = self._get_matcher().mask(rule) & (base[Col.rule] != MANUAL_RULE).to_numpy()
+        existing = original_id in ids
+        base = self._categorized_without(original_id) if existing else self.transactions()
+        matched = np.zeros(len(base), dtype=bool) if rule_errors(rule) else self._get_matcher().mask(rule)
+        overridden = matched & (
+            (base[Col.rule] == MANUAL_RULE).to_numpy() | self._later_rules_mask(original_id if existing else None)
+        )
         selected = (
             (base[Col.transaction_id] == transaction_id).to_numpy()
             if transaction_id
@@ -371,7 +390,10 @@ class AppModel:
         )
         shown = selected | matched
         rows = base.loc[shown].copy()
-        hit = matched[shown]
+        rows[analysis.OVERRIDDEN] = ""
+        taken = overridden[shown]
+        rows.loc[taken, analysis.OVERRIDDEN] = rows.loc[taken, Col.rule]
+        hit = (matched & ~overridden)[shown]
         rows.loc[hit, Col.category] = rule.category
         rows.loc[hit, Col.rule] = rule.id
         rows.loc[hit, Col.spread_months] = clean_months(rule.spread_months)
@@ -482,7 +504,7 @@ class AppModel:
         )
 
     def rule_overview(self) -> pd.DataFrame:
-        return analysis.rule_overview(self.transactions(), self._rules)
+        return analysis.rule_overview(self.transactions(), self._rules, self._get_matcher())
 
     def budget_series(self) -> budget.BudgetSeries:
         return budget.budget_series(

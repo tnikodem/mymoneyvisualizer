@@ -3,8 +3,8 @@ from PyQt6.QtWidgets import QLineEdit, QMessageBox, QSpinBox
 
 from mymoneyvisualizer.domain.categorization import regex_for
 from mymoneyvisualizer.domain.columns import MANUAL_RULE, Col
-from mymoneyvisualizer.domain.models import ManualCategory
-from mymoneyvisualizer.ui.common import GREEN, GREY, RED
+from mymoneyvisualizer.domain.models import ManualCategory, Rule
+from mymoneyvisualizer.ui.common import GREEN, GREY, RED, TOTAL_BACKGROUND
 from mymoneyvisualizer.ui.rule_window import Mode
 from mymoneyvisualizer.ui.rules_window import OVERVIEW_COLUMNS
 
@@ -173,6 +173,31 @@ def test_rule_explains_itself_in_plain_words(main, model):
     assert window.match_hint.text() == ""
     window.manual_radio.setChecked(True)
     assert window.preview_label.text() == "Vorschau: nur diese Buchung"
+
+
+def test_preview_shows_transactions_a_later_rule_takes(main, model):
+    """REWE is also matched by a later rule for "Einkauf": the groceries rule matches 13, but categorizes none."""
+    model.save_rule(Rule(category="shopping", regex_description="Einkauf"))
+    window = main.rule_window
+    main.open_rule(transaction_id=_transaction(model, "REWE")[Col.transaction_id])
+    assert window.original_id == model.rules[-1].id  # a double click opens the rule that categorizes it
+    main.open_rule(rule_id=rule_of(model, "household.food").id)
+    frame = window.table_model.frame
+    assert set(frame["taken"]) == {f"Regel #{len(model.rules)}"}
+    assert set(frame[Col.category]) == {"shopping"}
+    assert window.preview_label.text() == "Vorschau: 0 Buchungen erfasst · 13 weitere überschrieben (grau)"
+    assert _background(window, 0) == TOTAL_BACKGROUND
+
+    main.show_rules()
+    overview = main.rules_window.table_model
+    row = list(overview.frame[Col.category]).index("household.food")
+    column = _column("overridden")
+    assert overview.data(overview.index(row, _column("count"))) == "0"
+    assert overview.data(overview.index(row, column)) == "13"
+    assert overview.data(overview.index(row, column), Qt.ItemDataRole.ForegroundRole).name() == "#9a5b00"
+    other = list(overview.frame[Col.category]).index("car.fuel")
+    assert overview.data(overview.index(other, column)) == ""
+    assert overview.data(overview.index(other, column), Qt.ItemDataRole.ForegroundRole) is None
 
 
 def test_manual_category(main, model, qtbot):
