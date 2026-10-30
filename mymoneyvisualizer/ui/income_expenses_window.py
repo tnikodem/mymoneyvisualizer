@@ -25,6 +25,7 @@ from mymoneyvisualizer.domain.analysis import (
     ordered_month_range,
     summary_groups,
 )
+from mymoneyvisualizer.domain.budget import IN_PERIOD, SOLD, SPREAD_FROM, SPREAD_TO
 from mymoneyvisualizer.domain.categories import display_category
 from mymoneyvisualizer.domain.columns import Col
 from mymoneyvisualizer.ui.budget_window import ACCRUAL_DETAILS
@@ -50,6 +51,7 @@ from mymoneyvisualizer.ui.table_model import (
     format_money,
     format_month,
     format_month_range,
+    format_months,
 )
 
 if TYPE_CHECKING:
@@ -75,9 +77,13 @@ HELP = (
 )
 DETAIL_HELP = "Doppelklick auf eine Buchung ändert ihre Kategorie."
 BUDGET_DETAIL_HELP = (
-    "Die Buchungen in Zahlungssicht. Im Budget sind verteilte Zahlungen anteilig enthalten, auch aus früheren Monaten;"
-    " die Summe kann dort abweichen. " + DETAIL_HELP
+    "<p>Alle Zahlungen, die periodengerecht in den Zeitraum zählen: auch frühere, die in den Zeitraum hineinverteilt"
+    " sind, und von Zahlungen, die über den Zeitraum hinaus verteilt sind, nur ihr Anteil.</p>"
+    "<p><b>im Zeitraum</b> ist dieser Anteil; zusammen ergeben die Zeilen den Wert im Budget.</p>"
+    f"<p>{DETAIL_HELP}</p>"
 )
+#: columns of the budget detail: how long a transaction is spread, the amount that counts in the period as text
+SPREAD, AMOUNT = "spread", "amount_in_period"
 SUMMARY_TIPS = {
     INCOME: "Alle Kategorien der Budgetgruppe Einkommen.",
     EXPENSES: "Alle Kategorien der Budgetgruppen Grundbedarf und Wünsche.",
@@ -95,6 +101,43 @@ DETAIL_COLUMNS = [
     Column(Col.category, "Kategorie", CATEGORY, 160),
     Column(Col.spread_months, "Verteilt über", MONTHS, 90, tooltip="Im Budget über so viele Monate verteilt."),
 ]
+
+
+BUDGET_DETAIL_COLUMNS = [
+    Column(Col.transaction_id, "id", hidden=True),
+    Column(Col.date, "bezahlt am", DATE, 90),
+    Column(Col.recipient, "Empfänger", width=220),
+    Column(Col.description, "Verwendungszweck", width=320),
+    Column(
+        AMOUNT,
+        "Betrag im Zeitraum",
+        width=240,
+        amount=IN_PERIOD,
+        tooltip="So viel der Zahlung zählt im Zeitraum; in Klammern der ganze Betrag, wenn nur ein Teil hineinzählt",
+    ),
+    Column(
+        SPREAD,
+        "verteilt über",
+        width=120,
+        tooltip="Auf so viele Monate ist die Zahlung verteilt, ab dem Monat der Zahlung",
+    ),
+    Column(Col.category, "Kategorie", CATEGORY, 160),
+    Column(Col.account, "Konto", width=110),
+]
+
+
+def spread_text(row) -> str:
+    """``10 Jahre``; for a purchase whose sale is included the months until the sale; ``""`` if not spread."""
+    months = (row[SPREAD_TO] - row[SPREAD_FROM]).n + 1
+    text = format_months(months) if months > 1 else ""
+    return f"{text} (verkauft)" if row[SOLD] else text
+
+
+def amount_text(row) -> str:
+    """``-75,00 € (von insg. -900,00 €)`` if only a part of the payment counts in the period, else ``-900,00 €``."""
+    part, total = float(row[IN_PERIOD]), float(row[Col.value])
+    text = f"{format_money(part)} €"
+    return text if abs(part - total) < 0.005 else f"{text} (von insg. {format_money(total)} €)"
 
 
 def default_months(last_date=None, today: pd.Timestamp | None = None) -> tuple[str, str]:
@@ -376,6 +419,10 @@ class IncomeExpensesWindow(Window):
         self.navigator.open_detail(key, categories, self.filter_edit.text(), title)
 
 
+def count_text(count: int) -> str:
+    return f"{count} {'Buchung' if count == 1 else 'Buchungen'}"
+
+
 class DetailWindow(Window):
     """Transactions of some categories in some months or in all months; a double click categorizes one."""
 
@@ -387,7 +434,8 @@ class DetailWindow(Window):
         self.resize(1400, 800)
         self.opened = False
         self.month: str | None = None
-        self.end: str | None = None
+        #: first month, last month and months with data of a budget detail; None: transactions as paid
+        self.budget: tuple[pd.Period, pd.Period, int] | None = None
         self.categories: list[str] | None = None
         self.category_filter = ""
         self.label = make_label("", self, "heading", wrap=True)
@@ -413,34 +461,56 @@ class DetailWindow(Window):
         categories: Sequence[str] | None,
         category_filter: str = "",
         title: str = "",
-        end: str | None = None,
     ) -> None:
-        """Show the transactions of ``categories`` (``None``: all) in ``month`` to ``end`` (``None``: all months)."""
+        """Show the transactions of ``categories`` (``None``: all) as paid in ``month`` (``None``: all months)."""
+        self.month, self.budget = month, None
+        when = "alle Monate" if month is None else format_month(month)
+        self._open(categories, title, when, DETAIL_HELP, category_filter)
+
+    def open_budget_detail(
+        self, start: pd.Period, end: pd.Period, categories: Sequence[str] | None, title: str = "", months: int = 0
+    ) -> None:
+        """Show what counts in the budget of ``start`` to ``end``: also spread payments made before, and only the
+        share of payments spread beyond. ``months`` with data give the average per month (default: all)."""
+        self.budget = (start, end, months or (end - start).n + 1)
+        self._open(categories, title, f"{format_month_range(start, end)}, periodengerecht", BUDGET_DETAIL_HELP)
+
+    def _open(self, categories, title: str, when: str, help_text: str, category_filter: str = "") -> None:
         self.opened = True
-        self.month, self.end = month, end
         self.categories = None if categories is None else list(categories)
         self.category_filter = category_filter
         what = title or (
             "alle Kategorien" if categories is None else ", ".join(display_category(c) for c in categories)
         )
-        when = "alle Monate" if month is None else format_month_range(month, end or month)
         self.setWindowTitle(f"{what}: {when}")
         self.label.setText(f"{what} · {when}")
-        self.help_button.text_ = BUDGET_DETAIL_HELP if end is not None else DETAIL_HELP
-        self.help_button.setToolTip(self.help_button.text_)
+        self.help_button.text_ = help_text
+        self.help_button.setToolTip(help_text)
         self.refresh()
         self.show()
         self.raise_()
 
     def refresh(self) -> None:
         super().refresh()
-        if self.opened:
-            frame = self.model.detail(self.month, self.categories, category_filter=self.category_filter, end=self.end)
-            self.table_model.set_frame(frame)
-            count = len(frame)
-            self.summary_label.setText(
-                f"{count} {'Buchung' if count == 1 else 'Buchungen'} · Summe {format_money(frame[Col.value].sum())} €"
-            )
+        if not self.opened:
+            return
+        if self.budget is None:
+            frame = self.model.detail(self.month, self.categories, category_filter=self.category_filter)
+            self.table_model.set_frame(frame, DETAIL_COLUMNS)
+            total = format_money(frame[Col.value].sum())
+            self.summary_label.setText(f"{count_text(len(frame))} · Summe {total} €")
+            return
+        start, end, months = self.budget
+        frame = self.model.budget_contributions(start, end, self.categories)
+        rows = [row for _, row in frame.iterrows()]
+        frame[SPREAD] = [spread_text(row) for row in rows]
+        frame[AMOUNT] = [amount_text(row) for row in rows]
+        self.table_model.set_frame(frame, BUDGET_DETAIL_COLUMNS)
+        total = float(frame[IN_PERIOD].sum())
+        self.summary_label.setText(
+            f"{count_text(len(frame))} · im Zeitraum {format_money(total)} € · Ø {format_money(total / months)} € pro"
+            " Monat"
+        )
 
     def open_rule(self, index) -> None:
         self.navigator.open_rule(transaction_id=self.table.row_at(index.row())[Col.transaction_id])

@@ -7,6 +7,7 @@ from collections.abc import Sequence
 from functools import cached_property
 from pathlib import Path
 
+import pandas as pd
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import (
     QFileDialog,
@@ -314,9 +315,13 @@ class MainWindow(QMainWindow):
         categories: Sequence[str] | None,
         category_filter: str = "",
         title: str = "",
-        end: str | None = None,
     ) -> None:
-        self.detail_window.open_detail(month, categories, category_filter, title, end)
+        self.detail_window.open_detail(month, categories, category_filter, title)
+
+    def open_budget_detail(
+        self, start: pd.Period, end: pd.Period, categories: Sequence[str] | None, title: str = "", months: int = 0
+    ) -> None:
+        self.detail_window.open_budget_detail(start, end, categories, title, months)
 
     def open_import(self, path: str | Path, account: str) -> None:
         self.import_window.open_file(path, account)

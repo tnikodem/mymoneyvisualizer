@@ -321,6 +321,16 @@ def test_budget_and_overview(filled):
     assert overview.loc["household.food", "count"] == 2
 
 
+def test_custom_budget_period_and_what_counts_in_it(filled):
+    filled.set_budget_period("2024-01:2024-12")
+    assert filled.budget_months() == (pd.Period("2024-01", "M"), pd.Period("2024-02", "M"))  # complete months
+    report = filled.budget_report()
+    rows = filled.budget_contributions(*filled.budget_months(), ["household"])
+    assert list(rows[Col.recipient]) == ["REWE", "EDEKA"]
+    assert -rows["in_period"].sum() == pytest.approx(report.needs.categories[0][1])
+    assert len(filled.budget_contributions(*filled.budget_months())) == 5  # all but the internal transfers
+
+
 def test_budget_periods_cover_complete_months_with_data(filled):
     """The data ends in February 2024; the current month never counts, it is not over yet."""
     month = pd.Period

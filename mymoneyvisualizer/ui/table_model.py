@@ -34,6 +34,8 @@ class Column:
     hidden: bool = False
     #: explanation shown when the mouse rests on the column header
     tooltip: str = ""
+    #: for a text that shows an amount of money: the column of that amount, which sorts, aligns and colors it
+    amount: str = ""
 
 
 def _is_missing(value: Any) -> bool:
@@ -138,6 +140,7 @@ class DataFrameModel(QAbstractTableModel):
         self.sorting: tuple[str, Qt.SortOrder] | None = None
         self._frame = pd.DataFrame(columns=[c.key for c in self.columns])
         self._arrays: list[np.ndarray | None] = []
+        self._amounts: list[np.ndarray | None] = []
 
     @property
     def frame(self) -> pd.DataFrame:
@@ -156,6 +159,9 @@ class DataFrameModel(QAbstractTableModel):
     def _set(self, frame: pd.DataFrame) -> None:
         self._frame = self._sorted(frame)
         self._arrays = [self._frame[c.key].to_numpy() if c.key in self._frame else None for c in self.columns]
+        self._amounts = [
+            self._frame[c.amount].to_numpy() if c.amount and c.amount in self._frame else None for c in self.columns
+        ]
 
     def _sorted(self, frame: pd.DataFrame) -> pd.DataFrame:
         """Sorted rows; pinned rows follow at the bottom in their own order."""
@@ -167,7 +173,11 @@ class DataFrameModel(QAbstractTableModel):
             key, order = self.sorting
             column = next((c for c in self.columns if c.key == key), None)
             if column is not None and key in frame:
-                keys = _sort_values(frame[key], column.kind)
+                keys = (
+                    _sort_values(frame[column.amount], MONEY)
+                    if column.amount
+                    else _sort_values(frame[key], column.kind)
+                )
                 frame = frame.iloc[np.argsort(keys.to_numpy(), kind="stable")]
                 if order == Qt.SortOrder.DescendingOrder:
                     frame = frame.iloc[::-1]
@@ -206,7 +216,8 @@ class DataFrameModel(QAbstractTableModel):
             return None
         column = self.columns[index.column()]
         if role == Qt.ItemDataRole.TextAlignmentRole:
-            return int(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter) if column.kind in NUMERIC else None
+            right = column.kind in NUMERIC or column.amount
+            return int(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter) if right else None
         if role == Qt.ItemDataRole.BackgroundRole:
             return self.background(index.row(), column.key) if self.background is not None else None
         if role == Qt.ItemDataRole.ToolTipRole:
@@ -216,8 +227,12 @@ class DataFrameModel(QAbstractTableModel):
         array = self._arrays[index.column()]
         value = None if array is None else array[index.row()]
         if role == Qt.ItemDataRole.ForegroundRole:  # money that comes in is green
-            positive = column.kind in (MONEY, MONEY0) and not _is_missing(value) and float(value) >= 0.5
-            return INCOMING if positive else None
+            amounts = self._amounts[index.column()]
+            if amounts is not None:
+                value = amounts[index.row()]
+            elif column.kind not in (MONEY, MONEY0):
+                return None
+            return INCOMING if not _is_missing(value) and float(value) >= 0.5 else None
         return format_value(value, column.kind) if role == Qt.ItemDataRole.DisplayRole else sort_key(value, column.kind)
 
 

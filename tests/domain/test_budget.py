@@ -2,15 +2,21 @@ import pandas as pd
 import pytest
 
 from mymoneyvisualizer.domain.budget import (
+    IN_PERIOD,
     SAVED,
+    SOLD,
+    SPREAD_FROM,
+    SPREAD_TO,
     BudgetSeries,
     budget_report,
     budget_series,
+    contributions,
     group_totals,
     period_months,
     previous_months,
     smooth,
 )
+from mymoneyvisualizer.domain.columns import Col
 from mymoneyvisualizer.domain.models import LAST_12_MONTHS, GroupAssignment
 
 from ..helpers import categorized
@@ -145,3 +151,45 @@ def test_period_months():
     assert period_months("2025", last) == (pd.Period("2025-01", "M"), pd.Period("2025-12", "M"))
     assert period_months("2026", last) == (pd.Period("2026-01", "M"), last)  # only complete months
     assert previous_months(*period_months("2026", last)) == (pd.Period("2025-01", "M"), pd.Period("2025-09", "M"))
+    assert period_months("2025-03:2025-08", last) == (pd.Period("2025-03", "M"), pd.Period("2025-08", "M"))
+    assert period_months("2026-03:2026-12", last) == (pd.Period("2026-03", "M"), last)  # only complete months
+
+
+def _month(text):
+    return pd.Period(text, freq="M")
+
+
+def test_contributions_of_a_period_include_spread_payments_made_before():
+    df = categorized(
+        ("2024-01-10", "Möbelhaus", "Sofa", -2400.0),  # 10 years: 20 € per month
+        ("2025-03-05", "REWE", "x", -10.0),
+        ("2025-06-01", "HUK", "Kfz", -600.0),  # June 2025 to May 2026: 50 € per month
+        ("2025-07-01", "Ich", "Sparen", -100.0),  # internal transfer
+        categories=["home.sofa", "food", "insurance", "spar"],
+        spread_months=[120, 0, 12, 0],
+    )
+    rows = contributions(df, _month("2025-01"), _month("2025-12"), own_accounts=["spar"])
+    assert list(rows[Col.recipient]) == ["Möbelhaus", "REWE", "HUK"]
+    assert list(rows[IN_PERIOD]) == [-240.0, -10.0, -350.0]  # the insurance counts 7 of its 12 months
+    assert (rows[SPREAD_FROM].iloc[0], rows[SPREAD_TO].iloc[0]) == (_month("2024-01"), _month("2033-12"))
+    assert not rows[SOLD].any()
+    only = contributions(df, _month("2025-01"), _month("2025-12"), categories=["home"])
+    assert list(only[Col.recipient]) == ["Möbelhaus"]  # main categories
+    assert contributions(df, _month("2023-01"), _month("2023-12")).empty
+
+
+def test_contributions_of_a_sold_purchase():
+    """A car for 30,000 € sold for 10,000 € after 18 months: 20,000 € over 18 months; the sale has no row."""
+    df = categorized(
+        ("2024-01-15", "Autohaus", "Auto", -30000.0),
+        ("2025-06-20", "Max Mustermann", "Verkauf Auto", 10000.0),
+        categories=["car", "car"],
+        spread_months=[60, 0],
+        residual_percent=[40, 0],
+    )
+    df.loc[1, Col.sale_of] = df.loc[0, Col.transaction_id]
+    rows = contributions(df, _month("2025-01"), _month("2025-12"))
+    assert list(rows[Col.recipient]) == ["Autohaus"]
+    assert rows[IN_PERIOD].iloc[0] == pytest.approx(-20000 / 18 * 6, abs=0.01)
+    assert rows[SPREAD_TO].iloc[0] == _month("2025-06")
+    assert rows[SOLD].iloc[0]

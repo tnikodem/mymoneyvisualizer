@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import re
 import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
@@ -138,7 +139,7 @@ class ManualCategory:
 
 @dataclass
 class GroupAssignment:
-    """Puts a main category into a budget group. The list order is the stacking order of the budget graph."""
+    """Puts a main category into a budget group. The list order is the order of the categories in the budget."""
 
     category: str
     group: str = GROUP_NEEDS
@@ -152,16 +153,30 @@ class GroupAssignment:
         return {"category": self.category, "group": self.group}
 
 
+_YEAR = re.compile(r"\d{4}")
+_MONTHS = re.compile(r"(\d{4}-(?:0[1-9]|1[0-2])):(\d{4}-(?:0[1-9]|1[0-2]))")
+
+
+def custom_period(start: str, end: str) -> str:
+    """A budget period of your own from month ``start`` to month ``end`` (``YYYY-MM``)."""
+    return f"{start}:{end}"
+
+
 def valid_budget_period(value: Any) -> bool:
-    """The last twelve complete months or a calendar year such as ``"2025"``."""
-    return value == LAST_12_MONTHS or (isinstance(value, str) and len(value) == 4 and value.isdigit())
+    """The last twelve complete months, a calendar year such as ``"2025"`` or a :func:`custom_period`."""
+    if value == LAST_12_MONTHS:
+        return True
+    if not isinstance(value, str):
+        return False
+    months = _MONTHS.fullmatch(value)
+    return bool(_YEAR.fullmatch(value)) or (months is not None and months.group(1) <= months.group(2))
 
 
 @dataclass
 class Settings:
     excluded_categories: list[str] = field(default_factory=list)
     hide_internal_transfers: bool = True
-    #: :data:`LAST_12_MONTHS` or a year such as ``"2025"``
+    #: :data:`LAST_12_MONTHS`, a year such as ``"2025"`` or a :func:`custom_period` such as ``"2025-03:2026-02"``
     budget_period: str = LAST_12_MONTHS
     #: target shares of the net income for needs and wants
     budget_shares: dict[str, float] = field(default_factory=lambda: dict(DEFAULT_BUDGET_SHARES))

@@ -116,18 +116,24 @@ of both windows (*Zahlungssicht* and *periodengerecht*) and their **?** explain 
 
 4. Budget (accrual basis, 50/30/20)
 -----------------------------------
-**Zeitraum** is the last twelve complete months (the default) or a calendar year. The current month only counts
-when it is over, so a half month does not distort the averages.
+**Zeitraum** is the last twelve complete months (the default), a calendar year or **Eigener Zeitraum** from one month
+to another. The current month only counts when it is over, so a half month does not distort the averages.
 
 Four key figures answer the main question: **Nettoeinkommen** and **Konsumausgaben** per month, the **Sparquote**
 (savings rate) against its target and the **Abstand zum Sparziel**: how much you could spend more per month, or
 should spend less, to reach the savings target. Below, **Kategorien** lists per month every budget group and main
-category with its share of the income and the change against the same months a year before (red: worse, green:
-better), so large cost factors and growing ones stand out. A click on a row shows its development in the chart next
-to it, a double click lists its transactions.
+category with its share of the income and, for a period of 12 months, the change against the 12 months before (red:
+worse, green: better), so large cost factors and growing ones stand out. A click on a row shows its development in
+the chart next to it, another click (or Escape, or **Gesamt** in the path above the chart) the whole again. A double
+click lists everything that counts in the period: also payments made before and spread into it, and of payments
+spread beyond it only their share (**Betrag im Zeitraum**, with the whole amount in brackets) and how long they are
+spread; together they add up to the value in the budget.
 
-Every main category belongs to a budget group; choose it in the row of the category. New main categories into which
-more money comes than goes out start as income, all others as needs. The targets of the groups are set in their rows.
+Drag a category in **Kategorien** to change its order (also in the chart) or, dropped into another group, its group;
+a drag selects nothing, so the chart stays as it is, also in the overall view.
+Every main category belongs to a budget group. **Gruppen & Ziele** opens a window with a list per group: drag a
+category into another list or use its context menu, and set the targets of the groups there. New main categories into
+which more money comes than goes out start as income, all others as needs.
 
 | group                         | share of the net income | examples                                               |
 |-------------------------------|-------------------------|--------------------------------------------------------|
@@ -143,7 +149,10 @@ how much you could spend more per month or should spend less (distance to the sa
 depend on inflation, so nothing is adjusted for it.
 
 The chart shows the moving average of the last 12 months, the long-term view, from the first month with a full year
-before it; uncheck **gleitender Ø 12 Monate** for the single months. The chosen period is shaded.
+before it; uncheck **gleitender Ø 12 Monate** for the single months. Two blue lines mark the period, another one
+shows the average in it. Zoom with the mouse wheel or **+** and **−**, drag to move, **↺** shows all.
+The mouse on an area shows its value in that month, a click lists its transactions (for the moving average those of
+the 12 months up to it).
 
 Simulating the future with scenarios (inflation, retirement, crises) is the job of
 [futureplanner](https://github.com/tnikodem/futureplanner); the spread monthly amounts per category are its input.

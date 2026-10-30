@@ -491,13 +491,12 @@ class AppModel:
             own_accounts=self._own_accounts(self._settings.hide_internal_transfers),
         )
 
-    def detail(self, month, categories: Sequence[str] | None, *, category_filter: str = "", end=None) -> pd.DataFrame:
-        """Transactions of ``categories`` (``None``: all) in ``month`` to ``end`` (``None``: all months)."""
+    def detail(self, month, categories: Sequence[str] | None, *, category_filter: str = "") -> pd.DataFrame:
+        """Transactions of ``categories`` (``None``: all) in ``month`` (``None``: all months)."""
         return analysis.detail_transactions(
             self.transactions(),
             month,
             categories,
-            end=end,
             excluded_categories=self._settings.excluded_categories,
             own_accounts=self._own_accounts(self._settings.hide_internal_transfers),
             category_filter=category_filter,
@@ -539,6 +538,19 @@ class AppModel:
             return None
         months = budget.period_months(self._settings.budget_period, analysis.last_complete_month(series.last_date))
         return budget.previous_months(*months) if previous else months
+
+    def budget_contributions(
+        self, start: pd.Period, end: pd.Period, categories: Sequence[str] | None = None
+    ) -> pd.DataFrame:
+        """The transactions that count in the budget of ``start`` to ``end``, see :func:`budget.contributions`."""
+        return budget.contributions(
+            self.transactions(),
+            start,
+            end,
+            own_accounts=self._own_accounts(),
+            excluded_categories=self._settings.excluded_categories,
+            categories=categories,
+        )
 
     def budget_report(
         self, series: budget.BudgetSeries | None = None, previous: bool = False

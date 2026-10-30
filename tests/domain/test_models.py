@@ -10,7 +10,9 @@ from mymoneyvisualizer.domain.models import (
     Settings,
     clean_months,
     clean_percent,
+    custom_period,
     reorder_groups,
+    valid_budget_period,
 )
 
 
@@ -62,6 +64,25 @@ def test_group_assignment_unknown_category():
     assert GroupAssignment.from_dict({"category": "", "group": "income"}) == GroupAssignment("", "income")
     assert GroupAssignment.from_dict({"category": "x", "group": "nonsense"}).group == "needs"
     assert GroupAssignment.from_dict({"category": "x"}).to_dict() == {"category": "x", "group": "needs"}
+
+
+@pytest.mark.parametrize(
+    ("period", "valid"),
+    [
+        ("last 12 months", True),
+        ("2025", True),
+        ("2025-03:2026-02", True),
+        ("2025-03:2025-03", True),
+        ("2026-02:2025-03", False),
+        ("2025-13:2026-01", False),
+        ("25", False),
+        (2025, False),
+    ],
+)
+def test_budget_periods(period, valid):
+    assert valid_budget_period(period) is valid
+    if valid and isinstance(period, str) and ":" in period:
+        assert custom_period(*period.split(":")) == period
 
 
 def test_settings_defaults():

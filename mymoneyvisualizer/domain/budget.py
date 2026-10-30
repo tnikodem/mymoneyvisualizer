@@ -10,9 +10,19 @@ from __future__ import annotations
 from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
 
+import numpy as np
 import pandas as pd
 
-from mymoneyvisualizer.domain.accrual import accrue
+from mymoneyvisualizer.domain.accrual import (
+    AMOUNT,
+    FIRST,
+    LAST,
+    accrue,
+    linked_sales,
+    month_numbers,
+    schedule,
+    to_period,
+)
 from mymoneyvisualizer.domain.analysis import filter_transactions
 from mymoneyvisualizer.domain.categories import category_at_level
 from mymoneyvisualizer.domain.columns import Col
@@ -31,6 +41,8 @@ from mymoneyvisualizer.domain.models import (
 SMOOTHING_MONTHS = 12
 #: Column of :func:`group_totals`: income minus needs and wants.
 SAVED = "saved"
+#: Columns of :func:`contributions`.
+IN_PERIOD, SPREAD_FROM, SPREAD_TO, SOLD = "in_period", "spread_from", "spread_to", "sold"
 
 
 @dataclass
@@ -72,10 +84,14 @@ def smooth(monthly: pd.DataFrame) -> pd.DataFrame:
 def period_months(period: str, last_month: pd.Period) -> tuple[pd.Period, pd.Period]:
     """First and last month of a budget period, at most up to ``last_month`` (the last complete month).
 
-    :data:`LAST_12_MONTHS` are the twelve months up to ``last_month``, any other period is a calendar year.
+    :data:`LAST_12_MONTHS` are the twelve months up to ``last_month``; a year such as ``"2025"`` is that calendar year,
+    ``"2025-03:2026-02"`` the months from March 2025 to February 2026.
     """
     if period == LAST_12_MONTHS:
         return last_month - (SMOOTHING_MONTHS - 1), last_month
+    if ":" in period:
+        start, end = period.split(":")
+        return pd.Period(start, freq="M"), min(pd.Period(end, freq="M"), last_month)
     year = int(period)
     return pd.Period(f"{year}-01", freq="M"), min(pd.Period(f"{year}-12", freq="M"), last_month)
 
@@ -83,6 +99,39 @@ def period_months(period: str, last_month: pd.Period) -> tuple[pd.Period, pd.Per
 def previous_months(start: pd.Period, end: pd.Period) -> tuple[pd.Period, pd.Period]:
     """The year before: the same months one year earlier."""
     return start - 12, end - 12
+
+
+def contributions(
+    categorized: pd.DataFrame,
+    start: pd.Period,
+    end: pd.Period,
+    *,
+    own_accounts: Collection[str] = (),
+    excluded_categories: Collection[str] = (),
+    categories: Collection[str] | None = None,
+) -> pd.DataFrame:
+    """Every transaction that counts in the months ``start`` to ``end`` on the accrual basis, oldest first.
+
+    That includes payments made before ``start`` and spread into the period, and of a payment spread beyond the
+    period only its share. :data:`IN_PERIOD` is the amount the transaction contributes to the period,
+    :data:`SPREAD_FROM` and :data:`SPREAD_TO` the months it is spread over, :data:`SOLD` marks a purchase whose sale is
+    included (its sale has no row of its own). ``categories`` are main categories (``None``: all). Together the rows add
+    up to the budget of the period.
+    """
+    data = filter_transactions(categorized, excluded_categories=excluded_categories, own_accounts=own_accounts)
+    plan = schedule(data)
+    if categories is not None:
+        plan = plan.loc[category_at_level(plan[Col.category], 0).isin(list(categories)).to_numpy()]
+    first, last = month_numbers(pd.Series([start.start_time, end.start_time]))
+    overlap = (np.minimum(plan[LAST], last) - np.maximum(plan[FIRST], first) + 1).clip(lower=0)
+    plan, overlap = plan.loc[overlap > 0], overlap[overlap > 0]
+    rows = data.loc[plan.index].copy()
+    rows[IN_PERIOD] = (plan[AMOUNT] * overlap).round(2)
+    rows[SPREAD_FROM] = [to_period(int(m)) for m in plan[FIRST]]
+    rows[SPREAD_TO] = [to_period(int(m)) for m in plan[LAST]]
+    sold = data.index[list(linked_sales(data))]
+    rows[SOLD] = rows.index.isin(sold)
+    return rows.sort_values(Col.date, kind="stable").reset_index(drop=True)
 
 
 def _group_of(groups: Sequence[GroupAssignment]) -> dict[str, str]:

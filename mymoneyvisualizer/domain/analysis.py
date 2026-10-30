@@ -211,9 +211,8 @@ def detail_transactions(
     excluded_categories: Collection[str] = (),
     own_accounts: Collection[str] = (),
     category_filter: str = "",
-    end: MonthLike | None = None,
 ) -> pd.DataFrame:
-    """Transactions of ``categories`` (with their subcategories) in ``month`` (to ``end``), oldest first.
+    """Transactions of ``categories`` (with their subcategories) in ``month``, oldest first.
 
     ``categories=None`` means all categories, ``month=None`` all months.
     """
@@ -221,7 +220,7 @@ def detail_transactions(
         df, excluded_categories=excluded_categories, own_accounts=own_accounts, category_filter=category_filter
     )
     if month is not None:
-        data = in_months(data, month, month if end is None else end)
+        data = in_months(data, month, month)
     if categories is not None:
         mask = pd.Series(False, index=data.index)
         for category in categories:
