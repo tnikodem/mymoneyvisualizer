@@ -9,7 +9,7 @@ import pandas as pd
 from mymoneyvisualizer.domain.columns import UNTAGGED
 
 SEPARATOR = "."
-UNTAGGED_LABEL = "unassigned"
+UNTAGGED_LABEL = "(no tag)"
 
 
 def base_tag(tag: str) -> str:

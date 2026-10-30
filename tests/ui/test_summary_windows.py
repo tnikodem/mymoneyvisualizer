@@ -98,7 +98,7 @@ def test_double_click_opens_detail(main, window):
     columns = [c.key for c in window.table_model.columns]
     frame = window.table.displayed_frame()
     car_row = frame.index[frame[Col.tag] == "car"][0]
-    window.table.doubleClicked.emit(window.table.proxy.index(car_row, columns.index("2023-07")))
+    window.table.doubleClicked.emit(window.table.model().index(car_row, columns.index("2023-07")))
     detail = main.detail_window
     assert detail.isVisible()
     # regression: carsharing was listed under car
@@ -106,11 +106,11 @@ def test_double_click_opens_detail(main, window):
     assert "car in 2023-07" in detail.windowTitle()
 
     total_row = len(frame) - 1
-    window.table.doubleClicked.emit(window.table.proxy.index(total_row, columns.index("2024-01")))
+    window.table.doubleClicked.emit(window.table.model().index(total_row, columns.index("2024-01")))
     assert list(detail.table_model.frame[Col.recipient]) == ["REWE", "Kiosk"]
     assert detail.label.text().startswith("All transactions in 2024-01 for all tags")
 
-    window.table.doubleClicked.emit(window.table.proxy.index(0, columns.index(TOTAL)))
+    window.table.doubleClicked.emit(window.table.model().index(0, columns.index(TOTAL)))
     assert detail.month == "2024-01"  # unchanged
 
 
@@ -118,8 +118,8 @@ def test_detail_follows_changes_and_opens_tagger(main, model, window):
     main.open_detail("2024-01", "")
     detail = main.detail_window
     assert list(detail.table_model.frame[Col.recipient]) == ["Kiosk"]
-    assert "unassigned" in detail.windowTitle()
-    detail.table.doubleClicked.emit(detail.table.proxy.index(0, 2))
+    assert "(no tag)" in detail.windowTitle()
+    detail.table.doubleClicked.emit(detail.table.model().index(0, 2))
     assert main.tagger_window.recipient_edit.text() == "Kiosk"
     main.tagger_window.tag_edit.setText("hobby")
     main.tagger_window.accept()

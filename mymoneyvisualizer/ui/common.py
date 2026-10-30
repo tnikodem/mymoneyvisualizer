@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Sequence
 
-from PyQt6.QtCore import QMargins, QObject, QPoint, QRect, QSize, pyqtSignal
+from PyQt6.QtCore import QMargins, QObject, QPoint, QRect, QSize, QTimer, pyqtSignal
 from PyQt6.QtGui import QColor, QShowEvent
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QMainWindow, QMessageBox, QWidget
 from pyqt6_multiselect_combobox import MultiSelectComboBox
@@ -82,13 +82,31 @@ class Window(QMainWindow):
     """
 
     topics: frozenset[str] = frozenset()
+    #: Changes are collected this long and then shown with one refresh (``None``: refresh at once).
+    REFRESH_DELAY_MS: int | None = 150
 
     def __init__(self, model: AppModel, bridge: ModelBridge, parent: QWidget | None = None):
         super().__init__(parent)
         self.model = model
         self._dirty = True
         self._placed = False
+        self._refresh_timer = QTimer(self)
+        self._refresh_timer.setSingleShot(True)
+        self._refresh_timer.timeout.connect(self.refresh)
         bridge.changed.connect(self._on_changed)
+
+    def schedule_refresh(self, *_args) -> None:
+        """Refresh soon; several changes in a row (e.g. typing) cause only one refresh."""
+        if self.REFRESH_DELAY_MS is None:
+            self.refresh()
+        else:
+            self._refresh_timer.start(self.REFRESH_DELAY_MS)
+
+    def flush(self) -> None:
+        """Run a scheduled refresh now."""
+        if self._refresh_timer.isActive():
+            self._refresh_timer.stop()
+            self.refresh()
 
     def place_on_screen(self) -> None:
         parent = self.parentWidget()
@@ -110,7 +128,7 @@ class Window(QMainWindow):
         if not topics & self.topics:
             return
         if self.isVisible():
-            self.refresh()
+            self.schedule_refresh()
         else:
             self._dirty = True
 
@@ -124,6 +142,7 @@ class Window(QMainWindow):
 
     def refresh(self) -> None:
         self._dirty = False
+        self._refresh_timer.stop()
 
     def confirm(self, title: str, text: str) -> bool:
         answer = QMessageBox.question(self, title, text)

@@ -8,6 +8,7 @@ from collections.abc import Callable, Iterable, Mapping
 from dataclasses import replace
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from mymoneyvisualizer.domain import analysis, budget
@@ -22,7 +23,7 @@ from mymoneyvisualizer.domain.models import (
     recurring_to_float,
     reorder_categories,
 )
-from mymoneyvisualizer.domain.tagging import apply_taggers, tagger_errors, tagger_mask
+from mymoneyvisualizer.domain.tagging import TagMatcher, apply_taggers, tagger_errors
 from mymoneyvisualizer.domain.tags import unique_base_tags, unique_tags
 from mymoneyvisualizer.importing.profile import ImportProfile
 from mymoneyvisualizer.storage.backup import create_backup, restore_backup
@@ -82,7 +83,7 @@ class AppModel:
     def __init__(self, repository: Repository):
         self.repository = repository
         self.changed = Event()
-        self._tagged: pd.DataFrame | None = None
+        self._invalidate(raw=True)
         self.reload()
 
     @classmethod
@@ -97,14 +98,23 @@ class AppModel:
         self._categories = state.categories
         self._profiles = state.profiles
         self._settings = state.settings
-        self._tagged = None
+        self._invalidate(raw=True)
         self._ensure_categories()
         self.changed.emit(ALL_TOPICS)
 
-    def _notify(self, *topics: str) -> None:
+    def _invalidate(self, raw: bool = False) -> None:
+        """Drop cached results; ``raw`` when transactions were added, removed or moved between accounts."""
+        self._tagged: pd.DataFrame | None = None
+        self._positions: dict[str, int] | None = None
+        self._without: tuple[str, pd.DataFrame] | None = None
+        if raw:
+            self._raw: pd.DataFrame | None = None
+            self._matcher: TagMatcher | None = None
+
+    def _notify(self, *topics: str, raw: bool = False) -> None:
         topics = set(topics)
-        if TRANSACTIONS in topics or TAGGERS in topics:
-            self._tagged = None
+        if raw or TRANSACTIONS in topics or TAGGERS in topics:
+            self._invalidate(raw)
             if self._ensure_categories():
                 topics.add(CATEGORIES)
         self.changed.emit(frozenset(topics))
@@ -138,15 +148,27 @@ class AppModel:
         return copy.deepcopy(self._settings)
 
     def _combined_raw(self) -> pd.DataFrame:
-        frames = [df.assign(**{Col.account: name}) for name, df in self._accounts.items() if not df.empty]
-        if not frames:
-            return empty_transactions().assign(**{Col.account: pd.Series(dtype=str)})
-        return pd.concat(frames, ignore_index=True)
+        if self._raw is None:
+            frames = [df.assign(**{Col.account: name}) for name, df in self._accounts.items() if not df.empty]
+            if frames:
+                self._raw = pd.concat(frames, ignore_index=True)
+            else:
+                self._raw = empty_transactions().assign(**{Col.account: pd.Series(dtype=str)})
+        return self._raw
+
+    def _get_matcher(self) -> TagMatcher:
+        """Regex results per distinct text; kept while the transactions stay the same."""
+        if self._matcher is None:
+            self._matcher = TagMatcher(self._combined_raw())
+        return self._matcher
+
+    def _apply(self, taggers: list[Tagger]) -> pd.DataFrame:
+        return apply_taggers(self._combined_raw(), taggers, self._one_time_tags, self._get_matcher())
 
     def transactions(self) -> pd.DataFrame:
         """All transactions of all accounts with their tags (cached)."""
         if self._tagged is None:
-            self._tagged = apply_taggers(self._combined_raw(), self._taggers, self._one_time_tags)
+            self._tagged = self._apply(self._taggers)
         return self._tagged
 
     def account_transactions(self, account: str) -> pd.DataFrame:
@@ -155,14 +177,16 @@ class AppModel:
 
     def transaction(self, transaction_id: str) -> pd.Series | None:
         df = self.transactions()
-        rows = df.loc[df[Col.transaction_id] == transaction_id]
-        return None if rows.empty else rows.iloc[0]
+        if self._positions is None:
+            self._positions = {tid: i for i, tid in enumerate(df[Col.transaction_id])}
+        position = self._positions.get(transaction_id)
+        return None if position is None else df.iloc[position]
 
     def unique_tags(self) -> list[str]:
-        return unique_tags(self.transactions()[Col.tag])
+        return unique_tags(self.transactions()[Col.tag].unique())
 
     def unique_base_tags(self) -> list[str]:
-        return unique_base_tags(self.transactions()[Col.tag])
+        return unique_base_tags(self.transactions()[Col.tag].unique())
 
     # ------------------------------------------------------------------ accounts
     def add_account(self, name: str | None = None) -> str:
@@ -173,7 +197,7 @@ class AppModel:
         self._accounts[name] = empty_transactions()
         self.repository.save_account(name, self._accounts[name])
         self.repository.save_account_index(self._accounts)
-        self._notify(ACCOUNTS, TRANSACTIONS)
+        self._notify(ACCOUNTS, TRANSACTIONS, raw=True)
         return name
 
     def rename_account(self, old: str, new: str) -> str:
@@ -198,7 +222,7 @@ class AppModel:
                 if tag.tag == old:
                     tag.tag = new
             self.repository.save_one_time_tags(self._one_time_tags.values())
-        self._notify(*topics)
+        self._notify(*topics, raw=True)
         return new
 
     def delete_account(self, name: str) -> None:
@@ -210,7 +234,7 @@ class AppModel:
             for transaction_id in orphaned:
                 del self._one_time_tags[transaction_id]
             self.repository.save_one_time_tags(self._one_time_tags.values())
-        self._notify(ACCOUNTS, TRANSACTIONS)
+        self._notify(ACCOUNTS, TRANSACTIONS, raw=True)
 
     def import_transactions(self, account: str, transactions: pd.DataFrame) -> int:
         new = normalize_transactions(transactions)
@@ -219,7 +243,7 @@ class AppModel:
         combined = pd.concat([self._accounts[account], new], ignore_index=True)
         self._accounts[account] = combined.sort_values(Col.date, ascending=False, kind="stable").reset_index(drop=True)
         self.repository.save_account(account, self._accounts[account])
-        self._notify(TRANSACTIONS)
+        self._notify(TRANSACTIONS, raw=True)
         return len(new)
 
     # ------------------------------------------------------------------ tagging
@@ -265,25 +289,40 @@ class AppModel:
             self.repository.save_one_time_tags(self._one_time_tags.values())
             self._notify(TRANSACTIONS)
 
+    def _tagged_without(self, name: str) -> pd.DataFrame:
+        """Tagging without the tagger ``name`` (cached while it is edited in the tagger window)."""
+        if self._without is None or self._without[0] != name:
+            self._without = (name, self._apply([t for t in self._taggers if t.name != name]))
+        return self._without[1]
+
     def preview_tagger(
         self, tagger: Tagger, original_name: str | None = None, transaction_id: str | None = None
     ) -> pd.DataFrame:
         """Transactions ``tagger`` would tag (shown with its tag), the transaction ``transaction_id`` first.
 
         The saved version ``original_name`` is ignored, so the preview shows exactly what the edited rule does.
+        Only the patterns of ``tagger`` are evaluated, the rest comes from caches: fast enough per key press.
         """
-        others = [t for t in self._taggers if t.name != original_name]
-        df = apply_taggers(self._combined_raw(), others, self._one_time_tags)
-        matched = tagger_mask(df, tagger) if not tagger_errors(tagger) else pd.Series(False, index=df.index)
-        matched &= df[Col.tagger_name] != ONE_TIME_TAGGER
-        df.loc[matched, Col.tag] = tagger.tag
-        df.loc[matched, Col.tagger_name] = tagger.name
-        df.loc[matched, Col.recurring] = recurring_to_float(clean_recurring(tagger.recurring))
-        selected = df[Col.transaction_id] == transaction_id if transaction_id else pd.Series(False, index=df.index)
-        result = pd.concat(
-            [df.loc[selected], df.loc[matched & ~selected].sort_values(Col.date, ascending=False, kind="stable")]
+        names = {t.name for t in self._taggers}
+        base = self._tagged_without(original_name) if original_name in names else self.transactions()
+        if tagger_errors(tagger):
+            matched = np.zeros(len(base), dtype=bool)
+        else:
+            matched = self._get_matcher().mask(tagger) & (base[Col.tagger_name] != ONE_TIME_TAGGER).to_numpy()
+        selected = (
+            (base[Col.transaction_id] == transaction_id).to_numpy()
+            if transaction_id
+            else np.zeros(len(base), dtype=bool)
         )
-        return result.reset_index(drop=True)
+        shown = selected | matched
+        rows = base.loc[shown].copy()
+        hit = matched[shown]
+        rows.loc[hit, Col.tag] = tagger.tag
+        rows.loc[hit, Col.tagger_name] = tagger.name
+        rows.loc[hit, Col.recurring] = recurring_to_float(clean_recurring(tagger.recurring))
+        first = selected[shown]
+        rest = rows.loc[~first].sort_values(Col.date, ascending=False, kind="stable")
+        return pd.concat([rows.loc[first], rest]).reset_index(drop=True)
 
     # ------------------------------------------------------------------ profiles / settings / categories
     def save_profile(self, profile: ImportProfile, original_name: str | None = None) -> ImportProfile:

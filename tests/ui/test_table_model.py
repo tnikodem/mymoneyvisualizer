@@ -1,5 +1,7 @@
 import math
+import time
 
+import numpy as np
 import pandas as pd
 import pytest
 from PyQt6.QtCore import Qt
@@ -33,7 +35,7 @@ from mymoneyvisualizer.ui.table_model import (
         (None, TEXT, ""),
         (pd.NaT, DATE, ""),
         (pd.Timestamp("2024-03-01"), DATE, "01.03.2024"),
-        ("", TAG, "unassigned"),
+        ("", TAG, ""),
         ("food", TAG, "food"),
         (5, TEXT, "5"),
     ],
@@ -98,7 +100,7 @@ def test_model_missing_column_and_reset():
 def test_view_sorting_keeps_pinned_rows_last(qtbot, order):
     model = DataFrameModel(COLUMNS)
     model.set_frame(_frame())
-    view = DataFrameView(model, pinned=lambda row: model.frame["name"].iat[row] == "total")
+    view = DataFrameView(model, pinned=lambda frame: (frame["name"] == "total").to_numpy())
     qtbot.addWidget(view)
     view.sortByColumn(1, order)
     names = list(view.displayed_frame()["name"])
@@ -108,6 +110,47 @@ def test_view_sorting_keeps_pinned_rows_last(qtbot, order):
     assert view.isColumnHidden(2)
     assert view.columnWidth(0) == 50
     assert view.row_at(0)["name"] == expected[0]
+
+
+def test_sorting_is_kept_when_the_frame_is_replaced(qtbot):
+    model = DataFrameModel(COLUMNS)
+    view = DataFrameView(model)
+    qtbot.addWidget(view)
+    model.set_frame(_frame())
+    view.sortByColumn(0, Qt.SortOrder.DescendingOrder)
+    model.set_frame(pd.DataFrame({"name": ["x", "z", "y"], "value": [1.0, 2.0, 3.0], "hidden": [1, 2, 3]}))
+    assert list(view.displayed_frame()["name"]) == ["z", "y", "x"]
+    model.sort(-1)  # invalid column: ignored
+    assert list(view.displayed_frame()["name"]) == ["z", "y", "x"]
+
+
+@pytest.mark.parametrize(
+    ("column", "values", "expected"),
+    [
+        (Column("d", "d", DATE), [pd.Timestamp("2024-02-01"), pd.NaT, pd.Timestamp("2023-01-01")], [1, 2, 0]),
+        (Column("d", "d", MONEY), [2.0, np.nan, -1.0], [1, 2, 0]),
+        (Column("d", "d", TEXT), ["b", "A", "c"], [1, 0, 2]),
+    ],
+)
+def test_sort_order_per_kind(column, values, expected):
+    model = DataFrameModel([column])
+    model.set_frame(pd.DataFrame({"d": values, "pos": range(3)}))
+    model.sort(0, Qt.SortOrder.AscendingOrder)
+    assert list(model.frame["pos"]) == expected
+
+
+def test_sorting_large_tables_is_fast(qtbot):
+    rng = np.random.default_rng(1)
+    frame = pd.DataFrame(
+        {"name": rng.integers(0, 10**6, 60_000).astype(str), "value": rng.normal(size=60_000), "hidden": 1}
+    )
+    model = DataFrameModel(COLUMNS)
+    model.set_frame(frame)
+    start = time.perf_counter()
+    model.sort(1, Qt.SortOrder.DescendingOrder)
+    model.sort(0, Qt.SortOrder.AscendingOrder)
+    assert time.perf_counter() - start < 1.0
+    assert model.frame["name"].is_monotonic_increasing or list(model.frame["name"]) == sorted(model.frame["name"])
 
 
 def test_view_keeps_frame_order_until_user_sorts(qtbot):
@@ -126,4 +169,4 @@ def test_view_selection(qtbot):
     qtbot.addWidget(view)
     view.selectRow(1)
     assert [r["name"] for r in view.selected_rows()] == ["a"]
-    assert view.source_row(view.proxy.index(3, 0)) == 3
+    assert view.row_at(3)["name"] == "c"

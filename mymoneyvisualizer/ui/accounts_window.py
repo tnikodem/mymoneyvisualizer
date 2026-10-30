@@ -43,6 +43,7 @@ class AccountTab(QWidget):
         super().__init__(window)
         self.window_ = window
         self.account = account
+        self.dirty = True
 
         self.name_edit = QLineEdit(account, self)
         self.name_edit.setFixedWidth(240)
@@ -64,6 +65,7 @@ class AccountTab(QWidget):
         self.table.doubleClicked.connect(self.open_tagger)
 
     def refresh(self) -> None:
+        self.dirty = False
         self.table_model.set_frame(self.window_.model.account_transactions(self.account))
 
     def rename(self) -> None:
@@ -113,6 +115,7 @@ class AccountsWindow(Window):
         self.taggers_button.clicked.connect(navigator.show_tagger_overview)
         self.load_button.clicked.connect(self.load_project)
         self.save_button.clicked.connect(self.save_project)
+        self.tabs.currentChanged.connect(self._tab_shown)
 
     @property
     def account_tabs(self) -> list[AccountTab]:
@@ -143,7 +146,14 @@ class AccountsWindow(Window):
                 self.tabs.setCurrentIndex(names.index(current))
             elif names:
                 self.tabs.setCurrentIndex(min(max(current_index, 0), len(names) - 1))
+        # large accounts: fill only the visible tab, the others when they are shown
         for tab in self.account_tabs:
+            tab.dirty = True
+        self._tab_shown(self.tabs.currentIndex())
+
+    def _tab_shown(self, index: int) -> None:
+        tab = self.tabs.widget(index)
+        if tab is not None and tab.dirty:
             tab.refresh()
 
     def create_account(self) -> str:
