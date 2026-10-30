@@ -1,4 +1,4 @@
-"""Start window: the four steps of the workflow and backups. Creates the other windows on first use."""
+"""Start window: how are my finances, and the four steps to get there. Creates the other windows on first use."""
 
 from __future__ import annotations
 
@@ -7,11 +7,10 @@ from collections.abc import Sequence
 from functools import cached_property
 from pathlib import Path
 
+from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import (
     QFileDialog,
-    QGridLayout,
     QHBoxLayout,
-    QLabel,
     QMainWindow,
     QMessageBox,
     QPushButton,
@@ -19,61 +18,156 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from mymoneyvisualizer.app import ACCOUNTS, RULES, TRANSACTIONS, AppModel
-from mymoneyvisualizer.domain.columns import UNCATEGORIZED
+from mymoneyvisualizer.app import ACCOUNTS, GROUPS, RULES, SETTINGS, TRANSACTIONS, AppModel
+from mymoneyvisualizer.domain.columns import UNCATEGORIZED, Col
 from mymoneyvisualizer.storage.files import StorageError
 from mymoneyvisualizer.ui.accounts_window import AccountsWindow
-from mymoneyvisualizer.ui.budget_window import BudgetWindow
-from mymoneyvisualizer.ui.common import ModelBridge
+from mymoneyvisualizer.ui.budget_window import BudgetWindow, euro, percent
+from mymoneyvisualizer.ui.common import Card, HelpButton, ModelBridge, make_button, make_label, set_tone
 from mymoneyvisualizer.ui.import_window import ImportWindow
 from mymoneyvisualizer.ui.income_expenses_window import DetailWindow, IncomeExpensesWindow
 from mymoneyvisualizer.ui.rule_window import RuleWindow
 from mymoneyvisualizer.ui.rules_window import RulesWindow
+from mymoneyvisualizer.ui.style import set_variant
+from mymoneyvisualizer.ui.table_model import format_month_range
+
+
+def thousands(number: int) -> str:
+    return f"{number:,}".replace(",", ".")
+
+
+HELP = (
+    "<p>Vier Schritte, der nächste ist blau hervorgehoben:</p>"
+    "<p><b>1 Konten:</b> CSV-Exporte der Bank importieren, für jedes Konto einzeln. Schon vorhandene Buchungen werden"
+    " übersprungen.</p>"
+    "<p><b>2 Kategorisieren:</b> jeder Buchung eine Kategorie geben, z. B. Wohnen.Miete. Eine Regel erledigt das für"
+    " alle ähnlichen Buchungen, auch künftige.</p>"
+    "<p><b>3 Einnahmen &amp; Ausgaben:</b> Monat für Monat in Zahlungssicht. Fällt eine Zahlung aus dem Rahmen?</p>"
+    "<p><b>4 Budget:</b> periodengerecht: Sparquote, Konsumausgaben nach Kategorien, Entwicklung und Vergleich zum"
+    " Vorjahr.</p>"
+    "<p>Alle Daten bleiben auf diesem Computer.</p>"
+)
+
+
+class StepCard(Card):
+    """One step of the workflow: number, title, its state and the buttons that start it; hover explains it."""
+
+    def __init__(self, number: int, title: str, text: str, buttons: Sequence[QPushButton], parent: QWidget):
+        super().__init__(parent, horizontal=True)
+        self.setToolTip(text)
+        badge = make_label(str(number), self, "step")
+        badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        texts = QVBoxLayout()
+        texts.setSpacing(3)
+        texts.addWidget(make_label(title, self, "heading"))
+        self.status = make_label("", self, wrap=True)
+        texts.addWidget(self.status)
+        self.content.setSpacing(14)
+        self.content.addWidget(badge, 0, Qt.AlignmentFlag.AlignVCenter)
+        self.content.addLayout(texts, 1)
+        column = QVBoxLayout()
+        column.setSpacing(6)
+        for button in buttons:
+            button.setMinimumWidth(170)
+            column.addWidget(button)
+        self.content.addLayout(column)
 
 
 class MainWindow(QMainWindow):
-    topics = frozenset({ACCOUNTS, TRANSACTIONS, RULES})
+    topics = frozenset({ACCOUNTS, TRANSACTIONS, RULES, GROUPS, SETTINGS})
 
     def __init__(self, model: AppModel):
         super().__init__()
         self.model = model
         self.bridge = ModelBridge(model, self)
-        self.setWindowTitle("My Money Visualizer")
+        self.setWindowTitle("MyMoneyVisualizer")
+        self.resize(720, 520)
 
-        self.accounts_button = QPushButton("1. Accounts", self)
-        self.rules_button = QPushButton("2. Rules", self)
-        self.income_expenses_button = QPushButton("3. Income && Expenses", self)
-        self.budget_button = QPushButton("4. Budget", self)
-        self.accounts_status = QLabel(self)
-        self.rules_status = QLabel(self)
-        self.uncategorized_button = QPushButton("Categorize", self)
-        steps = QGridLayout()
-        explanations = (
-            (self.accounts_button, self.accounts_status),
-            (self.rules_button, self.rules_status),
-            (self.income_expenses_button, QLabel("When was how much paid? Check every month at a glance.", self)),
-            (self.budget_button, QLabel("Spending spread over time, compared with the 50/30/20 rule.", self)),
+        self.accounts_button = make_button(
+            "Öffnen",
+            "Konten anlegen und die CSV-Exporte deiner Bank importieren. Bereits importierte Buchungen werden erkannt"
+            " und übersprungen.",
+            self,
         )
-        for row, (button, label) in enumerate(explanations):
-            button.setMinimumSize(220, 32)
-            steps.addWidget(button, row, 0)
-            steps.addWidget(label, row, 1)
-        steps.addWidget(self.uncategorized_button, 1, 2)
-        steps.setColumnStretch(1, 1)
+        self.uncategorized_button = make_button(
+            "Ohne Kategorie", "Alle Buchungen ohne Kategorie auflisten; ein Doppelklick kategorisiert eine davon.", self
+        )
+        self.rules_button = make_button(
+            "Regeln",
+            "Alle Regeln auf einen Blick: was sie erkennen, welche Kategorie sie vergeben und wie viele Buchungen sie"
+            " treffen. Dort lassen sie sich auch ändern.",
+            self,
+        )
+        self.income_expenses_button = make_button(
+            "Öffnen", "Tabelle der Einnahmen und Ausgaben pro Monat und Kategorie, so wie bezahlt.", self
+        )
+        self.budget_button = make_button(
+            "Öffnen",
+            "Sparquote, Konsumausgaben nach Kategorien und ihre Entwicklung, periodengerecht.",
+            self,
+        )
+        self.accounts_card = StepCard(
+            1,
+            "Konten",
+            "CSV-Exporte der Bank importieren, für jedes Konto einzeln.",
+            [self.accounts_button],
+            self,
+        )
+        self.categorize_card = StepCard(
+            2,
+            "Kategorisieren",
+            "Jeder Buchung eine Kategorie geben, z. B. Wohnen.Miete. Eine Regel erledigt das für alle ähnlichen"
+            " Buchungen.",
+            [self.uncategorized_button, self.rules_button],
+            self,
+        )
+        self.income_expenses_card = StepCard(
+            3,
+            "Einnahmen & Ausgaben",
+            "Zahlungssicht: Monat für Monat und Kategorie für Kategorie. Fällt eine Zahlung aus dem Rahmen?",
+            [self.income_expenses_button],
+            self,
+        )
+        self.budget_card = StepCard(
+            4,
+            "Budget",
+            "Periodengerecht: Sparquote, Konsumausgaben nach Kategorien, Entwicklung und Vergleich zum Vorjahr.",
+            [self.budget_button],
+            self,
+        )
+        self.accounts_status = self.accounts_card.status
+        self.rules_status = self.categorize_card.status
+        self.budget_status = self.budget_card.status
+        self.income_expenses_card.status.hide()
 
-        self.save_button = QPushButton("Save backup…", self)
-        self.load_button = QPushButton("Load backup…", self)
+        self.save_button = make_button(
+            "Sicherung speichern …", "Alle Daten (Konten, Regeln, Einstellungen) in eine ZIP-Datei sichern.", self
+        )
+        self.load_button = make_button(
+            "Sicherung laden …",
+            "Alle Daten durch eine Sicherung ersetzen; die bisherigen Daten werden aufbewahrt.",
+            self,
+        )
         backups = QHBoxLayout()
         backups.addWidget(self.save_button)
         backups.addWidget(self.load_button)
         backups.addStretch(1)
-        location = QLabel(f"Data: {model.repository.data_dir}", self)
-        location.setWordWrap(True)
+        location = make_label(f"Daten: {model.repository.data_dir}", self, "hint", wrap=True)
+        location.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
 
         central = QWidget(self)
         layout = QVBoxLayout(central)
-        layout.addLayout(steps)
-        layout.addSpacing(12)
+        layout.setContentsMargins(20, 18, 20, 16)
+        layout.setSpacing(10)
+        self.help_button = HelpButton(HELP, "MyMoneyVisualizer", self)
+        header = QHBoxLayout()
+        header.addWidget(make_label("MyMoneyVisualizer", self, "title"), 1)
+        header.addWidget(self.help_button)
+        layout.addLayout(header)
+        layout.addSpacing(4)
+        for card in (self.accounts_card, self.categorize_card, self.income_expenses_card, self.budget_card):
+            layout.addWidget(card)
+        layout.addStretch(1)
         layout.addLayout(backups)
         layout.addWidget(location)
         self.setCentralWidget(central)
@@ -85,6 +179,10 @@ class MainWindow(QMainWindow):
         self.uncategorized_button.clicked.connect(self.show_uncategorized)
         self.save_button.clicked.connect(self.save_backup)
         self.load_button.clicked.connect(self.load_backup)
+        # the budget is calculated once after a series of changes, not after every single one
+        self._budget_timer = QTimer(self)
+        self._budget_timer.setSingleShot(True)
+        self._budget_timer.timeout.connect(self.refresh_budget_status)
         self.bridge.changed.connect(self._on_changed)
         self.refresh_status()
 
@@ -98,18 +196,57 @@ class MainWindow(QMainWindow):
 
     def refresh_status(self) -> None:
         accounts = len(self.model.account_names)
-        transactions = len(self.model.transactions())
-        self.accounts_status.setText(
-            f"{accounts} account{'' if accounts == 1 else 's'} with {transactions} transactions."
-            " Import the CSV exports of your bank."
-        )
+        df = self.model.transactions()
+        if df.empty:
+            self.accounts_status.setText("Noch keine Buchungen." if accounts else "Noch kein Konto.")
+        else:
+            self.accounts_status.setText(
+                f"{accounts} {'Konto' if accounts == 1 else 'Konten'} · {thousands(len(df))} Buchungen"
+                f" bis {df[Col.date].max():%d.%m.%Y}"
+            )
+        set_tone(self.accounts_status, "warning" if df.empty else None)
+
         uncategorized = self.model.uncategorized_count()
         rules = len(self.model.rules)
-        self.rules_status.setText(
-            f"{rules} rule{'' if rules == 1 else 's'}; "
-            + (f"{uncategorized} transactions without category." if uncategorized else "everything is categorized.")
-        )
+        rules_text = f"{rules} {'Regel' if rules == 1 else 'Regeln'}"
+        if df.empty:
+            self.rules_status.setText(rules_text)
+            set_tone(self.rules_status, None)
+        elif uncategorized:
+            self.rules_status.setText(f"{rules_text} · {thousands(uncategorized)} Buchungen ohne Kategorie")
+            set_tone(self.rules_status, "warning")
+        else:
+            self.rules_status.setText(f"{rules_text} · ✓ alle Buchungen kategorisiert")
+            set_tone(self.rules_status, "good")
+        count = f" ({thousands(uncategorized)})" if uncategorized else ""
+        self.uncategorized_button.setText(f"Ohne Kategorie{count}")
         self.uncategorized_button.setEnabled(uncategorized > 0)
+
+        # the next step stands out
+        if df.empty:
+            next_step = self.accounts_button
+        elif uncategorized:
+            next_step = self.uncategorized_button
+        else:
+            next_step = self.budget_button
+        for button in (self.accounts_button, self.uncategorized_button, self.budget_button):
+            set_variant(button, "primary", button is next_step)
+        self._budget_timer.start(0)
+
+    def refresh_budget_status(self) -> None:
+        """The answer of the budget in one line: savings rate and room per month."""
+        report = self.model.budget_report()
+        if report is None or report.months == 0 or report.savings_rate is None or report.room_per_month is None:
+            self.budget_status.setText("Sparquote nach dem ersten abgeschlossenen Monat mit Einkommen")
+            set_tone(self.budget_status, None)
+            return
+        room = report.room_per_month
+        verdict = f"{euro(abs(room))} pro Monat {'über' if room >= 0 else 'unter'} dem Ziel"
+        self.budget_status.setText(
+            f"Sparquote {percent(report.savings_rate)} (Ziel {percent(report.savings.target)}) · {verdict}"
+            f" · {format_month_range(report.start, report.end)}"
+        )
+        set_tone(self.budget_status, "good" if room >= 0 else "bad")
 
     # ------------------------------------------------------------------ windows (created lazily)
     @cached_property
@@ -172,9 +309,14 @@ class MainWindow(QMainWindow):
             self.rule_window.open_new()
 
     def open_detail(
-        self, month: str | None, categories: Sequence[str] | None, category_filter: str = "", title: str = ""
+        self,
+        month: str | None,
+        categories: Sequence[str] | None,
+        category_filter: str = "",
+        title: str = "",
+        end: str | None = None,
     ) -> None:
-        self.detail_window.open_detail(month, categories, category_filter, title)
+        self.detail_window.open_detail(month, categories, category_filter, title, end)
 
     def open_import(self, path: str | Path, account: str) -> None:
         self.import_window.open_file(path, account)
@@ -183,26 +325,27 @@ class MainWindow(QMainWindow):
     def save_backup(self, checked: bool = False, path: str | None = None) -> None:
         if path is None:
             proposal = f"mmv_backup_{datetime.datetime.now():%Y_%m_%d__%H_%M_%S}.zip"
-            path, _ = QFileDialog.getSaveFileName(self, "Save backup", proposal, "Zip files (*.zip)")
+            path, _ = QFileDialog.getSaveFileName(self, "Sicherung speichern", proposal, "ZIP-Dateien (*.zip)")
         if path:
             self.model.create_backup(path)
 
     def load_backup(self, checked: bool = False, path: str | None = None) -> None:
         if path is None:
-            path, _ = QFileDialog.getOpenFileName(self, "Load backup", "", "Zip files (*.zip)")
+            path, _ = QFileDialog.getOpenFileName(self, "Sicherung laden", "", "ZIP-Dateien (*.zip)")
         if not path:
             return
         answer = QMessageBox.question(
             self,
-            "Load backup",
-            "Replace all current data by the backup? The current data is kept in a folder next to the data directory.",
+            "Sicherung laden",
+            "Alle aktuellen Daten durch die Sicherung ersetzen? Die aktuellen Daten bleiben in einem Ordner neben dem"
+            " Datenverzeichnis erhalten.",
         )
         if answer != QMessageBox.StandardButton.Yes:
             return
         try:
             previous = self.model.restore_backup(Path(path))
         except StorageError as e:
-            QMessageBox.warning(self, "Load backup", str(e))
+            QMessageBox.warning(self, "Sicherung laden", str(e))
             return
         if previous is not None:
-            QMessageBox.information(self, "Load backup", f"Previous data moved to\n{previous}")
+            QMessageBox.information(self, "Sicherung laden", f"Die bisherigen Daten liegen jetzt in\n{previous}")

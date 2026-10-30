@@ -38,7 +38,7 @@ def test_detects_format_and_columns(window, export):
     assert (window.separator_edit.text(), window.decimal_edit.text(), window.header_spin.value()) == (";", ",", 4)
     assert window.column_combos["col_recipient"].currentText() == "Zahlungsempfänger*in"
     assert list(window.table_model.frame[Col.value]) == [-3.5, 2500.0, -1050.0]
-    assert window.status_text() == "3 new transactions"
+    assert window.status_text() == "<b>3 neue Buchungen</b>"
     assert window.since_edit.date() == QDate(2024, 1, 13)
     assert window.import_button.isEnabled()
 
@@ -49,7 +49,7 @@ def test_import_latin1_with_duplicates_and_zero(window, model, export):
     assert window.header_spin.value() == 2
     assert window.dayfirst_check.isChecked()
     assert window.column_combos["col_date"].currentText() == "Datum fää"
-    assert window.status_text() == "3 new transactions, 1 with value 0"
+    assert window.status_text() == "<b>3 neue Buchungen</b> · 1 mit Betrag 0"
 
     before = len(model.account_transactions("spar"))
     assert window.import_transactions() == 3
@@ -70,12 +70,12 @@ def test_reimport_uses_saved_profile_and_skips_known_rows(window, model, export)
     window.open_file(path, "giro")
     assert window.original_name == "dkb"
     assert window.name_edit.text() == "dkb"
-    assert window.status_text() == "0 new transactions, 3 already imported"
+    assert window.status_text() == "<b>0 neue Buchungen</b> · 3 schon vorhanden"
     assert not window.import_button.isEnabled()
     assert window.import_transactions() == 0
 
     window.duplicates_check.setChecked(False)
-    assert window.status_text() == "3 new transactions"
+    assert window.status_text() == "<b>3 neue Buchungen</b>"
     window.import_transactions()
     assert [p.name for p in model.profiles] == ["dkb"]
 
@@ -83,25 +83,37 @@ def test_reimport_uses_saved_profile_and_skips_known_rows(window, model, export)
 def test_since_filter(window, model, export):
     window.open_file(export(DKB), "giro")
     window.since_edit.setDate(QDate(2024, 1, 14))
-    assert window.status_text() == "2 new transactions, 1 before the start date"
+    assert window.status_text() == "<b>2 neue Buchungen</b> · 1 vor dem Startdatum"
     window.import_transactions()
     assert model.account_transactions("giro")[Col.date].min() == pd.Timestamp("2023-01-01")
     assert (model.account_transactions("giro")[Col.date] == pd.Timestamp("2024-01-13")).sum() == 0
 
 
+def test_format_settings_are_hidden_until_needed(window, export):
+    window.open_file(export(DKB), "giro")
+    assert window.title.text() == "export.csv → Konto giro"
+    assert window.advanced.isHidden()
+    window.advanced_button.click()
+    assert not window.advanced.isHidden()
+    assert window.advanced_button.text() == "▾ Erweiterte Einstellungen"
+    window.advanced_button.click()
+    assert window.advanced.isHidden()
+
+
 def test_format_errors_are_shown(window, export, qtbot):
     window.open_file(export(DKB), "giro")
     window.separator_edit.clear()
-    assert "separator" in window.error_label.text()
+    assert "Trennzeichen" in window.error_label.text()
+    assert not window.advanced.isHidden()  # the format is wrong: the settings to fix it are shown
     assert not window.import_button.isEnabled()
     window.separator_edit.setText(";")
     assert window.error_label.text() == ""
     window.column_combos["col_value"].setCurrentText("")
-    assert "value" in window.error_label.text()
+    assert "Betrag" in window.error_label.text()
     window.decimal_edit.setText(".")
     window.column_combos["col_value"].setCurrentText("Betrag (€)")
     window.thousands_edit.setText(".")
-    assert "thousands" in window.error_label.text()
+    assert "Tausendertrennzeichen" in window.error_label.text()
 
 
 def test_changing_header_line_updates_columns(window, export):

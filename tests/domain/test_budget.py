@@ -1,4 +1,3 @@
-import numpy as np
 import pandas as pd
 import pytest
 
@@ -8,14 +7,16 @@ from mymoneyvisualizer.domain.budget import (
     budget_report,
     budget_series,
     group_totals,
+    period_months,
+    previous_months,
     smooth,
-    stacked_curves,
 )
-from mymoneyvisualizer.domain.models import GroupAssignment
+from mymoneyvisualizer.domain.models import LAST_12_MONTHS, GroupAssignment
 
 from ..helpers import categorized
 
 SHARES = {"needs": 0.5, "wants": 0.3}
+YEAR_2024 = (pd.Period("2024-01", "M"), pd.Period("2024-12", "M"))
 GROUPS = [
     GroupAssignment("income", "income"),
     GroupAssignment("household", "needs"),
@@ -56,7 +57,7 @@ def test_budget_series_empty():
     series = budget_series(categorized(("2024-01-01", "a", "b", -1.0), categories=["x"]), excluded_categories=["x"])
     assert series.monthly.empty
     assert series.last_date is None
-    assert budget_report(series, [], 2024, 2024, SHARES) is None
+    assert budget_report(series, [], *YEAR_2024, SHARES) is None
 
 
 def _series(last_date="2024-12-31"):
@@ -79,10 +80,11 @@ def test_group_totals():
 
 
 def test_budget_report():
-    report = budget_report(_series(), GROUPS, 2024, 2024, SHARES)
+    report = budget_report(_series(), GROUPS, *YEAR_2024, SHARES)
     assert report.months == report.period_months == 12
     assert report.is_complete
     assert report.income == pytest.approx(36000.0)
+    assert report.income_categories == [("income", 36000.0)]
     assert report.needs.amount == pytest.approx(12 * 1530.0)
     assert report.needs.categories == [("household", 14400.0), ("car", 3600.0), ("", 360.0)]
     assert report.wants.amount == pytest.approx(7200.0)
@@ -98,7 +100,7 @@ def test_budget_report():
 def test_too_little_saved_gives_negative_room():
     series = _series()
     series.monthly["hobby"] = -1470.0
-    report = budget_report(series, GROUPS, 2024, 2024, SHARES)
+    report = budget_report(series, GROUPS, *YEAR_2024, SHARES)
     assert report.savings_rate == pytest.approx(0.0)
     assert report.room_per_month == pytest.approx(-0.2 * 3000.0)
 
@@ -106,7 +108,7 @@ def test_too_little_saved_gives_negative_room():
 def test_budget_report_counts_only_the_months_of_the_period_with_data():
     series = _series()
     series.monthly.index = pd.period_range("2023-07", "2024-06", freq="M")
-    report = budget_report(series, GROUPS, 2024, 2025, SHARES)
+    report = budget_report(series, GROUPS, pd.Period("2024-01", "M"), pd.Period("2025-12", "M"), SHARES)
     assert (report.months, report.period_months) == (6, 24)
     assert not report.is_complete
     assert report.income == pytest.approx(18000.0)
@@ -116,28 +118,30 @@ def test_budget_report_counts_only_the_months_of_the_period_with_data():
 def test_budget_report_without_income():
     series = _series()
     series.monthly["income"] = 0.0
-    report = budget_report(series, GROUPS, 2024, 2024, SHARES)
+    report = budget_report(series, GROUPS, *YEAR_2024, SHARES)
     assert report.savings_rate is None
     assert report.room_per_month is None
 
 
 def test_budget_report_outside_the_data():
-    report = budget_report(_series(), GROUPS, 2030, 2030, SHARES)
+    report = budget_report(_series(), GROUPS, pd.Period("2030-01", "M"), pd.Period("2030-12", "M"), SHARES)
     assert report.months == 0
     assert report.room_per_month is None
     assert report.per_month(100.0) == 0.0
 
 
-def test_stacked_curves_in_reverse_group_order():
-    monthly = _series().monthly
-    curves = stacked_curves(monthly, GROUPS, "needs")
-    assert [name for name, _ in curves] == ["car", "household"]
-    np.testing.assert_allclose(curves[-1][1], 1500.0)
-
-
-def test_smooth_is_a_moving_average_of_twelve_months():
+def test_smooth_starts_with_a_full_year():
+    """An average of fewer months would show a single large payment (here 12 in January) as a spike."""
     monthly = pd.DataFrame({"x": [12.0] + [0.0] * 13}, index=pd.period_range("2024-01", periods=14, freq="M"))
-    smoothed = smooth(monthly)["x"].tolist()
-    assert smoothed[:2] == [12.0, 6.0]
-    assert smoothed[11] == pytest.approx(1.0)
-    assert smoothed[12] == 0.0
+    smoothed = smooth(monthly)["x"]
+    assert smoothed.index[0] == pd.Period("2024-12", "M")
+    assert smoothed.tolist() == pytest.approx([1.0, 0.0, 0.0])
+    assert smooth(monthly.iloc[:11]).empty
+
+
+def test_period_months():
+    last = pd.Period("2026-09", "M")
+    assert period_months(LAST_12_MONTHS, last) == (pd.Period("2025-10", "M"), last)
+    assert period_months("2025", last) == (pd.Period("2025-01", "M"), pd.Period("2025-12", "M"))
+    assert period_months("2026", last) == (pd.Period("2026-01", "M"), last)  # only complete months
+    assert previous_months(*period_months("2026", last)) == (pd.Period("2025-01", "M"), pd.Period("2025-09", "M"))

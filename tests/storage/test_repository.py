@@ -39,7 +39,7 @@ def test_roundtrip(tmp_path):
         },
         groups=[GroupAssignment("küche", "wants"), GroupAssignment("", "needs")],
         profiles=[ImportProfile(name="dkb", skiprows=4)],
-        settings=Settings(excluded_categories=["x"], budget_start=2020, budget_end=2021),
+        settings=Settings(excluded_categories=["x"], budget_period="2021"),
     )
     repo.save_all(state)
     loaded = Repository(tmp_path).load()

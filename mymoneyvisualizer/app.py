@@ -24,6 +24,7 @@ from mymoneyvisualizer.domain.columns import (
 from mymoneyvisualizer.domain.models import (
     GROUP_INCOME,
     GROUP_NEEDS,
+    LAST_12_MONTHS,
     GroupAssignment,
     ManualCategory,
     Rule,
@@ -32,6 +33,7 @@ from mymoneyvisualizer.domain.models import (
     clean_percent,
     new_rule_id,
     reorder_groups,
+    valid_budget_period,
 )
 from mymoneyvisualizer.importing.profile import ImportProfile
 from mymoneyvisualizer.storage.backup import create_backup, restore_backup
@@ -47,7 +49,7 @@ PROFILES = "profiles"
 SETTINGS = "settings"
 ALL_TOPICS = frozenset({ACCOUNTS, TRANSACTIONS, RULES, GROUPS, PROFILES, SETTINGS})
 
-DEFAULT_ACCOUNT_NAME = "new account"
+DEFAULT_ACCOUNT_NAME = "Neues Konto"
 
 
 class Event:
@@ -402,8 +404,16 @@ class AppModel:
         shares[group] = share
         self.update_settings(budget_shares=shares)
 
-    def set_budget_period(self, start: int, end: int) -> None:
-        self.update_settings(budget_start=min(start, end), budget_end=max(start, end))
+    def set_budget_period(self, period: str) -> None:
+        """:data:`~mymoneyvisualizer.domain.models.LAST_12_MONTHS` or a year such as ``"2025"``."""
+        if not valid_budget_period(period):
+            raise ValueError(f"invalid budget period {period!r}")
+        self.update_settings(budget_period=period)
+
+    def hide_hint(self, name: str) -> None:
+        """Do not show the explanation ``name`` again; it stays available behind the help button."""
+        if name not in self._settings.hidden_hints:
+            self.update_settings(hidden_hints=[*self._settings.hidden_hints, name])
 
     def assign_groups(self, assignment: Mapping[str, Iterable[str]]) -> None:
         self._groups = reorder_groups(self._groups, {k: list(v) for k, v in assignment.items()})
@@ -459,12 +469,13 @@ class AppModel:
             own_accounts=self._own_accounts(self._settings.hide_internal_transfers),
         )
 
-    def detail(self, month, categories: Sequence[str] | None, *, category_filter: str = "") -> pd.DataFrame:
-        """Transactions of ``categories`` (``None``: all) in ``month`` (``None``: all months)."""
+    def detail(self, month, categories: Sequence[str] | None, *, category_filter: str = "", end=None) -> pd.DataFrame:
+        """Transactions of ``categories`` (``None``: all) in ``month`` to ``end`` (``None``: all months)."""
         return analysis.detail_transactions(
             self.transactions(),
             month,
             categories,
+            end=end,
             excluded_categories=self._settings.excluded_categories,
             own_accounts=self._own_accounts(self._settings.hide_internal_transfers),
             category_filter=category_filter,
@@ -480,15 +491,42 @@ class AppModel:
             excluded_categories=self._settings.excluded_categories,
         )
 
-    def budget_report(self, series: budget.BudgetSeries | None = None) -> budget.BudgetReport | None:
-        settings = self._settings
-        return budget.budget_report(
-            series if series is not None else self.budget_series(),
-            self._groups,
-            settings.budget_start,
-            settings.budget_end,
-            settings.budget_shares,
-        )
+    def budget_periods(self, series: budget.BudgetSeries | None = None) -> list[tuple[str, pd.Period, pd.Period]]:
+        """``(period, first month, last month)`` of the budget periods with data, newest first.
+
+        The last twelve complete months come first, then every calendar year, cut to the months with data.
+        """
+        series = series if series is not None else self.budget_series()
+        if series.last_date is None:
+            return []
+        first, last = series.monthly.index[0], analysis.last_complete_month(series.last_date)
+        if last < first:
+            return []
+        periods = [(LAST_12_MONTHS, *budget.period_months(LAST_12_MONTHS, last))]
+        for year in range(last.year, first.year - 1, -1):
+            start, end = budget.period_months(str(year), last)
+            periods.append((str(year), max(start, first), end))
+        return periods
+
+    def budget_months(
+        self, series: budget.BudgetSeries | None = None, previous: bool = False
+    ) -> tuple[pd.Period, pd.Period] | None:
+        """First and last month of the budget period (``previous``: of the year before); only complete months."""
+        series = series if series is not None else self.budget_series()
+        if series.last_date is None:
+            return None
+        months = budget.period_months(self._settings.budget_period, analysis.last_complete_month(series.last_date))
+        return budget.previous_months(*months) if previous else months
+
+    def budget_report(
+        self, series: budget.BudgetSeries | None = None, previous: bool = False
+    ) -> budget.BudgetReport | None:
+        """Income, needs, wants and savings in the budget period (``previous``: in the year before)."""
+        series = series if series is not None else self.budget_series()
+        months = self.budget_months(series, previous)
+        if months is None:
+            return None
+        return budget.budget_report(series, self._groups, *months, self._settings.budget_shares)
 
     # ------------------------------------------------------------------ backup
     def create_backup(self, zip_path: str | Path) -> list[str]:

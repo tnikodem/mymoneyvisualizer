@@ -10,7 +10,6 @@ from __future__ import annotations
 from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
 
-import numpy as np
 import pandas as pd
 
 from mymoneyvisualizer.domain.accrual import accrue
@@ -24,6 +23,7 @@ from mymoneyvisualizer.domain.models import (
     GROUP_SAVINGS,
     GROUP_WANTS,
     GROUPS,
+    LAST_12_MONTHS,
     GroupAssignment,
 )
 
@@ -61,8 +61,28 @@ def budget_series(
 
 
 def smooth(monthly: pd.DataFrame) -> pd.DataFrame:
-    """Moving average over the last :data:`SMOOTHING_MONTHS` months, for a calm long-term view."""
-    return monthly.rolling(SMOOTHING_MONTHS, min_periods=1).mean()
+    """Moving average over the last :data:`SMOOTHING_MONTHS` months, for a calm long-term view.
+
+    It starts with the first month that has a full year before it: an average of fewer months would show a
+    single bonus or yearly payment as a spike.
+    """
+    return monthly.rolling(SMOOTHING_MONTHS).mean().dropna(how="all")
+
+
+def period_months(period: str, last_month: pd.Period) -> tuple[pd.Period, pd.Period]:
+    """First and last month of a budget period, at most up to ``last_month`` (the last complete month).
+
+    :data:`LAST_12_MONTHS` are the twelve months up to ``last_month``, any other period is a calendar year.
+    """
+    if period == LAST_12_MONTHS:
+        return last_month - (SMOOTHING_MONTHS - 1), last_month
+    year = int(period)
+    return pd.Period(f"{year}-01", freq="M"), min(pd.Period(f"{year}-12", freq="M"), last_month)
+
+
+def previous_months(start: pd.Period, end: pd.Period) -> tuple[pd.Period, pd.Period]:
+    """The year before: the same months one year earlier."""
+    return start - 12, end - 12
 
 
 def _group_of(groups: Sequence[GroupAssignment]) -> dict[str, str]:
@@ -84,24 +104,6 @@ def group_totals(monthly: pd.DataFrame, groups: Sequence[GroupAssignment]) -> pd
     return totals
 
 
-def stacked_curves(
-    monthly: pd.DataFrame, groups: Sequence[GroupAssignment], group: str
-) -> list[tuple[str, np.ndarray]]:
-    """Cumulative curves of the money used per category of one group (positive), from the bottom up.
-
-    The bottom category is the last one of the group in ``groups``, so the order of ``groups`` is the stacking
-    order from the top.
-    """
-    curves = []
-    level = np.zeros(len(monthly))
-    for assignment in reversed(groups):
-        if assignment.group != group or assignment.category not in monthly.columns:
-            continue
-        level = level - monthly[assignment.category].to_numpy()
-        curves.append((assignment.category, level))
-    return curves
-
-
 @dataclass
 class GroupReport:
     group: str
@@ -115,17 +117,23 @@ class GroupReport:
 
 @dataclass
 class BudgetReport:
-    start_year: int
-    end_year: int
+    #: first and last month of the budget period
+    start: pd.Period
+    end: pd.Period
     #: months of the budget period with data
     months: int
-    period_months: int
     last_date: pd.Timestamp
     income: float
+    #: (category, amount that came in), largest first
+    income_categories: list[tuple[str, float]]
     needs: GroupReport
     wants: GroupReport
     #: transfers to savings and investments that are not tracked as an account
     savings: GroupReport
+
+    @property
+    def period_months(self) -> int:
+        return (self.end - self.start).n + 1
 
     @property
     def is_complete(self) -> bool:
@@ -157,36 +165,40 @@ class BudgetReport:
 def budget_report(
     series: BudgetSeries,
     groups: Sequence[GroupAssignment],
-    start_year: int,
-    end_year: int,
+    start: pd.Period,
+    end: pd.Period,
     shares: Mapping[str, float],
 ) -> BudgetReport | None:
-    """Income, needs, wants and savings in the budget period ``start_year``-``end_year`` (whole years).
+    """Income, needs, wants and savings in the months ``start`` to ``end``.
 
     ``shares`` are the target shares of needs and wants; the rest of the income is the savings target.
     """
     monthly = series.monthly
     if monthly.empty or series.last_date is None:
         return None
-    period = monthly.loc[(monthly.index.year >= start_year) & (monthly.index.year <= end_year)]
+    period = monthly.loc[(monthly.index >= start) & (monthly.index <= end)]
     group_of = _group_of(groups)
     totals = period.sum()
 
-    def report(group: str, target: float) -> GroupReport:
+    def amounts(group: str, sign: float) -> list[tuple[str, float]]:
+        """(category, amount), largest first, without empty categories; ``sign`` -1 makes spending positive."""
         members = [c for c in period.columns if group_of.get(c, GROUP_NEEDS) == group]
-        used = [(c, float(-totals[c])) for c in members if abs(totals[c]) >= 0.005]  # without empty categories
-        used.sort(key=lambda item: item[1], reverse=True)
+        used = [(c, float(sign * totals[c])) for c in members if abs(totals[c]) >= 0.005]
+        return sorted(used, key=lambda item: item[1], reverse=True)
+
+    def report(group: str, target: float) -> GroupReport:
+        used = amounts(group, -1.0)
         return GroupReport(group, target, float(sum(amount for _, amount in used)), used)
 
     needs, wants = shares.get(GROUP_NEEDS, 0.0), shares.get(GROUP_WANTS, 0.0)
-    income = sum(float(totals[c]) for c in period.columns if group_of.get(c) == GROUP_INCOME)
+    income_categories = amounts(GROUP_INCOME, 1.0)
     return BudgetReport(
-        start_year=start_year,
-        end_year=end_year,
+        start=start,
+        end=end,
         months=len(period),
-        period_months=12 * (end_year - start_year + 1),
         last_date=series.last_date,
-        income=income,
+        income=float(sum(amount for _, amount in income_categories)),
+        income_categories=income_categories,
         needs=report(GROUP_NEEDS, needs),
         wants=report(GROUP_WANTS, wants),
         savings=report(GROUP_SAVINGS, max(0.0, 1.0 - needs - wants)),

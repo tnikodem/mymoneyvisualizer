@@ -1,3 +1,4 @@
+import pandas as pd
 import pytest
 
 from mymoneyvisualizer.app import (
@@ -13,7 +14,7 @@ from mymoneyvisualizer.app import (
     InvalidRuleError,
 )
 from mymoneyvisualizer.domain.columns import MANUAL_RULE, Col
-from mymoneyvisualizer.domain.models import ManualCategory, Rule
+from mymoneyvisualizer.domain.models import LAST_12_MONTHS, ManualCategory, Rule
 from mymoneyvisualizer.importing.profile import ImportProfile
 
 from .helpers import rule_of, transactions
@@ -80,16 +81,16 @@ def test_reload_emits_all_topics(model, events):
 
 
 def test_accounts_lifecycle(model, events):
-    assert model.add_account() == "new account 1"
-    assert model.add_account() == "new account 2"
+    assert model.add_account() == "Neues Konto 1"
+    assert model.add_account() == "Neues Konto 2"
     assert model.add_account("giro") == "giro"
     assert model.add_account("giro") == "giro_1"
     assert ACCOUNTS in events[0]
-    assert model.rename_account("new account 1", "giro") == "giro_2"
+    assert model.rename_account("Neues Konto 1", "giro") == "giro_2"
     assert model.rename_account("giro_2", "  ") == "giro_2"
     model.delete_account("giro_1")
-    assert model.account_names == ["giro_2", "new account 2", "giro"]  # renaming keeps the position
-    assert _reloaded(model).account_names == ["giro_2", "new account 2", "giro"]
+    assert model.account_names == ["giro_2", "Neues Konto 2", "giro"]  # renaming keeps the position
+    assert _reloaded(model).account_names == ["giro_2", "Neues Konto 2", "giro"]
 
 
 def test_rename_account_keeps_transfer_categories(filled):
@@ -248,11 +249,13 @@ def test_settings(model, events):
     count = len(events)
     model.update_settings(excluded_categories=["x"])
     assert len(events) == count
-    model.set_budget_period(2025, 2023)
+    model.set_budget_period("2025")
     model.set_budget_share("needs", 0.45)
     settings = _reloaded(model).settings
-    assert (settings.budget_start, settings.budget_end) == (2023, 2025)
+    assert settings.budget_period == "2025"
     assert settings.budget_shares["needs"] == 0.45
+    with pytest.raises(ValueError):
+        model.set_budget_period("2023-2025")
 
 
 def test_assign_groups(filled):
@@ -285,7 +288,7 @@ def test_detail(filled):
 
 def test_budget_and_overview(filled):
     filled.save_rule(Rule(category="giro", regex_description="Sparen Eingang"))  # internal transfer
-    filled.set_budget_period(2024, 2024)
+    filled.set_budget_period("2024")
     series = filled.budget_series()
     assert "spar" not in series.monthly.columns
     report = filled.budget_report(series)
@@ -296,6 +299,21 @@ def test_budget_and_overview(filled):
     assert filled.categories_in_group("income") == ["income"]
     overview = filled.rule_overview().set_index(Col.category)
     assert overview.loc["household.food", "count"] == 2
+
+
+def test_budget_periods_cover_complete_months_with_data(filled):
+    """The data ends in February 2024; the current month never counts, it is not over yet."""
+    month = pd.Period
+    assert filled.budget_periods() == [
+        (LAST_12_MONTHS, month("2023-03", "M"), month("2024-02", "M")),
+        ("2024", month("2024-01", "M"), month("2024-02", "M")),
+    ]
+    assert filled.budget_months() == (month("2023-03", "M"), month("2024-02", "M"))
+    assert filled.budget_months(previous=True) == (month("2022-03", "M"), month("2023-02", "M"))
+    assert filled.budget_report(previous=True).months == 0
+    report = filled.budget_report()
+    assert (report.months, report.period_months) == (2, 12)
+    assert AppModel.open(filled.repository.data_dir / "empty").budget_periods() == []
 
 
 def test_spread_rule_in_the_budget(filled):

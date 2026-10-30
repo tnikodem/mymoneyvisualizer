@@ -19,7 +19,7 @@ MONTHLY_AVERAGE = "monthly average"
 #: Column of the income & expenses table that marks the summary rows below the categories ("" for categories).
 SUMMARY = "summary"
 INCOME, EXPENSES, SAVINGS, NET = "income", "expenses", "savings", "net"
-SUMMARY_LABELS = {INCOME: "Income", EXPENSES: "Expenses", SAVINGS: "Savings", NET: "Net"}
+SUMMARY_LABELS = {INCOME: "Einnahmen", EXPENSES: "Ausgaben", SAVINGS: "Sparen", NET: "Saldo"}
 
 MonthLike = str | pd.Period | pd.Timestamp
 
@@ -30,6 +30,12 @@ def to_month(value: MonthLike) -> pd.Period:
 
 def month_key(value: MonthLike) -> str:
     return to_month(value).strftime("%Y-%m")
+
+
+def last_complete_month(last_date: MonthLike, today: MonthLike | None = None) -> pd.Period:
+    """The month of the last transaction, but at most the previous month: the current month is not over yet."""
+    current = to_month(today if today is not None else pd.Timestamp.today())
+    return min(to_month(last_date), current - 1)
 
 
 def month_range(start: MonthLike, end: MonthLike) -> list[str]:
@@ -202,8 +208,9 @@ def detail_transactions(
     excluded_categories: Collection[str] = (),
     own_accounts: Collection[str] = (),
     category_filter: str = "",
+    end: MonthLike | None = None,
 ) -> pd.DataFrame:
-    """Transactions of ``categories`` (with their subcategories) in ``month``, oldest first.
+    """Transactions of ``categories`` (with their subcategories) in ``month`` (to ``end``), oldest first.
 
     ``categories=None`` means all categories, ``month=None`` all months.
     """
@@ -211,7 +218,7 @@ def detail_transactions(
         df, excluded_categories=excluded_categories, own_accounts=own_accounts, category_filter=category_filter
     )
     if month is not None:
-        data = in_months(data, month, month)
+        data = in_months(data, month, month if end is None else end)
     if categories is not None:
         mask = pd.Series(False, index=data.index)
         for category in categories:

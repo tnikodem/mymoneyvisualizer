@@ -77,7 +77,7 @@ def test_model_roles(qtbot):
     assert model.data(index, SORT_ROLE) == 10.0
     assert model.data(index, Qt.ItemDataRole.TextAlignmentRole) & Qt.AlignmentFlag.AlignRight
     assert model.data(index, Qt.ItemDataRole.BackgroundRole) == QColor("red")
-    assert model.data(index, Qt.ItemDataRole.ToolTipRole) == "1:value"
+    assert model.data(index, Qt.ItemDataRole.ToolTipRole) == "<p>1:value</p>"  # rich text wraps
     assert model.data(model.index(0, 0), Qt.ItemDataRole.TextAlignmentRole) is None
     assert model.data(model.index(0, 0), Qt.ItemDataRole.DecorationRole) is None
     assert model.data(model.index(9, 9)) is None

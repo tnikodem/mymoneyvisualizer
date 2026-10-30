@@ -71,5 +71,5 @@ def test_unique_categories_and_display():
     categories = ["b.x", "a", "b.y", "a"]
     assert unique_categories(categories) == ["a", "b.x", "b.y"]
     assert unique_main_categories(categories) == ["a", "b"]
-    assert display_category("") == "(uncategorized)"
+    assert display_category("") == "(ohne Kategorie)"
     assert display_category("food") == "food"

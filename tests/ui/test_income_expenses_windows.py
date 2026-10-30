@@ -29,7 +29,30 @@ def _cell(window, category, month, role=Qt.ItemDataRole.DisplayRole):
 
 
 def test_default_months():
-    assert default_months(pd.Timestamp("2024-03-15")) == ("2023-03", "2024-02")
+    """The last twelve complete months up to the last transaction: the current month is not over yet."""
+    today = pd.Timestamp("2024-03-15")
+    assert default_months(pd.Timestamp("2024-03-10"), today) == ("2023-03", "2024-02")
+    assert default_months(pd.Timestamp("2023-06-30"), today) == ("2022-07", "2023-06")
+    assert default_months(None, today) == ("2023-03", "2024-02")
+
+
+def test_period_presets(window):
+    """The data ends in January 2024."""
+    combo = window.period_combo
+    assert [combo.itemText(i) for i in range(combo.count())] == [
+        "Letzte 12 Monate",
+        "2024",
+        "2023",
+        "Eigener Zeitraum",
+    ]
+    assert combo.currentData() == "custom"  # the fixture chose July 2023 to January 2024
+    combo.setCurrentIndex(combo.findData("2023"))
+    assert window.months == ("2023-01", "2023-12")
+    combo.setCurrentIndex(combo.findData("last 12"))
+    assert window.months == ("2023-02", "2024-01")
+    assert window.start_combo.currentText() == "Feb 2023"
+    window.set_months("2023-05", "2023-06")
+    assert combo.currentData() == "custom"
 
 
 def test_table_shows_monthly_sums(window, model):
@@ -38,19 +61,21 @@ def test_table_shows_monthly_sums(window, model):
     assert frame.loc["household", "2023-07"] == -1000.0
     assert frame.loc["household", "2024-01"] == -450.0
     assert "spar" not in frame.index  # internal transfers hidden
-    assert list(frame.index[-3:]) == ["Income", "Expenses", "Net"]
-    assert frame.loc["Income", "2023-07"] == 3000.0
-    assert frame.loc["Expenses", "2023-07"] == -1075.0
-    assert frame.loc["Net", "2023-07"] == 1925.0
+    assert list(frame.index[-3:]) == ["Einnahmen", "Ausgaben", "Saldo"]
+    assert frame.loc["Einnahmen", "2023-07"] == 3000.0
+    assert frame.loc["Ausgaben", "2023-07"] == -1075.0
+    assert frame.loc["Saldo", "2023-07"] == 1925.0
+    assert window.table_model.headerData(1, Qt.Orientation.Horizontal) == "Jul 2023"
+    assert set(window.table_model.frame["label"]) >= {"(ohne Kategorie)", "Saldo"}
     assert _cell(window, "household", "2023-07") == "-1.000"
 
 
 def test_start_after_end_moves_end(window):
     """Regression: choosing a start month after the end month produced an empty table."""
-    window.start_combo.setCurrentText("2024-01")
+    window.start_combo.setCurrentIndex(window.start_combo.findData("2024-01"))
     assert window.months == ("2024-01", "2024-01")
     assert not window.table_model.frame.empty
-    window.end_combo.setCurrentText("2023-11")
+    window.end_combo.setCurrentIndex(window.end_combo.findData("2023-11"))
     assert window.months == ("2023-11", "2023-11")
     assert list(window.table_model.frame.columns[1:2]) == ["2023-11"]
 
@@ -80,7 +105,7 @@ def test_unusual_month_is_highlighted(window):
     assert _cell(window, "household", "2024-01", Qt.ItemDataRole.BackgroundRole) == LESS_EXPENSE
     assert "-450" not in _cell(window, "household", "2024-01", Qt.ItemDataRole.ToolTipRole)
     assert _cell(window, "household", "2023-08", Qt.ItemDataRole.BackgroundRole) is None
-    assert _cell(window, "Net", "2023-08", Qt.ItemDataRole.BackgroundRole) == TOTAL_BACKGROUND
+    assert _cell(window, "Saldo", "2023-08", Qt.ItemDataRole.BackgroundRole) == TOTAL_BACKGROUND
     assert _cell(window, "household", TOTAL, Qt.ItemDataRole.BackgroundRole) == TOTAL_BACKGROUND
     window.level_combo.setCurrentIndex(1)
     assert _cell(window, "household.food", "2024-01", Qt.ItemDataRole.BackgroundRole) == MORE_EXPENSE
@@ -111,17 +136,18 @@ def test_double_click_opens_detail(main, window):
     assert detail.isVisible()
     # regression: carsharing was listed under car
     assert list(detail.table_model.frame[Col.category]) == ["car.fuel"]
-    assert detail.windowTitle() == "car: 2023-07"
+    assert detail.windowTitle() == "car: Jul 2023"
 
     net_row = len(frame) - 1
     window.table.doubleClicked.emit(window.table.model().index(net_row, columns.index("2024-01")))
     assert list(detail.table_model.frame[Col.recipient]) == ["REWE", "Kiosk"]
-    assert detail.label.text().startswith("Transactions of all categories in 2024-01")
+    assert detail.label.text() == "alle Kategorien · Jan 2024"
+    assert detail.summary_label.text() == "2 Buchungen · Summe -452,50 €"
 
     income_row = net_row - 2
     window.table.doubleClicked.emit(window.table.model().index(income_row, columns.index("2023-07")))
     assert list(detail.table_model.frame[Col.recipient]) == ["ACME GmbH"]
-    assert detail.windowTitle() == "income: 2023-07"
+    assert detail.windowTitle() == "Einnahmen: Jul 2023"
 
     window.table.doubleClicked.emit(window.table.model().index(0, columns.index(TOTAL)))
     assert detail.month == "2023-07"  # unchanged
@@ -131,7 +157,7 @@ def test_detail_follows_changes_and_opens_rule(main, model, window):
     main.open_detail("2024-01", [""])
     detail = main.detail_window
     assert list(detail.table_model.frame[Col.recipient]) == ["Kiosk"]
-    assert "(uncategorized)" in detail.windowTitle()
+    assert "(ohne Kategorie)" in detail.windowTitle()
     detail.table.doubleClicked.emit(detail.table.model().index(0, 2))
     assert main.rule_window.recipient_edit.text() == "Kiosk"
     main.rule_window.category_edit.setText("hobby")

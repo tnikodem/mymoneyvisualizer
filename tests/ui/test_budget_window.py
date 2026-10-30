@@ -1,10 +1,14 @@
-import pandas as pd
-import pyqtgraph as pg
-import pytest
-from PyQt6.QtCore import Qt
+"""The budget window with the fixture data: 2023 complete, January 2024 without income."""
 
-from mymoneyvisualizer.domain.budget import BudgetReport, GroupReport
-from mymoneyvisualizer.ui.budget_window import group_html, summary_html
+import pandas as pd
+import pytest
+from PyQt6.QtCore import QPointF
+from PyQt6.QtWidgets import QComboBox, QSpinBox
+
+from mymoneyvisualizer.domain.models import LAST_12_MONTHS
+from mymoneyvisualizer.ui.budget_window import euro, percent, period_label
+
+from ..helpers import transactions
 
 
 @pytest.fixture
@@ -13,130 +17,206 @@ def window(main):
     return main.budget_window
 
 
-def _items(widget):
-    return [widget.item(i).data(Qt.ItemDataRole.UserRole) for i in range(widget.count())]
+def _top(window, title):
+    tree = window.tree
+    return next(tree.topLevelItem(i) for i in range(tree.topLevelItemCount()) if tree.topLevelItem(i).text(0) == title)
 
 
-def _curve(plot, name):
-    return next(item for item in plot.plot.listDataItems() if item.name() == name)
+def _child(window, group_title, text):
+    item = _top(window, group_title)
+    return next(item.child(i) for i in range(item.childCount()) if item.child(i).text(0) == text)
 
 
-def test_renders_plots_and_reports(window):
-    """Regression: drawing crashed with pyqtgraph 0.14 / pandas 3 (series with a date index)."""
-    needs = window.plots["needs"]
-    assert {c.name() for c in needs.plot.listDataItems() if c.name()} == {"target", "household", "car"}
-    assert any(isinstance(i, pg.FillBetweenItem) for i in needs.plot.getPlotItem().items)
-    text = needs.report_view.toPlainText()
-    assert "Needs, per month" in text
-    assert "Target:50 % = 1.500 €" in text.replace("\n", "")
-    assert "Actual:35 % = 1.060 €" in text.replace("\n", "")  # rent 900, food 100, fuel 60
-    assert "household:1.000 €" in text.replace("\n", "")
-    savings = window.plots["savings"]
-    assert {c.name() for c in savings.plot.listDataItems() if c.name()} == {"target", "saved"}
+def _layer(window, name):
+    return next(layer for layer in window.chart.layers if layer.name == name)
 
 
-def test_summary_answers_whether_too_much_or_too_little_is_spent(window):
+def test_key_figures_answer_whether_too_much_or_too_little_is_spent(window):
     """2023: income 36,000 €, needs 12,720 €, wants -20 € (carsharing 180 € minus the uncategorized 200 € that came
     in on the savings account), so 65 % are saved instead of 20 %: (23,300 € - 7,200 €) / 12 more per month."""
-    text = window.summary_label.text()
-    assert "savings rate <b>65 %</b> (target 20 %)" in text
-    assert "1.342 € more per month" in text
+    figures = window.figures
+    assert (figures["income"].value.text(), figures["income"].detail.text()) == ("3.000 €", "pro Monat")
+    assert figures["spending"].value.text() == "1.058 €"
+    assert figures["spending"].detail.text() == "pro Monat · 35 % des Einkommens"
+    assert figures["rate"].value.text() == "65 %"
+    assert figures["rate"].detail.text() == "Ziel 20 % · ✓ erreicht"
+    assert figures["rate"].property("tone") == "good"
+    assert figures["room"].value.text() == "+1.342 €"
+    assert window.period_note.text() == ""
 
 
-def test_category_lists(window):
-    assert _items(window.lists["income"]) == ["income"]
-    assert _items(window.lists["needs"]) == ["household", "car"]
-    assert _items(window.lists["wants"]) == ["carsharing", ""]
-    assert _items(window.lists["savings"]) == []
-    assert window.lists["wants"].item(1).text() == "(uncategorized)"
+def test_too_little_saved(window, model):
+    """A car for 30,000 € without category (wants) eats up all savings: (36,000 - 12,720 - 29,980) € = -6,700 €."""
+    model.import_transactions("giro", transactions(("2023-05-01", "Autohaus", "Auto", -30000.0)))
+    assert window.figures["rate"].value.text() == "−19 %"
+    assert window.figures["rate"].detail.text() == "Ziel 20 % · ✗ verfehlt"
+    room = window.figures["room"]
+    assert room.value.text() == "−1.158 €"  # (-6,700 € - 7,200 €) / 12
+    assert room.detail.text() == "pro Monat unter dem Ziel"
+    assert room.property("tone") == "bad"
+    assert (
+        _top(window, "Freizeit & Lebensstil").foreground(2).color().name() == "#c5221f"
+    )  # 83 % instead of at most 30 %
+    assert _top(window, "Sparen").foreground(2).color().name() == "#c5221f"
 
 
-def test_moving_a_category_changes_its_group(window, model, qtbot):
-    item = window.lists["wants"].takeItem(0)
-    window.lists["needs"].addItem(item)
+def test_breakdown_per_group_and_category(window):
+    assert [window.tree.topLevelItem(i).text(0) for i in range(4)] == [
+        "Einkommen",
+        "Grundbedarf",
+        "Freizeit & Lebensstil",
+        "Sparen",
+    ]
+    needs = _top(window, "Grundbedarf")
+    assert [needs.text(c) for c in range(1, 4)] == ["1.060 €", "35 %", "–"]  # no data a year before
+    assert [needs.child(i).text(0) for i in range(needs.childCount())] == ["household", "car"]
+    assert _child(window, "Grundbedarf", "household").text(1) == "1.000 €"
+    assert _child(window, "Freizeit & Lebensstil", "(ohne Kategorie)").text(1) == "−17 €"
+    savings = _top(window, "Sparen")
+    assert [savings.text(c) for c in (1, 2, 4)] == ["1.942 €", "65 %", "Ziel 20 %"]
+    assert _child(window, "Sparen", "Rest auf den Konten").text(1) == "1.942 €"
+    spin = window.tree.itemWidget(needs, 4)
+    assert isinstance(spin, QSpinBox) and spin.value() == 50
+
+
+def test_change_against_the_year_before(window, model):
+    """2024 against January 2023: the food bill went up from 100 € to 450 €, the salary is missing."""
+    model.set_budget_period("2024")
+    food = _child(window, "Grundbedarf", "household")
+    assert food.text(3) == "−550 €"  # rent and food 1,000 € in January 2023, only food 450 € now
+    assert food.foreground(3).color().name() == "#1e7d3a"  # less spent: good
+    assert _top(window, "Einkommen").text(3) == "−3.000 €"
+    assert _top(window, "Einkommen").foreground(3).color().name() == "#c5221f"
+    assert "Ein Jahr davor: 1.000 € pro Monat" in food.toolTip(3)
+
+
+def test_moving_a_category_to_another_group(window, model, qtbot):
+    combo = window.tree.itemWidget(_child(window, "Freizeit & Lebensstil", "carsharing"), 4)
+    assert isinstance(combo, QComboBox) and combo.currentData() == "wants"
+    combo.setCurrentIndex(combo.findData("needs"))
     qtbot.waitUntil(lambda: {a.category: a.group for a in model.groups}["carsharing"] == "needs")
-    assert _items(window.lists["needs"]) == ["household", "car", "carsharing"]
-    names = {item.name() for item in window.plots["needs"].plot.listDataItems() if item.name()}
-    assert "carsharing" in names
+    assert _child(window, "Grundbedarf", "carsharing").text(1) == "15 €"
 
 
-def test_budget_settings(window, model):
-    window.plots["wants"].share_spin.setValue(40)
-    assert model.settings.budget_shares["wants"] == 0.4
-    assert window.plots["savings"].share_label.text() == "10 % of income (the rest)"
-    window.end_combo.setCurrentText("2024")
-    assert (model.settings.budget_start, model.settings.budget_end) == (2023, 2024)
-    assert "2023-2024 (13 of 24 months" in window.summary_label.text()
-    window.start_combo.setCurrentText(str(pd.Timestamp.today().year + 1))
-    settings = model.settings
-    assert settings.budget_start <= settings.budget_end
+def test_targets(window, model):
+    window.tree.itemWidget(_top(window, "Grundbedarf"), 4).setValue(40)
+    assert model.settings.budget_shares["needs"] == 0.4
+    assert _top(window, "Sparen").text(4) == "Ziel 30 %"
+    assert window.figures["rate"].detail.text() == "Ziel 30 % · ✓ erreicht"
 
 
-def test_twelve_month_average(window):
-    """January 2024 has no income; the moving average still shows 11 of the last 12 salaries."""
-    needs = window.plots["needs"]
-    assert _curve(needs, "target").yData[-1] == pytest.approx(0.5 * 11 * 3000 / 12)
-    window.smooth_check.setChecked(False)
-    assert _curve(needs, "target").yData[-1] == 0.0
+def test_periods(window, model):
+    combo = window.period_combo
+    assert [combo.itemText(i) for i in range(combo.count())] == [
+        "Letzte 12 Monate (Feb 2023 – Jan 2024)",
+        "2024 (Jan)",
+        "2023",
+    ]
+    assert combo.currentData() == "2023"
+    combo.setCurrentIndex(0)
+    assert model.settings.budget_period == LAST_12_MONTHS
+    assert window.figures["income"].value.text() == "2.750 €"  # 11 salaries in 12 months
 
 
-def test_empty_data(qtbot, tmp_path):
+def test_chart_shows_the_development_of_the_selection(window):
+    chart = window.chart
+    assert [layer.name for layer in chart.layers] == [
+        "Grundbedarf",
+        "Freizeit & Lebensstil",
+        "Konsumgrenze für 20 % Sparquote",
+        "Nettoeinkommen",
+    ]
+    assert chart.title.text() == "Einkommen und Konsum"
+    # January 2024 has no income; the average of the last 12 months still holds 11 salaries
+    assert _layer(window, "Nettoeinkommen").values[-1] == pytest.approx(11 * 3000 / 12)
+    assert len(chart.months) == 2  # a full year is needed for the first average
+
+    window.tree.setCurrentItem(_top(window, "Grundbedarf"))
+    assert [layer.name for layer in chart.layers] == ["household", "car", "Ziel 50 % des Einkommens"]
+    window.tree.setCurrentItem(_child(window, "Grundbedarf", "household"))
+    assert _layer(window, "household").values[-1] == pytest.approx((11 * 1000 + 450) / 12)
+    window.tree.setCurrentItem(_top(window, "Sparen"))
+    assert "Ersparnis gesamt" in [layer.name for layer in chart.layers]
+    window.tree.setCurrentItem(_top(window, "Einkommen"))
+    assert [layer.name for layer in chart.layers] == ["income"]
+
+    chart.smooth_check.setChecked(False)
+    assert chart.title.text() == "Einkommen"
+    assert _layer(window, "income").values[-1] == 0.0
+    assert len(chart.months) == 13
+
+
+def test_hovering_the_chart_shows_the_values_of_a_month(window):
+    chart = window.chart
+    view = chart.plot.getPlotItem().vb
+    chart._hover(view.mapViewToScene(QPointF(chart.x[-1], 100)))
+    assert chart.cursor.isVisible()
+    assert chart.cursor.value() == chart.x[-1]
+    chart._hover(QPointF(-1000, -1000))
+    assert not chart.cursor.isVisible()
+
+
+def test_double_click_lists_the_transactions_as_paid(main, window):
+    window.open_detail(_child(window, "Grundbedarf", "household"))
+    detail = main.detail_window
+    assert detail.isVisible()
+    assert detail.label.text() == "household · 2023"
+    assert "Im Budget sind verteilte Zahlungen anteilig" in detail.help_button.toolTip()
+    assert detail.summary_label.text() == "24 Buchungen · Summe -12.000,00 €"
+    window.open_detail(_top(window, "Grundbedarf"))
+    assert detail.label.text() == "Grundbedarf · 2023"
+    assert len(detail.table_model.frame) == 36
+    window.open_detail(_child(window, "Sparen", "Rest auf den Konten"))
+    assert detail.label.text() == "Grundbedarf · 2023"  # nothing to list
+
+
+def test_banner_explains_why_the_numbers_differ_until_it_is_closed(window, model, dialogs):
+    window.banner.more_button.click()
+    kind, title, text = dialogs.shown[-1]
+    assert (kind, title) == ("information", "Periodengerechte Sicht")
+    assert "Kfz-Versicherung, 684 € im Januar" in text
+    window.banner.close_button.click()
+    assert window.banner.isHidden()
+    assert model.settings.hidden_hints == ["budget"]
+    window.refresh()
+    assert window.banner.isHidden()  # read once is enough
+    window.help_button.click()  # the explanation stays available
+    assert "Kfz-Versicherung, 684 € im Januar" in dialogs.shown[-1][2]
+
+
+def test_partial_and_empty_data(qtbot, tmp_path):
     from mymoneyvisualizer.app import AppModel
     from mymoneyvisualizer.ui.main_window import MainWindow
 
-    main = MainWindow(AppModel.open(tmp_path / "empty"))
+    model = AppModel.open(tmp_path / "data")
+    main = MainWindow(model)
     qtbot.addWidget(main)
     main.show_budget()
     window = main.budget_window
-    assert window.plots["needs"].report_view.toPlainText() == ""
-    assert window.summary_label.text() == "No transactions in the budget period."
-    assert window.lists["needs"].count() == 0
+    assert window.figures["rate"].value.text() == "–"
+    assert window.tree.topLevelItemCount() == 0
+    assert window.chart.legend.text() == "Zu wenige Monate für einen Verlauf."
+
+    model.add_account("giro")
+    model.import_transactions("giro", transactions(("2024-01-05", "a", "b", 100.0), ("2024-02-05", "c", "d", -10.0)))
+    assert window.period_note.text() == "Nur 2 von 12 Monaten haben Buchungen."
+    assert window.figures["rate"].value.text() == "–"  # without income
+    assert window.figures["rate"].detail.text() == "Kein Einkommen im Zeitraum."
 
 
-def _report(**changes):
-    values = {
-        "start_year": 2024,
-        "end_year": 2024,
-        "months": 6,
-        "period_months": 12,
-        "last_date": pd.Timestamp("2024-06-20"),
-        "income": 18000.0,
-        "needs": GroupReport("needs", 0.5, 9600.0, [("household", 9000.0), ("", 600.0)]),
-        "wants": GroupReport("wants", 0.3, 3600.0, [("hobby", 3600.0)]),
-        "savings": GroupReport("savings", 0.2, 3000.0, [("depot", 3000.0)]),
-    }
-    values.update(changes)
-    return BudgetReport(**values)
-
-
-def test_summary_html():
-    text = summary_html(_report())
-    assert "2024 (6 of 12 months, until 20.06.2024)" in text
-    assert "income 3.000 € per month" in text
-    assert "savings rate <b>27 %</b> (target 20 %)" in text
-    assert "<b>200 € more per month</b>" in text
-
-
-def test_summary_html_when_too_little_is_saved():
-    report = _report(wants=GroupReport("wants", 0.3, 6600.0, []), months=12, period_months=12)
-    text = summary_html(report)
-    assert "savings rate <b>10 %</b>" in text
-    assert "spend <b>150 € less per month</b>" in text
-    assert "until" not in text  # complete period
-
-
-def test_summary_html_without_income_or_data():
-    assert "no income" in summary_html(_report(income=0.0))
-    assert summary_html(None) == summary_html(_report(months=0)) == "No transactions in the budget period."
-
-
-def test_group_html():
-    needs = group_html(_report(), "needs")
-    assert "Target:</td><td align='right'>50 % = 1.500 €" in needs
-    assert "Actual:</b></td><td align='right'><b>53 % = 1.600 €" in needs
-    assert "(uncategorized):</td><td align='right'>100 €" in needs
-    savings = group_html(_report(), "savings")
-    assert "Saved:</b></td><td align='right'><b>27 % = 800 €" in savings
-    assert "depot:</td><td align='right'>500 €" in savings
-    assert "kept on the accounts" in savings
-    assert group_html(None, "needs") == ""
+def test_formatting():
+    assert (euro(1234.4), euro(-0.4), euro(-12.6), euro(12.6, signed=True), euro(0.2, signed=True)) == (
+        "1.234 €",
+        "0 €",
+        "−13 €",
+        "+13 €",
+        "0 €",
+    )
+    assert (percent(0.254), percent(-0.19), percent(None)) == ("25 %", "−19 %", "–")
+    month = pd.Period
+    assert period_label(LAST_12_MONTHS, month("2025-10", "M"), month("2026-09", "M")) == (
+        "Letzte 12 Monate (Okt 2025 – Sep 2026)"
+    )
+    assert period_label("2026", month("2026-01", "M"), month("2026-09", "M")) == "2026 (Jan – Sep)"
+    assert period_label("2025", month("2025-01", "M"), month("2025-12", "M")) == "2025"
+    assert period_label("2023", month("2023-11", "M"), month("2023-12", "M")) == "2023 (Nov – Dez)"

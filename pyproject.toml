@@ -37,6 +37,9 @@ version = { attr = "mymoneyvisualizer.__version__" }
 [tool.setuptools.packages.find]
 include = ["mymoneyvisualizer*"]
 
+[tool.setuptools.package-data]
+"mymoneyvisualizer.ui" = ["icons/*.svg"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 qt_api = "pyqt6"

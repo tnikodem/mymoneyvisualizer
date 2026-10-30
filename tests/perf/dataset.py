@@ -116,7 +116,7 @@ def build_state(
     rng = random.Random(seed)
     start = pd.Period("2014-11", "M")
     names = ["Girokonto", "Tagesgeld", *[f"Konto {i}" for i in range(2, accounts)]]
-    state = State(settings=Settings(budget_start=2025, budget_end=2026))
+    state = State(settings=Settings(budget_period="2025"))
     for i, name in enumerate(names):
         state.accounts[name] = _transactions(rng, i, start, years * 12, per_month * (1.0 if i < 2 else 0.6))
     combined = pd.concat(state.accounts.values(), ignore_index=True)

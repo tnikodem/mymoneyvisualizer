@@ -34,14 +34,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     from mymoneyvisualizer.app import AppModel
     from mymoneyvisualizer.storage.files import StorageError
     from mymoneyvisualizer.ui.main_window import MainWindow
+    from mymoneyvisualizer.ui.style import apply_style, use_german
 
     app = QApplication.instance() or QApplication(sys.argv[:1])
+    apply_style(app)
+    use_german(app)
     data_dir = resolve_data_dir(args.data_dir)
     logger.info("using data directory %s", data_dir)
     try:
         model = AppModel.open(data_dir)
     except StorageError as e:
-        QMessageBox.critical(None, "MyMoneyVisualizer", f"Cannot load your data:\n{e}")
+        QMessageBox.critical(None, "MyMoneyVisualizer", f"Deine Daten lassen sich nicht laden:\n{e}")
         return 1
     window = MainWindow(model)
     window.show()

@@ -1,19 +1,18 @@
-"""Import a CSV export: detected format, column mapping and a preview of what will be added."""
+"""Import a CSV export: what will be added, the column mapping and, if detection failed, the file format."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
 import pandas as pd
-from PyQt6.QtCore import QDate
+from PyQt6.QtCore import QDate, Qt
 from PyQt6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QDateEdit,
+    QGridLayout,
     QHBoxLayout,
-    QLabel,
     QLineEdit,
-    QPushButton,
     QSpinBox,
     QVBoxLayout,
     QWidget,
@@ -31,25 +30,42 @@ from mymoneyvisualizer.importing.reader import (
     read_table,
 )
 from mymoneyvisualizer.importing.sniff import MIXED_ENCODING
-from mymoneyvisualizer.ui.common import Window
+from mymoneyvisualizer.ui.common import Card, HelpButton, Window, make_button, make_label, set_tone
 from mymoneyvisualizer.ui.table_model import DATE, MONEY, Column, DataFrameModel, DataFrameView
 
 ENCODINGS = ("utf-8", "utf-8-sig", MIXED_ENCODING, "cp1252", "latin-1", "utf-16")
 PREVIEW_COLUMNS = [
-    Column(Col.date, "date", DATE, 90),
-    Column(Col.recipient, "recipient", width=280),
-    Column(Col.description, "description", width=560),
-    Column(Col.value, "value", MONEY, 100),
+    Column(Col.date, "Datum", DATE, 90),
+    Column(Col.recipient, "Empfänger", width=280),
+    Column(Col.description, "Verwendungszweck", width=560),
+    Column(Col.value, "Betrag", MONEY, 100),
 ]
 MAPPING_LABELS = {
-    "col_date": "Date",
-    "col_recipient": "Recipient (optional)",
-    "col_description": "Description (optional)",
-    "col_value": "Value",
-    "col_debit": "Debit amounts (optional)",
-    "col_credit": "Credit amounts (optional)",
-    "col_sign": "Debit/credit mark, e.g. S/H (optional)",
+    "col_date": "Datum",
+    "col_recipient": "Empfänger (optional)",
+    "col_description": "Verwendungszweck (optional)",
+    "col_value": "Betrag",
+    "col_debit": "Soll-Beträge (optional)",
+    "col_credit": "Haben-Beträge (optional)",
+    "col_sign": "Soll/Haben-Kennzeichen, z. B. S/H (optional)",
 }
+MAPPING_TIPS = {
+    "col_date": "Die Spalte mit dem Buchungsdatum.",
+    "col_recipient": "Wer das Geld bekommt oder schickt; damit werden Regeln vorgeschlagen.",
+    "col_description": "Der Verwendungszweck bzw. Buchungstext.",
+    "col_value": "Der Betrag mit Vorzeichen: Ausgaben negativ, Eingänge positiv.",
+    "col_debit": "Nur nötig, wenn die Datei Ausgaben in einer eigenen Spalte hat.",
+    "col_credit": "Nur nötig, wenn die Datei Eingänge in einer eigenen Spalte hat.",
+    "col_sign": "Nur nötig, wenn die Beträge kein Vorzeichen haben und eine Spalte S (Soll) oder H (Haben) angibt.",
+}
+MAIN_FIELDS = ("col_date", "col_value", "col_recipient", "col_description")
+HELP = (
+    "<p>Die Spalten sind vorgeschlagen; prüfe sie an der Vorschau. Die Zuordnung wird für die nächste Datei derselben"
+    " Bank gespeichert.</p>"
+    "<p>Buchungen, die schon im Konto sind, werden übersprungen.</p>"
+    "<p>Sehen Umlaute oder Beträge in der Vorschau falsch aus, helfen die <b>erweiterten Einstellungen</b>"
+    " (Zeichensatz, Trennzeichen, Dezimalzeichen).</p>"
+)
 
 
 def _qdate(timestamp: pd.Timestamp) -> QDate:
@@ -67,69 +83,124 @@ class ImportWindow(Window):
         self._loading = False
 
         self.name_edit = QLineEdit(self)
+        self.name_edit.setToolTip(
+            "Unter diesem Namen werden die Einstellungen gespeichert und beim nächsten Import einer Datei mit denselben"
+            " Spalten automatisch verwendet."
+        )
         self.encoding_combo = QComboBox(self)
         self.encoding_combo.setEditable(True)
         self.encoding_combo.addItems(ENCODINGS)
+        self.encoding_combo.setToolTip(
+            "Wie die Datei kodiert ist. Kaputte Umlaute (Ã¤ statt ä) deuten auf den falschen."
+        )
         self.separator_edit = QLineEdit(self)
+        self.separator_edit.setToolTip("Zeichen zwischen den Spalten, meist ; oder ,")
         self.decimal_edit = QLineEdit(self)
+        self.decimal_edit.setToolTip("Zeichen vor den Cent, in deutschen Dateien meist ein Komma: 1,99")
         self.thousands_edit = QLineEdit(self)
+        self.thousands_edit.setToolTip("Zeichen zwischen den Tausendern, z. B. der Punkt in 1.000,00; darf leer sein.")
         for edit in (self.separator_edit, self.decimal_edit, self.thousands_edit):
             edit.setMaxLength(1)
-            edit.setFixedWidth(40)
+            edit.setFixedWidth(48)
         self.header_spin = QSpinBox(self)
         self.header_spin.setRange(0, 10_000)
-        self.dayfirst_check = QCheckBox("Day first", self)
-        self.duplicates_check = QCheckBox("Drop duplicates", self)
+        self.header_spin.setToolTip("So viele Zeilen stehen vor der Zeile mit den Spaltennamen.")
+        self.dayfirst_check = QCheckBox("Tag vor Monat", self)
+        self.dayfirst_check.setToolTip("Datum als Tag.Monat.Jahr wie in Deutschland, nicht Monat/Tag/Jahr.")
+        self.duplicates_check = QCheckBox("Schon vorhandene überspringen", self)
+        self.duplicates_check.setToolTip(
+            "Buchungen, die schon im Konto sind (gleiches Datum, gleicher Betrag, gleicher Text), nicht noch einmal"
+            " importieren. So schaden überlappende Exporte nicht."
+        )
         self.since_edit = QDateEdit(self)
         self.since_edit.setCalendarPopup(True)
         self.since_edit.setDisplayFormat("dd.MM.yyyy")
+        self.since_edit.setToolTip("Ältere Buchungen der Datei werden nicht importiert.")
         self.column_combos = {f: QComboBox(self) for f in MAPPING_FIELDS}
+        for field, combo in self.column_combos.items():
+            combo.setToolTip(MAPPING_TIPS[field])
+            combo.setMinimumWidth(200)
         self.extra_combo = MultiSelectComboBox(self)
-        self.extra_combo.setPlaceholderText("none")
-        self.extra_combo.setMinimumWidth(160)
+        self.extra_combo.setPlaceholderText("keine")
+        self.extra_combo.setMinimumWidth(200)
+        self.extra_combo.setToolTip("Spalten, die zum Betrag addiert werden, z. B. Gebühren oder Steuern eines Depots.")
+        self.name_edit.setFixedWidth(200)
 
-        self.name_edit.setFixedWidth(180)
-        format_row, mapping_row, value_row = QHBoxLayout(), QHBoxLayout(), QHBoxLayout()
-        for label, widget in (
-            ("Profile", self.name_edit),
-            ("Encoding", self.encoding_combo),
-            ("Separator", self.separator_edit),
-            ("Decimal", self.decimal_edit),
-            ("Thousands", self.thousands_edit),
-            ("Header line", self.header_spin),
-            ("Import since", self.since_edit),
-            ("", self.dayfirst_check),
-            ("", self.duplicates_check),
-        ):
-            format_row.addLayout(self._labelled(label, widget))
-        for field in MAPPING_FIELDS:
-            self.column_combos[field].setMinimumWidth(160)
-            row = mapping_row if field in ("col_date", "col_recipient", "col_description", "col_value") else value_row
-            row.addLayout(self._labelled(MAPPING_LABELS[field], self.column_combos[field]))
-        value_row.insertLayout(0, self._labelled("Add to value, e.g. fee/tax (optional)", self.extra_combo))
-        for row in (format_row, mapping_row, value_row):
-            row.addStretch(1)
+        self.title = make_label("", self, "heading")
+        self.status_label = make_label("", self, wrap=True)
+        self.error_label = make_label("", self, wrap=True)
+        set_tone(self.error_label, "bad")
+        self.import_button = make_button(
+            "Importieren", "Die Buchungen der Vorschau in das Konto übernehmen.", self, primary=True
+        )
+        self.cancel_button = make_button("Abbrechen", "Nichts importieren und das Fenster schließen.", self)
+        header = QHBoxLayout()
+        texts = QVBoxLayout()
+        texts.addWidget(self.title)
+        texts.addWidget(self.status_label)
+        header.addLayout(texts, 1)
+        header.addWidget(HelpButton(HELP, "Import", self))
+        header.addWidget(self.cancel_button)
+        header.addWidget(self.import_button)
 
-        self.status_label = QLabel(self)
-        self.error_label = QLabel(self)
-        self.error_label.setStyleSheet("color: #b00020;")
-        self.import_button = QPushButton("Import", self)
-        self.cancel_button = QPushButton("Cancel", self)
-        buttons = QHBoxLayout()
-        buttons.addWidget(self.status_label, 1)
-        buttons.addWidget(self.cancel_button)
-        buttons.addWidget(self.import_button)
+        mapping = Card(self)
+        mapping.content.addWidget(make_label("Spaltenzuordnung", mapping, "heading"))
+        grid = QGridLayout()
+        grid.setHorizontalSpacing(16)
+        for column, field in enumerate(MAIN_FIELDS):
+            grid.addWidget(make_label(MAPPING_LABELS[field], mapping), 0, column)
+            grid.addWidget(self.column_combos[field], 1, column)
+        grid.addWidget(make_label("Importieren ab", mapping), 0, len(MAIN_FIELDS))
+        grid.addWidget(self.since_edit, 1, len(MAIN_FIELDS))
+        grid.setColumnStretch(len(MAIN_FIELDS) + 1, 1)
+        mapping.content.addLayout(grid)
+
+        self.advanced_button = make_button(
+            "▸ Erweiterte Einstellungen",
+            "Dateiformat und besondere Betragsspalten. Nur nötig, wenn die Vorschau falsch aussieht.",
+            self,
+            link=True,
+        )
+        self.advanced_button.setCheckable(True)
+        self.advanced = QWidget(self)
+        advanced = QGridLayout(self.advanced)
+        advanced.setContentsMargins(0, 0, 0, 0)
+        advanced.setHorizontalSpacing(16)
+        format_fields = (
+            ("Profilname", self.name_edit),
+            ("Zeichensatz", self.encoding_combo),
+            ("Trennzeichen", self.separator_edit),
+            ("Dezimalzeichen", self.decimal_edit),
+            ("Tausender", self.thousands_edit),
+            ("Zeilen vor der Kopfzeile", self.header_spin),
+        )
+        for column, (label, widget) in enumerate(format_fields):
+            advanced.addWidget(make_label(label, self.advanced), 0, column)
+            advanced.addWidget(widget, 1, column)
+        advanced.addWidget(self.dayfirst_check, 1, len(format_fields))
+        advanced.addWidget(self.duplicates_check, 1, len(format_fields) + 1)
+        values = (*[f for f in MAPPING_FIELDS if f not in MAIN_FIELDS],)
+        advanced.addWidget(make_label("Zum Betrag addieren (optional)", self.advanced), 2, 0, 1, 2)
+        advanced.addWidget(self.extra_combo, 3, 0, 1, 2)
+        for column, field in enumerate(values, start=2):
+            advanced.addWidget(make_label(MAPPING_LABELS[field], self.advanced), 2, 2 * column - 2, 1, 2)
+            advanced.addWidget(self.column_combos[field], 3, 2 * column - 2, 1, 2)
+        advanced.setColumnStretch(len(format_fields) + 2, 1)
+        mapping.content.addWidget(self.advanced_button, 0, Qt.AlignmentFlag.AlignLeft)
+        mapping.content.addWidget(self.advanced)
+        self.advanced.hide()
 
         self.table_model = DataFrameModel(PREVIEW_COLUMNS, self)
         self.table = DataFrameView(self.table_model, self)
 
         central = QWidget(self)
         layout = QVBoxLayout(central)
-        layout.addLayout(format_row)
-        layout.addLayout(mapping_row)
-        layout.addLayout(value_row)
+        layout.setContentsMargins(16, 14, 16, 14)
+        layout.setSpacing(10)
+        layout.addLayout(header)
         layout.addWidget(self.error_label)
-        layout.addLayout(buttons)
+        layout.addWidget(mapping)
+        layout.addWidget(make_label("Vorschau", self, "heading"))
         layout.addWidget(self.table)
         self.setCentralWidget(central)
 
@@ -145,17 +216,17 @@ class ImportWindow(Window):
         self.extra_combo.selectionChanged.connect(self.refresh_preview)
         self.import_button.clicked.connect(self.import_transactions)
         self.cancel_button.clicked.connect(self.close)
+        self.advanced_button.toggled.connect(self.show_advanced)
 
-    def _labelled(self, label: str, widget: QWidget) -> QVBoxLayout:
-        box = QVBoxLayout()
-        box.addWidget(QLabel(label, self))
-        box.addWidget(widget)
-        return box
+    def show_advanced(self, shown: bool) -> None:
+        self.advanced.setVisible(shown)
+        self.advanced_button.setText(("▾" if shown else "▸") + " Erweiterte Einstellungen")
 
     # ------------------------------------------------------------------ profile <-> widgets
     def open_file(self, path: str | Path, account: str) -> None:
         self.path, self.account = Path(path), account
-        self.setWindowTitle(f"Import {self.path.name} into {account}")
+        self.setWindowTitle(f"Import: {self.path.name} → {account}")
+        self.title.setText(f"{self.path.name} → Konto {account}")
         profile, matched = propose_profile(self.path, self.model.profiles)
         self.original_name = matched.name if matched else None
         self.set_profile(profile)
@@ -239,7 +310,12 @@ class ImportWindow(Window):
             existing = self.model.account_transactions(self.account)
             self.preview = preview_import(table, profile, existing=existing, since=self.since())
         except ImportFormatError as e:
-            self.error_label.setText(str(e))
+            message = str(e)
+            if not message.startswith("Bitte eine Spalte"):  # the file format is not right
+                message += " Prüfe die erweiterten Einstellungen."
+                self.advanced_button.setChecked(True)
+            self.error_label.setText(message)
+        self.error_label.setVisible(bool(self.error_label.text()))
         frame = self.preview.transactions if self.preview is not None else None
         self.table_model.set_frame(frame)
         self.status_label.setText(self.status_text())
@@ -249,16 +325,18 @@ class ImportWindow(Window):
         preview = self.preview
         if preview is None:
             return ""
-        parts = [f"{len(preview.transactions)} new transactions"]
+        new = len(preview.transactions)
+        parts = [f"<b>{new} neue {'Buchung' if new == 1 else 'Buchungen'}</b>"]
         if len(preview.duplicates):
-            parts.append(f"{len(preview.duplicates)} already imported")
+            parts.append(f"{len(preview.duplicates)} schon vorhanden")
         if preview.before_since:
-            parts.append(f"{preview.before_since} before the start date")
+            parts.append(f"{preview.before_since} vor dem Startdatum")
         if preview.invalid:
-            parts.append(f"{preview.invalid} rows without valid date or value")
+            rows = "Zeile" if preview.invalid == 1 else "Zeilen"
+            parts.append(f"{preview.invalid} {rows} ohne gültiges Datum oder gültigen Betrag")
         if preview.zero:
-            parts.append(f"{preview.zero} with value 0")
-        return ", ".join(parts)
+            parts.append(f"{preview.zero} mit Betrag 0")
+        return " · ".join(parts)
 
     def import_transactions(self) -> int:
         if self.preview is None or self.preview.transactions.empty:

@@ -1,9 +1,9 @@
-import datetime
 import math
 
 import pytest
 
 from mymoneyvisualizer.domain.models import (
+    LAST_12_MONTHS,
     GroupAssignment,
     ManualCategory,
     Rule,
@@ -64,9 +64,9 @@ def test_group_assignment_unknown_category():
     assert GroupAssignment.from_dict({"category": "x"}).to_dict() == {"category": "x", "group": "needs"}
 
 
-def test_settings_defaults_use_current_year():
+def test_settings_defaults():
     settings = Settings()
-    assert settings.budget_start == settings.budget_end == datetime.date.today().year
+    assert settings.budget_period == LAST_12_MONTHS
     assert settings.budget_shares == {"needs": 0.5, "wants": 0.3}
     assert settings.savings_share == pytest.approx(0.2)
     assert settings.hide_internal_transfers is True
@@ -88,7 +88,9 @@ def test_settings_instances_do_not_share_state():
 
 
 def test_settings_roundtrip():
-    settings = Settings(excluded_categories=["x"], budget_start=2020, budget_end=2022, hide_internal_transfers=False)
+    settings = Settings(
+        excluded_categories=["x"], budget_period="2022", hide_internal_transfers=False, hidden_hints=["budget"]
+    )
     settings.budget_shares["needs"] = 0.4
     assert Settings.from_dict(settings.to_dict()) == settings
 
@@ -99,19 +101,16 @@ def test_settings_roundtrip():
         None,
         {},
         {"budget": "garbage"},
-        {"budget": {"start": 2020}},
+        {"budget": {"period": 2020}},
+        {"budget": {"period": "last year"}},
         {"budget": {"shares": {"needs": 7}}},
         {"budget": {"shares": "garbage"}},
         {"excluded_categories": "not-a-list"},
+        {"hidden_hints": "not-a-list"},
     ],
 )
 def test_settings_ignore_invalid_values(data):
     assert Settings.from_dict(data) == Settings()
-
-
-def test_settings_swap_inverted_period():
-    settings = Settings.from_dict({"budget": {"start": 2024, "end": 2020}})
-    assert (settings.budget_start, settings.budget_end) == (2020, 2024)
 
 
 def test_reorder_groups_moves_and_recategorizes():

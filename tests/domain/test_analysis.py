@@ -106,7 +106,7 @@ def test_income_expenses_table_summary_rows():
     table = income_expenses_table(_sample(), "2024-01", "2024-04", groups={**GROUPS, "spar": "savings"})
     summaries = _summaries(table)
     assert list(summaries.index) == ["income", "expenses", "savings", "net"]
-    assert list(summaries[Col.category]) == ["Income", "Expenses", "Savings", "Net"]
+    assert list(summaries[Col.category]) == ["Einnahmen", "Ausgaben", "Sparen", "Saldo"]
     assert summaries.loc["income", TOTAL] == 2000.0
     assert summaries.loc["expenses", TOTAL] == pytest.approx(-50 - 60 - 30 - 10 - 2)
     assert summaries.loc["savings", "2024-03"] == -200.0

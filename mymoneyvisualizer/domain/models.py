@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import datetime
 import math
 import uuid
 from collections.abc import Mapping, Sequence
@@ -19,6 +18,9 @@ CONSUMPTION_GROUPS = (GROUP_NEEDS, GROUP_WANTS)
 
 #: Shares of the net income for needs and wants; the rest is the savings target.
 DEFAULT_BUDGET_SHARES = {GROUP_NEEDS: 0.5, GROUP_WANTS: 0.3}
+
+#: Budget period of the last twelve complete months; the other budget periods are calendar years, e.g. "2025".
+LAST_12_MONTHS = "last 12 months"
 
 #: Longest spread: 50 years.
 MAX_SPREAD_MONTHS = 600
@@ -150,18 +152,21 @@ class GroupAssignment:
         return {"category": self.category, "group": self.group}
 
 
-def _current_year() -> int:
-    return datetime.date.today().year
+def valid_budget_period(value: Any) -> bool:
+    """The last twelve complete months or a calendar year such as ``"2025"``."""
+    return value == LAST_12_MONTHS or (isinstance(value, str) and len(value) == 4 and value.isdigit())
 
 
 @dataclass
 class Settings:
     excluded_categories: list[str] = field(default_factory=list)
     hide_internal_transfers: bool = True
-    budget_start: int = field(default_factory=_current_year)
-    budget_end: int = field(default_factory=_current_year)
+    #: :data:`LAST_12_MONTHS` or a year such as ``"2025"``
+    budget_period: str = LAST_12_MONTHS
     #: target shares of the net income for needs and wants
     budget_shares: dict[str, float] = field(default_factory=lambda: dict(DEFAULT_BUDGET_SHARES))
+    #: explanations the user has read and closed
+    hidden_hints: list[str] = field(default_factory=list)
 
     @property
     def savings_share(self) -> float:
@@ -178,12 +183,14 @@ class Settings:
             settings.excluded_categories = [str(c) for c in excluded]
         if "hide_internal_transfers" in data:
             settings.hide_internal_transfers = bool(data["hide_internal_transfers"])
+        hints = data.get("hidden_hints")
+        if isinstance(hints, Sequence) and not isinstance(hints, str):
+            settings.hidden_hints = [str(h) for h in hints]
 
         budget = data.get("budget")
         budget = budget if isinstance(budget, Mapping) else {}
-        start, end = budget.get("start"), budget.get("end")
-        if isinstance(start, int) and isinstance(end, int):
-            settings.budget_start, settings.budget_end = min(start, end), max(start, end)
+        if valid_budget_period(budget.get("period")):
+            settings.budget_period = budget["period"]
         shares = budget.get("shares")
         shares = shares if isinstance(shares, Mapping) else {}
         for group in CONSUMPTION_GROUPS:
@@ -196,11 +203,8 @@ class Settings:
         return {
             "excluded_categories": list(self.excluded_categories),
             "hide_internal_transfers": self.hide_internal_transfers,
-            "budget": {
-                "start": self.budget_start,
-                "end": self.budget_end,
-                "shares": dict(self.budget_shares),
-            },
+            "budget": {"period": self.budget_period, "shares": dict(self.budget_shares)},
+            "hidden_hints": list(self.hidden_hints),
         }
 
 

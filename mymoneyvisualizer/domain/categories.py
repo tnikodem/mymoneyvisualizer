@@ -9,7 +9,7 @@ import pandas as pd
 from mymoneyvisualizer.domain.columns import UNCATEGORIZED
 
 SEPARATOR = "."
-UNCATEGORIZED_LABEL = "(uncategorized)"
+UNCATEGORIZED_LABEL = "(ohne Kategorie)"
 
 
 def main_category(category: str) -> str:

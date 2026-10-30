@@ -5,6 +5,7 @@ from mymoneyvisualizer.app import AppModel
 from mymoneyvisualizer.domain.models import Rule
 from mymoneyvisualizer.ui.common import Window
 from mymoneyvisualizer.ui.main_window import MainWindow
+from mymoneyvisualizer.ui.style import apply_style, use_german
 
 from ..helpers import transactions
 
@@ -26,6 +27,13 @@ class Dialogs:
             return QMessageBox.StandardButton.Ok
 
         return show
+
+
+@pytest.fixture(scope="session", autouse=True)
+def styled(qapp):
+    """The tests run with the look of the application, so a broken style sheet shows up here."""
+    apply_style(qapp)
+    use_german(qapp)
 
 
 @pytest.fixture(autouse=True)
@@ -74,7 +82,7 @@ def model(tmp_path):
     ):
         model.save_rule(rule)
     model.assign_groups({"income": ["income"], "needs": ["household", "car"], "wants": ["carsharing", ""]})
-    model.set_budget_period(2023, 2023)
+    model.set_budget_period("2023")
     return model
 
 
